@@ -26,7 +26,7 @@ schemars = "1"
 secrecy = { version = "0.10", features = ["serde"] }
 
 # llm / agents
-rig-core = "0.42"
+rig-core = "0.45"
 rmcp = { version = "3", features = ["client", "transport-child-process", "transport-streamable-http-client", "transport-streamable-http-client-reqwest"] }
 
 # interfaces
