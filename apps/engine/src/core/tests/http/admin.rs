@@ -37,6 +37,9 @@ fn state(store: Arc<Ledger>) -> AdminState {
         },
         max_instructions_chars: 40,
         history_limit: 10,
+        traces: None,
+        traces_limit: 10,
+        queries: None,
     }
 }
 
@@ -216,4 +219,90 @@ async fn a_moderator_sees_held_actions_and_denies_one() {
     assert_eq!(again.status(), StatusCode::NOT_FOUND);
     let (_, limits) = body(admin::limits(State(state), moderator()).await).await;
     assert_eq!(limits["rate_limit_per_min"], 20);
+}
+
+#[tokio::test]
+async fn a_moderator_lists_traces_of_the_tenant_and_reads_one_in_full() {
+    use crate::core::traits::trace::TraceSink;
+    use crate::core::types::agent::context::RequestContext;
+    use crate::core::types::model::Usage;
+    use crate::core::types::trace::{RunStatus, TraceEvent};
+    use crate::runtime::harness::trace::{JsonlSink, JsonlTraces};
+
+    let dir = std::env::temp_dir().join(format!("sparky-admin-traces-{}", uuid::Uuid::new_v4()));
+    let Ok(sink) = JsonlSink::new(&dir, 0) else {
+        unreachable!("the trace dir is created")
+    };
+    let turn = |tenant: &str, input: &str| {
+        let ctx = RequestContext::new(tenant, "222", std::time::Duration::from_secs(5));
+        sink.emit(
+            &ctx,
+            TraceEvent::RequestStarted {
+                input: input.into(),
+                tenant_id: tenant.into(),
+                user_id: "222".into(),
+            },
+        );
+        sink.emit(
+            &ctx,
+            TraceEvent::Completed {
+                status: RunStatus::Answered,
+                steps: 2,
+                usage: Usage {
+                    prompt_tokens: 100,
+                    completion_tokens: 20,
+                },
+                cost_usd: 0.0,
+                duration_ms: 900,
+            },
+        );
+        ctx.request_id
+    };
+    let mine = turn("g", "when is the library open?");
+    let _ = turn("other", "not for this server");
+
+    let mut state = state(Arc::new(Ledger::default()));
+    state.traces = Some(Arc::new(JsonlTraces::new(&dir)));
+    let (status, listed) = body(admin::traces(State(state.clone()), moderator()).await).await;
+    assert_eq!(status, StatusCode::OK);
+    let rows = listed.as_array().cloned().unwrap_or_default();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0]["user_id"], "222");
+    assert_eq!(rows[0]["input"], "when is the library open?");
+    assert_eq!(rows[0]["status"], "answered");
+    assert_eq!(rows[0]["tokens"], 120);
+
+    let (status, full) =
+        body(admin::trace(State(state.clone()), moderator(), Path(mine.to_string())).await).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(full.as_array().map(Vec::len), Some(2));
+    assert_eq!(full[0]["kind"], "request_started");
+
+    let missing = admin::trace(
+        State(state.clone()),
+        moderator(),
+        Path("../etc/passwd".into()),
+    )
+    .await;
+    assert_eq!(missing.status(), StatusCode::NOT_FOUND);
+    let member = admin::traces(State(state), signed_in(&[])).await;
+    assert_eq!(member.status(), StatusCode::FORBIDDEN);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[tokio::test]
+async fn sources_list_the_live_registry_and_traces_off_is_not_implemented() {
+    use crate::core::tests::support::FakeQueries;
+    use crate::core::types::knowledge::query::QuerySourceInfo;
+
+    let mut state = state(Arc::new(Ledger::default()));
+    state.queries = Some(Arc::new(FakeQueries::new(vec![QuerySourceInfo {
+        key: "library_hours".into(),
+        params: Vec::new(),
+        indexed: true,
+    }])));
+    let (_, sources) = body(admin::sources(State(state.clone()), moderator()).await).await;
+    assert_eq!(sources[0]["key"], "library_hours");
+    let off = admin::traces(State(state), moderator()).await;
+    assert_eq!(off.status(), StatusCode::NOT_IMPLEMENTED);
 }

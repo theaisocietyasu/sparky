@@ -32,3 +32,26 @@ export const rollback = (id: number) => call<Change>("POST", `/admin/rollback/${
 export const limits = () => call<Limits>("GET", "/admin/limits");
 export const approvals = () => call<Held[]>("GET", "/admin/approvals");
 export const deny = (token: string) => call<{ denied: boolean }>("POST", `/admin/approvals/${encodeURIComponent(token)}/deny`);
+
+/** One request in the trace list. */
+export type TraceSummary = {
+  request_id: string;
+  conversation_id: string;
+  at: string;
+  user_id: string;
+  input: string;
+  status: string | null;
+  steps: number;
+  tokens: number;
+  duration_ms: number;
+};
+
+/** One recorded trace event. */
+export type TraceRecord = { at: string; kind: string } & Record<string, unknown>;
+
+/** One live query source Platform publishes. */
+export type Source = { key: string; indexed: boolean; params: { name: string; required: boolean }[] };
+
+export const traces = () => call<TraceSummary[]>("GET", "/admin/traces");
+export const trace = (id: string) => call<TraceRecord[]>("GET", `/admin/traces/${encodeURIComponent(id)}`);
+export const sources = () => call<Source[]>("GET", "/admin/sources");

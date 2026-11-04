@@ -12,6 +12,7 @@ use crate::core::traits::oauth::OAuthStore;
 use crate::core::traits::safety::confirmation::ConfirmationStore;
 use crate::core::traits::tools::canvas::CanvasFeeds;
 use crate::core::traits::tools::sandbox::Sandbox;
+use crate::core::traits::trace::TraceReader;
 use crate::core::types::admin::AdminLimits;
 use crate::routes::Limits;
 use crate::routes::admin::AdminState;
@@ -24,6 +25,7 @@ use crate::routes::rate_limit::RateLimiter;
 use crate::routes::session::WebAuth;
 use crate::routes::web::WebState;
 use crate::runtime::harness::agent::Agent;
+use crate::runtime::harness::trace::JsonlTraces;
 use crate::runtime::tools::sandbox::ContainerSandbox;
 use crate::stores::discord::DiscordOAuth;
 
@@ -102,6 +104,7 @@ pub(super) fn admin_state(
     cfg: &Config,
     agent: Agent,
     store: Option<Arc<dyn crate::core::traits::admin::AdminStore>>,
+    queries: Option<Arc<dyn crate::core::traits::knowledge::query::SourceQueries>>,
     web: Option<WebAuth>,
 ) -> AdminState {
     AdminState {
@@ -120,6 +123,12 @@ pub(super) fn admin_state(
         },
         max_instructions_chars: cfg.admin.max_instructions_chars,
         history_limit: cfg.admin.history_limit,
+        traces: cfg
+            .trace
+            .enabled
+            .then(|| Arc::new(JsonlTraces::new(&cfg.trace.dir)) as Arc<dyn TraceReader>),
+        traces_limit: cfg.admin.traces_limit,
+        queries,
     }
 }
 
@@ -186,7 +195,13 @@ pub(super) fn http_router(
     sandbox: Option<Arc<ContainerSandbox>>,
 ) -> anyhow::Result<axum::Router> {
     let web = web_auth(cfg)?;
-    let admin = admin_state(cfg, agent.clone(), stores.admin, web.clone());
+    let admin = admin_state(
+        cfg,
+        agent.clone(),
+        stores.admin,
+        Some(Arc::clone(&stores.queries)),
+        web.clone(),
+    );
     let state = chat_state(
         cfg,
         agent,

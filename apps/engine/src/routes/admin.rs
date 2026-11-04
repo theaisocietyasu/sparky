@@ -10,6 +10,8 @@ use secrecy::SecretString;
 use serde_json::{Value, json};
 
 use crate::core::traits::admin::AdminStore;
+use crate::core::traits::knowledge::query::SourceQueries;
+use crate::core::traits::trace::TraceReader;
 use crate::core::types::admin::{
     AdminChange, AdminLimits, ChangeKind, INSTRUCTIONS_KEY, InstructionsState, InstructionsUpdate,
     NewChange, ToolState, ToolSwitch,
@@ -40,6 +42,12 @@ pub struct AdminState {
     pub max_instructions_chars: usize,
     /// Changes the history returns.
     pub history_limit: usize,
+    /// Reads recorded traces. None when trace recording is off.
+    pub traces: Option<Arc<dyn TraceReader>>,
+    /// Traces the list returns.
+    pub traces_limit: usize,
+    /// The live query registry.
+    pub queries: Option<Arc<dyn SourceQueries>>,
 }
 
 /// Applies one recorded change to the running agent.
@@ -309,5 +317,94 @@ pub async fn deny(
         }
         Ok(false) => (StatusCode::NOT_FOUND, "that action is not waiting").into_response(),
         Err(e) => unavailable(&e),
+    }
+}
+
+/// GET /admin/traces: the newest requests with who asked, what, and how each ended.
+pub async fn traces(State(state): State<AdminState>, headers: HeaderMap) -> Response {
+    if let Err(refused) = state.actor(&headers) {
+        return refused;
+    }
+    let Some(reader) = state.traces.clone() else {
+        return (StatusCode::NOT_IMPLEMENTED, "trace recording is off").into_response();
+    };
+    let (tenant, limit) = (state.tenant.clone(), state.traces_limit);
+    match tokio::task::spawn_blocking(move || reader.list(&tenant, limit)).await {
+        Ok(Ok(list)) => Json(list).into_response(),
+        Ok(Err(e)) => {
+            tracing::error!(error = %e, "traces not listed");
+            (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "the traces could not be read",
+            )
+                .into_response()
+        }
+        Err(e) => {
+            tracing::error!(error = %e, "trace listing task failed");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "the traces could not be read",
+            )
+                .into_response()
+        }
+    }
+}
+
+/// GET /admin/traces/{id}: every recorded event of one request.
+pub async fn trace(
+    State(state): State<AdminState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Response {
+    let actor = match state.actor(&headers) {
+        Ok(actor) => actor,
+        Err(refused) => return refused,
+    };
+    let Ok(request_id) = uuid::Uuid::parse_str(&id) else {
+        return (StatusCode::NOT_FOUND, "no trace by that id").into_response();
+    };
+    let Some(reader) = state.traces.clone() else {
+        return (StatusCode::NOT_IMPLEMENTED, "trace recording is off").into_response();
+    };
+    let tenant = state.tenant.clone();
+    match tokio::task::spawn_blocking(move || reader.read(&tenant, request_id)).await {
+        Ok(Ok(Some(records))) => {
+            tracing::info!(%request_id, %actor, "trace read by a moderator");
+            Json(records).into_response()
+        }
+        Ok(Ok(None)) => (StatusCode::NOT_FOUND, "no trace by that id").into_response(),
+        Ok(Err(e)) => {
+            tracing::error!(error = %e, "trace not read");
+            (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "the trace could not be read",
+            )
+                .into_response()
+        }
+        Err(e) => {
+            tracing::error!(error = %e, "trace read task failed");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "the trace could not be read",
+            )
+                .into_response()
+        }
+    }
+}
+
+/// GET /admin/sources: the live query sources Platform publishes.
+pub async fn sources(State(state): State<AdminState>, headers: HeaderMap) -> Response {
+    if let Err(refused) = state.actor(&headers) {
+        return refused;
+    }
+    let Some(queries) = &state.queries else {
+        return Json(Vec::<Value>::new()).into_response();
+    };
+    match queries.sources().await {
+        Ok(sources) => Json(sources).into_response(),
+        Err(e) => {
+            tracing::error!(error = %e, "live sources not listed");
+            (StatusCode::BAD_GATEWAY, "Platform did not list its sources").into_response()
+        }
     }
 }

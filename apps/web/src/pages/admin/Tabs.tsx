@@ -188,3 +188,70 @@ export const Limits = () => {
     </section>
   );
 };
+
+/** The newest requests; one opens to every recorded event. */
+export const Traces = () => {
+  const { data, error } = useLoad(api.traces);
+  const [open, setOpen] = useState<{ id: string; records: api.TraceRecord[] } | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
+  const show = (id: string) =>
+    api
+      .trace(id)
+      .then((records) => setOpen({ id, records }))
+      .catch((e: unknown) => setFailed(refusal(e)));
+  return (
+    <section aria-label="Traces">
+      <Alert text={error ?? failed} />
+      {data?.length === 0 && <p className="text-sm text-ink-soft">No traces yet.</p>}
+      <ul className="divide-y divide-ink/10 rounded-md border border-ink/10">
+        {data?.map((t) => (
+          <li key={t.request_id} className="px-4 py-3">
+            <button type="button" onClick={() => show(t.request_id)} className="w-full text-left" aria-label={`Open trace ${t.request_id}`}>
+              <p className="truncate text-sm">{t.input}</p>
+              <p className="mt-0.5 text-xs text-ink-soft">
+                {t.at} by {t.user_id}, {t.status ?? "unfinished"}, {t.steps} steps, {t.tokens} tokens, {t.duration_ms} ms
+              </p>
+            </button>
+            {open?.id === t.request_id && (
+              <ol aria-label="Trace events" className="mt-2 space-y-1">
+                {open.records.map((r, i) => (
+                  <li key={i}>
+                    <details className="text-xs">
+                      <summary className="font-mono">
+                        {r.at} {r.kind}
+                      </summary>
+                      <pre className="mt-1 overflow-x-auto whitespace-pre-wrap rounded bg-ink/5 p-2">{JSON.stringify(r, null, 2)}</pre>
+                    </details>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+};
+
+/** The live query sources Platform publishes, read only. */
+export const Sources = () => {
+  const { data, error } = useLoad(api.sources);
+  return (
+    <section aria-label="Sources">
+      <Alert text={error} />
+      {data?.length === 0 && <p className="text-sm text-ink-soft">Platform publishes no live sources.</p>}
+      <ul className="divide-y divide-ink/10 rounded-md border border-ink/10">
+        {data?.map((s) => (
+          <li key={s.key} className="px-4 py-3">
+            <p className="font-mono text-sm">{s.key}</p>
+            <p className="mt-0.5 text-xs text-ink-soft">
+              {s.params.length ? s.params.map((p) => (p.required ? `${p.name}*` : p.name)).join(", ") : "no parameters"}
+              {s.indexed ? ", results indexed" : ""}
+            </p>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2 text-xs text-ink-soft">Stored sources are managed on the Platform dashboard.</p>
+    </section>
+  );
+};

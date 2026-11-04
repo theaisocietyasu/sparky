@@ -136,3 +136,28 @@ pub struct AdminLimits {
     /// Days an idle conversation is kept; 0 keeps it.
     pub conversation_idle_days: u32,
 }
+
+/// One request as GET /admin/traces lists it.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct TraceSummary {
+    /// Request id; GET /admin/traces/{id} reads the whole trace.
+    pub request_id: String,
+    /// Conversation it belongs to.
+    pub conversation_id: String,
+    /// When it started, RFC 3339 UTC.
+    pub at: String,
+    /// Tenant scope.
+    pub tenant_id: String,
+    /// Caller.
+    pub user_id: String,
+    /// The start of the user input.
+    pub input: String,
+    /// How it ended; None while running or when the trace was cut short.
+    pub status: Option<String>,
+    /// Model steps.
+    pub steps: u32,
+    /// Total tokens.
+    pub tokens: u32,
+    /// Wall time.
+    pub duration_ms: u64,
+}

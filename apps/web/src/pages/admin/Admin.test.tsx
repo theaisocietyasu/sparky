@@ -106,4 +106,43 @@ describe("admin pages", () => {
     open("/admin");
     expect(await screen.findByRole("alert")).toHaveTextContent(/manage server role/i);
   });
+
+  it("lists traces and opens one to its events", async () => {
+    engine({
+      "GET /web/me": () => Response.json(MOD),
+      "GET /admin/traces": () =>
+        Response.json([
+          {
+            request_id: "r1",
+            conversation_id: "c1",
+            at: "2026-11-04T00:00:00Z",
+            user_id: "222",
+            input: "when is the library open?",
+            status: "answered",
+            steps: 2,
+            tokens: 120,
+            duration_ms: 900,
+          },
+        ]),
+      "GET /admin/traces/r1": () =>
+        Response.json([
+          { at: "t0", kind: "request_started", input: "when is the library open?" },
+          { at: "t1", kind: "completed" },
+        ]),
+    });
+    open("/admin/traces");
+    fireEvent.click(await screen.findByRole("button", { name: "Open trace r1" }));
+    expect(await screen.findByText("t1 completed")).toBeInTheDocument();
+  });
+
+  it("lists the live sources", async () => {
+    engine({
+      "GET /web/me": () => Response.json(MOD),
+      "GET /admin/sources": () =>
+        Response.json([{ key: "library_hours", indexed: true, params: [{ name: "date", required: false }] }]),
+    });
+    open("/admin/sources");
+    expect(await screen.findByText("library_hours")).toBeInTheDocument();
+    expect(screen.getByText(/date, results indexed/)).toBeInTheDocument();
+  });
 });
