@@ -7,6 +7,7 @@ mod spans;
 pub mod thinking;
 pub mod thought;
 
+use std::collections::HashSet;
 use std::time::Instant;
 
 use tracing::Instrument;
@@ -19,7 +20,8 @@ use crate::core::types::agent::context::RequestContext;
 use crate::core::types::agent::thinking::{ThinkingChoice, ThinkingReason};
 use crate::core::types::conversation::message::{Message, Role};
 use crate::core::types::model::{FinishReason, ModelError, ModelRequest, ModelResponse};
-use crate::core::types::safety::redact::{json, truncate};
+use crate::core::types::safety::redact::{json, masked, truncate};
+use crate::core::types::tools::RiskClass;
 use crate::core::types::trace::TraceEvent;
 use crate::runtime::harness::agent::run::Run;
 
@@ -79,6 +81,38 @@ impl Agent {
         Ok((response, thought))
     }
 
+    /// The prompt as a span records it: a tool turn answering an authenticated call is masked.
+    fn traced_messages(&self, messages: &[Message]) -> Vec<Message> {
+        let authenticated: HashSet<&str> = messages
+            .iter()
+            .flat_map(|m| &m.tool_calls)
+            .filter(|call| {
+                self.deps
+                    .tools
+                    .get(&call.name)
+                    .is_some_and(|tool| tool.definition().risk == RiskClass::ReadAuthenticated)
+            })
+            .map(|call| call.id.as_str())
+            .collect();
+        messages
+            .iter()
+            .map(|m| {
+                let answers_authenticated = m.role == Role::Tool
+                    && m.tool_call_id
+                        .as_deref()
+                        .is_some_and(|id| authenticated.contains(id));
+                if answers_authenticated {
+                    Message {
+                        content: masked(&m.content),
+                        ..m.clone()
+                    }
+                } else {
+                    m.clone()
+                }
+            })
+            .collect()
+    }
+
     /// Span of one model call: full prompt and reply as JSON, under gen_ai and OpenInference names.
     fn model_span(
         &self,
@@ -89,7 +123,7 @@ impl Agent {
         thinking: ThinkingReason,
     ) -> tracing::Span {
         let limit = self.cfg.max_span_value_chars;
-        let prompt = truncate(&json(&request.messages), limit);
+        let prompt = truncate(&json(&self.traced_messages(&request.messages)), limit);
         tracing::info_span!(
             "llm",
             "gen_ai.operation.name" = "chat",

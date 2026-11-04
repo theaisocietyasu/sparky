@@ -174,3 +174,112 @@ fn a_finished_span_says_whether_it_succeeded() {
         );
     }
 }
+
+/// Reads a grade: an authenticated result that must not reach a trace in clear.
+struct Grades;
+
+#[async_trait::async_trait]
+impl crate::core::traits::tools::Tool for Grades {
+    fn definition(&self) -> crate::core::types::tools::ToolDefinition {
+        crate::core::types::tools::ToolDefinition {
+            name: "grades".into(),
+            description: "reads the caller's grades".into(),
+            parameters: serde_json::json!({"type": "object"}),
+            risk: crate::core::types::tools::RiskClass::ReadAuthenticated,
+            private: false,
+            sequential: false,
+            timeout_secs: None,
+        }
+    }
+    async fn call(
+        &self,
+        _ctx: &crate::core::types::agent::context::RequestContext,
+        _args: serde_json::Value,
+    ) -> Result<crate::core::types::tools::ToolOutput, crate::core::types::tools::ToolError> {
+        Ok(crate::core::types::tools::ToolOutput {
+            content: "CSE 310: B+".into(),
+            data: None,
+            sources: Vec::new(),
+        })
+    }
+}
+
+#[test]
+fn an_authenticated_result_is_masked_in_the_trace_and_every_span() {
+    use std::sync::Arc;
+
+    use crate::core::tests::support::{Named, calls};
+    use crate::core::types::conversation::Visibility;
+    use crate::core::types::trace::TraceEvent;
+
+    let exporter = InMemorySpanExporter::default();
+    let provider = SdkTracerProvider::builder()
+        .with_simple_exporter(exporter.clone())
+        .build();
+    let subscriber = tracing_subscriber::registry()
+        .with(tracing_opentelemetry::layer().with_tracer(provider.tracer("test")));
+    let tools = ToolSet::new()
+        .with(Arc::new(Grades))
+        .with(Arc::new(Named("lookup")));
+    let model = Scripted::new(vec![
+        Ok(calls(vec![
+            ("c1", "grades", serde_json::json!({})),
+            ("c2", "lookup", serde_json::json!({})),
+        ])),
+        Ok(text("You have a B+ in CSE 310.")),
+    ]);
+    let (agent, sink) = agent(model, tools, AgentConfig::default());
+    let ctx = ctx().with_visibility(Visibility::Private);
+    let Ok(rt) = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+    else {
+        unreachable!("a runtime builds")
+    };
+    let answered = tracing::subscriber::with_default(subscriber, || {
+        rt.block_on(agent.run(&ctx, "what are my grades"))
+    });
+    assert!(answered.is_ok(), "{answered:?}");
+    let _ = provider.force_flush();
+
+    let results: Vec<(String, Result<String, String>)> = sink
+        .records()
+        .into_iter()
+        .filter_map(|r| match r.event {
+            TraceEvent::ToolCall { tool, result, .. } => Some((tool, result)),
+            _ => None,
+        })
+        .collect();
+    let traced = |name: &str| {
+        results
+            .iter()
+            .find(|(tool, _)| tool == name)
+            .and_then(|(_, result)| result.clone().ok())
+            .unwrap_or_default()
+    };
+    assert_eq!(traced("grades"), "[authenticated result, 11 chars]");
+    assert_eq!(
+        traced("lookup"),
+        "what the page says",
+        "a public result stays readable"
+    );
+
+    let spans = exporter.get_finished_spans().unwrap_or_default();
+    for span in spans.iter().filter(|s| s.name == "tool") {
+        let output = attr(span, "output.value").unwrap_or_default();
+        assert!(!output.contains("B+"), "tool span: {output}");
+    }
+    let prompts: Vec<String> = spans
+        .iter()
+        .filter(|s| s.name == "llm")
+        .filter_map(|s| attr(s, "input.value"))
+        .collect();
+    let second = prompts.iter().find(|p| p.contains("what the page says"));
+    assert!(second.is_some(), "{prompts:?}");
+    let second = second.cloned().unwrap_or_default();
+    assert!(!second.contains("CSE 310: B+"), "llm span: {second}");
+    assert!(
+        second.contains("[authenticated result, 11 chars]"),
+        "{second}"
+    );
+}

@@ -15,6 +15,11 @@ pub(crate) fn truncate(text: &str, max: usize) -> String {
     }
 }
 
+/// Stands in for the result of an authenticated tool: only its length reaches a trace.
+pub(crate) fn masked(text: &str) -> String {
+    format!("[authenticated result, {} chars]", text.chars().count())
+}
+
 /// Masks values that follow a secret-looking key in free text.
 pub(crate) fn redact_text(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
