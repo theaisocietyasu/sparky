@@ -1,5 +1,6 @@
 //! Interfaces every adapter implements. Types are in core::types; impls live in runtime and stores.
 
+pub mod admin;
 pub mod conversation;
 pub mod health;
 pub mod identity;

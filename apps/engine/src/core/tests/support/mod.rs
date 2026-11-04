@@ -1,5 +1,6 @@
 //! Test doubles shared across the suite, one file per domain. Agent builders live here.
 
+mod admin;
 mod conversation;
 mod health;
 mod knowledge;
@@ -22,6 +23,7 @@ use crate::runtime::harness::agent::{Agent, AgentDeps};
 use crate::runtime::harness::safety::policy::RiskPolicy;
 use crate::runtime::harness::tools::ToolSet;
 
+pub use self::admin::Ledger;
 pub use self::conversation::{Recording, Rooms, Row, history_of, push_row};
 pub use self::health::Fixed;
 pub use self::knowledge::{FakeQueries, FixedEmbedder, Stored};

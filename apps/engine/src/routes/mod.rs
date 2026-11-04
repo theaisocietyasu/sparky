@@ -1,12 +1,13 @@
-//! Router assembly: /chat, /conversation, /memories, /sandbox, /oauth, /canvas, /web, and /health.
+//! Router assembly: /chat, /conversation, /memories, /sandbox, /oauth, /canvas, /web, /admin, and /health.
 
 use axum::Router;
 use axum::extract::DefaultBodyLimit;
 use axum::http::{HeaderValue, Method, header};
-use axum::routing::{delete, get, post};
+use axum::routing::{delete, get, post, put};
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 
+pub mod admin;
 pub mod auth;
 pub mod canvas;
 pub mod chat;
@@ -56,7 +57,7 @@ pub fn cors(origins: &[String], credentials: bool) -> Option<CorsLayer> {
         return Some(
             CorsLayer::new()
                 .allow_origin(parsed)
-                .allow_methods([Method::GET, Method::POST])
+                .allow_methods([Method::GET, Method::POST, Method::PUT])
                 .allow_headers([header::CONTENT_TYPE])
                 .allow_credentials(true),
         );
@@ -98,6 +99,8 @@ pub struct States {
     pub canvas: canvas::CanvasState,
     /// Web sign-in routes. None while the web sign-in is off.
     pub web: Option<web::WebState>,
+    /// Admin routes.
+    pub admin: admin::AdminState,
 }
 
 /// Full application router.
@@ -110,6 +113,7 @@ pub fn router(states: States, limits: Limits, cors_origins: &[String]) -> Router
         oauth: oauth_state,
         canvas: canvas_state,
         web: web_state,
+        admin: admin_state,
     } = states;
     let credentials = web_state.is_some();
     let health = Router::new()
@@ -139,8 +143,20 @@ pub fn router(states: States, limits: Limits, cors_origins: &[String]) -> Router
         .route("/canvas/feed", post(canvas::save))
         .route("/canvas/feed/remove", post(canvas::remove))
         .with_state(canvas_state);
+    let admin = Router::new()
+        .route("/admin/tools", get(admin::tools))
+        .route("/admin/tools/{name}", post(admin::switch_tool))
+        .route("/admin/instructions", get(admin::instructions))
+        .route("/admin/instructions", put(admin::set_instructions))
+        .route("/admin/history", get(admin::history))
+        .route("/admin/rollback/{id}", post(admin::rollback))
+        .route("/admin/limits", get(admin::limits))
+        .route("/admin/approvals", get(admin::approvals))
+        .route("/admin/approvals/{token}/deny", post(admin::deny))
+        .with_state(admin_state);
     let mut router = Router::new()
         .merge(health)
+        .merge(admin)
         .merge(chat)
         .merge(memories)
         .merge(sandbox)

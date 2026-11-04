@@ -137,10 +137,11 @@ impl Agent {
         if self.deps.tools.get(SEARCH_LIVE).is_none() {
             templates.discovery_rules = "";
         }
+        let system = self.instructions();
         let assembled = assemble::assemble(
             ctx,
             &Sections {
-                system: &self.system_prompt,
+                system: &system,
                 memory: &inputs.memory,
                 uploads: &inputs.uploads,
                 history: &inputs.history,
