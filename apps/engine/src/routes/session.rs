@@ -11,6 +11,9 @@ use crate::core::types::http::web::Session;
 /// Length of an XChaCha20 nonce in bytes.
 const NONCE_BYTES: usize = 24;
 
+/// Header a browser sets to say where a request comes from.
+const SEC_FETCH_SITE: &str = "sec-fetch-site";
+
 /// Channel id every web turn of a student shares, so one web conversation is kept per student.
 pub const WEB_CHANNEL: &str = "web";
 
@@ -57,10 +60,20 @@ impl WebAuth {
         (session.expires_at > now).then_some(session)
     }
 
-    /// The session of a request: a valid cookie, sent from the site origin.
+    /// True when the request comes from the site: its Origin is the site, or, with no Origin, the browser marks it same-origin behind the site proxy.
+    pub fn is_from_site(&self, headers: &HeaderMap) -> bool {
+        match headers.get(header::ORIGIN).and_then(|v| v.to_str().ok()) {
+            Some(origin) => origin.trim_end_matches('/') == self.site,
+            None => headers
+                .get(SEC_FETCH_SITE)
+                .and_then(|v| v.to_str().ok())
+                .is_some_and(|v| v == "same-origin"),
+        }
+    }
+
+    /// The session of a request: a valid cookie, sent from the site.
     pub fn session(&self, headers: &HeaderMap) -> Option<Session> {
-        let origin = headers.get(header::ORIGIN).and_then(|v| v.to_str().ok())?;
-        if origin.trim_end_matches('/') != self.site {
+        if !self.is_from_site(headers) {
             return None;
         }
         let value = cookie(headers, &self.cookie_name)?;

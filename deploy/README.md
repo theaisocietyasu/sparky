@@ -130,7 +130,16 @@ Details: `deploy/inference/README.md`.
 
 `apps/web` builds to static files (`npm run build` to `apps/web/dist`). Deploy to Vercel (root directory `apps/web`) or any static host. It is not part of a Docker image.
 
-The `/chat` and `/memories` pages call the engine from the browser. Build with `VITE_ENGINE_URL` set to the engine's public https origin (on RunPod, the pod's proxy URL for the engine port); without it the pages say the chat is not set up. On the engine, set `[web] enabled = true`, the `SPARKY_WEB__*` values in `.env.example`, and list the site origin in `http.cors_origins`. Register `<SPARKY_WEB__PUBLIC_URL>/web/callback` as a redirect on the Discord application. `apps/web/vercel.json` sends every path without a file extension to `index.html`.
+The `/chat`, `/memories` and `/admin` pages call the engine from the browser. On Vercel the site serves the engine under its own origin: `api/engine.ts` is an edge function that forwards `/api/engine/*` to `ENGINE_URL` and streams the answer back, so the session cookie is first-party and browsers that block third-party cookies still sign in. Without `VITE_ENGINE_URL` the pages say the chat is not set up.
+
+Set up, once:
+
+1. Discord application (the bot's): under OAuth2, add the redirect `https://<site>/api/engine/web/callback`, and copy the client id and secret.
+2. Engine `.env` on the pod: `SPARKY_WEB__ENABLED=true`, `SPARKY_WEB__DISCORD_CLIENT_ID`, `SPARKY_WEB__DISCORD_CLIENT_SECRET`, `SPARKY_WEB__SESSION_KEY` (generate with `openssl rand -base64 32`), `SPARKY_WEB__PUBLIC_URL=https://<site>/api/engine`, `SPARKY_WEB__SITE_URL=https://<site>`, and `SPARKY_HTTP__CORS_ORIGINS='["https://<site>"]'`. Restart the engine.
+3. Vercel project (root directory `apps/web`): `VITE_ENGINE_URL=/api/engine` and `ENGINE_URL=<engine https origin>` (on RunPod, the pod's proxy URL for the engine port). Redeploy, since `VITE_ENGINE_URL` is read at build time.
+4. Check: open `https://<site>/chat`, sign in, and send a message. A moderator (Manage Server) also sees the Admin link.
+
+A cookie counts when the request `Origin` is the site, or, with no `Origin`, when the browser marks it `Sec-Fetch-Site: same-origin`. A host without the proxy can set `VITE_ENGINE_URL` to the engine origin and `SPARKY_WEB__PUBLIC_URL` to it instead; the cookie is then third-party and some browsers drop it. `apps/web/vercel.json` sends `/api/engine/*` to the function and every other path without a file extension to `index.html`.
 
 ## The sandbox
 

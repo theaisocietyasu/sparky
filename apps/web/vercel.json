@@ -1,3 +1,6 @@
 {
-  "rewrites": [{ "source": "/((?!.*\\.).*)", "destination": "/index.html" }]
+  "rewrites": [
+    { "source": "/api/engine/:path*", "destination": "/api/engine?__path=:path*" },
+    { "source": "/((?!api/)(?!.*\\.).*)", "destination": "/index.html" }
+  ]
 }
