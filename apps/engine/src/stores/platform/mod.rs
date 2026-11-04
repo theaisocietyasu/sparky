@@ -10,7 +10,6 @@ mod conversation;
 mod export;
 mod health;
 mod memory;
-mod profile;
 mod query;
 mod retrieval;
 
@@ -21,6 +20,5 @@ pub use conversation::PlatformConversations;
 pub use export::PlatformExport;
 pub use health::PlatformProbe;
 pub use memory::PlatformMemory;
-pub use profile::PlatformProfileGraph;
 pub use query::PlatformQueries;
 pub use retrieval::{PlatformRetriever, SearchTuning};

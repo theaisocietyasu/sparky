@@ -43,7 +43,6 @@ fn the_loop_config_carries_the_agent_settings_unchanged() {
     assert_eq!(cfg.max_model_retries, settings.max_model_retries);
     assert!((cfg.temperature - settings.temperature).abs() < f32::EPSILON);
     assert_eq!(cfg.history_turns, settings.history_turns);
-    assert_eq!(cfg.memory_recall_limit, settings.memory_recall_limit);
     assert_eq!(cfg.retry_base_ms, settings.retry_base_ms);
     assert_eq!(cfg.retry_cap_ms, settings.retry_cap_ms);
     assert_eq!(cfg.max_span_value_chars, settings.max_span_value_chars);

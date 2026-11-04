@@ -1,4 +1,4 @@
-//! Router assembly: /chat, /conversation, /memories, /profile, /sandbox, /oauth, and /health.
+//! Router assembly: /chat, /conversation, /memories, /sandbox, /oauth, and /health.
 
 use axum::Router;
 use axum::extract::DefaultBodyLimit;
@@ -14,7 +14,6 @@ pub mod failure;
 pub mod health;
 pub mod memories;
 pub mod oauth;
-pub mod profile;
 pub mod rate_limit;
 pub mod sandbox;
 
@@ -63,8 +62,6 @@ pub struct States {
     pub chat: chat::ChatState,
     /// Health routes.
     pub health: health::HealthState,
-    /// Profile graph routes.
-    pub profile: profile::ProfileState,
     /// Memory routes.
     pub memories: memories::MemoryState,
     /// Sandbox routes.
@@ -78,7 +75,6 @@ pub fn router(states: States, limits: Limits, cors_origins: &[String]) -> Router
     let States {
         chat: chat_state,
         health: health_state,
-        profile: profile_state,
         memories: memory_state,
         sandbox: sandbox_state,
         oauth: oauth_state,
@@ -93,10 +89,6 @@ pub fn router(states: States, limits: Limits, cors_origins: &[String]) -> Router
         .route("/confirm", post(chat::confirm))
         .route("/conversation/reset", post(conversation::reset))
         .with_state(chat_state);
-    let profile = Router::new()
-        .route("/profile/forget", post(profile::forget))
-        .route("/profile/list", post(profile::list))
-        .with_state(profile_state);
     let memories = Router::new()
         .route("/memories/list", post(memories::list))
         .route("/memories/forget", post(memories::forget))
@@ -113,7 +105,6 @@ pub fn router(states: States, limits: Limits, cors_origins: &[String]) -> Router
     let mut router = Router::new()
         .merge(health)
         .merge(chat)
-        .merge(profile)
         .merge(memories)
         .merge(sandbox)
         .merge(oauth)

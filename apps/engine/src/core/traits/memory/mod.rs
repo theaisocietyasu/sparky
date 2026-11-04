@@ -1,8 +1,5 @@
 //! MemoryStore trait. Every call is scoped to the tenant and user of the request.
 
-pub mod detector;
-pub mod profile;
-
 use async_trait::async_trait;
 use uuid::Uuid;
 

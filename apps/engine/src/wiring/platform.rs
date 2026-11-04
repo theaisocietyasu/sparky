@@ -7,10 +7,9 @@ use std::time::Duration;
 use super::Stores;
 use crate::core::config::Config;
 use crate::core::traits::knowledge::retrieval::Embedder;
-use crate::core::traits::memory::profile::ProfileGraph;
 use crate::stores::platform::{
     PlatformAccounts, PlatformClient, PlatformConfirmations, PlatformConversations, PlatformMemory,
-    PlatformProbe, PlatformProfileGraph, PlatformQueries, PlatformRetriever, SearchTuning,
+    PlatformProbe, PlatformQueries, PlatformRetriever, SearchTuning,
 };
 
 /// Every store over the platform. Config::validate guarantees the url and the token.
@@ -31,10 +30,6 @@ pub(super) fn stores(cfg: &Config, embedder: &Arc<dyn Embedder>) -> anyhow::Resu
     };
     // The query vector is the dense leg; without it the platform searches as it is configured to.
     let query_embedder = cfg.retrieval.dense.then(|| Arc::clone(embedder));
-    let profile_graph = cfg
-        .profile
-        .enabled
-        .then(|| Arc::new(PlatformProfileGraph::new(client.clone())) as Arc<dyn ProfileGraph>);
     tracing::info!(url, "stores are the platform's");
     Ok(Stores {
         retriever: Arc::new(PlatformRetriever::new(
@@ -46,7 +41,6 @@ pub(super) fn stores(cfg: &Config, embedder: &Arc<dyn Embedder>) -> anyhow::Resu
         conversations: Arc::new(PlatformConversations::new(client.clone())),
         memory: Arc::new(PlatformMemory::new(client.clone())),
         confirmations: Arc::new(PlatformConfirmations::new(client.clone())),
-        profile_graph,
         oauth_store: Arc::new(PlatformAccounts::new(client.clone())),
         probes: vec![Arc::new(PlatformProbe::new(client))],
     })

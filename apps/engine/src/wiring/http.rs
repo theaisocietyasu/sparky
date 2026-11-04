@@ -7,7 +7,6 @@ use crate::core::config::Config;
 use crate::core::traits::conversation::ConversationStore;
 use crate::core::traits::health::Probe;
 use crate::core::traits::memory::MemoryStore;
-use crate::core::traits::memory::profile::ProfileGraph;
 use crate::core::traits::oauth::OAuthStore;
 use crate::core::traits::safety::confirmation::ConfirmationStore;
 use crate::core::traits::tools::sandbox::Sandbox;
@@ -16,7 +15,6 @@ use crate::routes::chat::ChatState;
 use crate::routes::health::HealthState;
 use crate::routes::memories::MemoryState;
 use crate::routes::oauth::OAuthState;
-use crate::routes::profile::ProfileState;
 use crate::routes::rate_limit::RateLimiter;
 use crate::runtime::harness::agent::Agent;
 use crate::runtime::tools::sandbox::ContainerSandbox;
@@ -45,22 +43,6 @@ pub(super) fn chat_state(
     }
 }
 
-/// What the profile routes need, gathered from the settings that describe it.
-pub(super) fn profile_state(
-    cfg: &Config,
-    graph: Option<Arc<dyn ProfileGraph>>,
-    rate_limit: RateLimiter,
-) -> ProfileState {
-    ProfileState {
-        graph,
-        list_limit: cfg.profile.list_limit,
-        request_budget: Duration::from_secs(cfg.profile.request_timeout_secs),
-        rate_limit,
-        default_tenant: cfg.discord.guild_id.to_string(),
-        service_token: cfg.engine.service_token.clone(),
-    }
-}
-
 /// What the memory routes need: the store, the clock offset, and the chat rate limit.
 pub(super) fn memory_state(
     cfg: &Config,
@@ -69,7 +51,7 @@ pub(super) fn memory_state(
 ) -> MemoryState {
     MemoryState {
         store,
-        request_budget: Duration::from_secs(cfg.profile.request_timeout_secs),
+        request_budget: Duration::from_secs(cfg.memory.request_timeout_secs),
         utc_offset_hours: cfg.prompt.utc_offset_hours,
         rate_limit,
         default_tenant: cfg.discord.guild_id.to_string(),
@@ -100,7 +82,6 @@ pub(super) fn oauth_state(cfg: &Config, store: Arc<dyn OAuthStore>) -> OAuthStat
 pub(super) fn http_router(
     cfg: &Config,
     state: ChatState,
-    profile: ProfileState,
     memories: MemoryState,
     oauth: OAuthState,
     probes: Vec<Arc<dyn Probe>>,
@@ -117,7 +98,6 @@ pub(super) fn http_router(
     let states = crate::routes::States {
         chat: state,
         health,
-        profile,
         memories,
         sandbox: sandbox_state(cfg, sandbox),
         oauth,

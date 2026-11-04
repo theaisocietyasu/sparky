@@ -19,7 +19,6 @@ use tracing::field::Empty;
 use crate::core::traits::conversation::ConversationStore;
 use crate::core::traits::conversation::compaction::Compactor;
 use crate::core::traits::memory::MemoryStore;
-use crate::core::traits::memory::profile::ProfileGraph;
 use crate::core::traits::model::ModelProvider;
 use crate::core::traits::safety::confirmation::ConfirmationStore;
 use crate::core::traits::safety::guardrail::Guardrail;
@@ -37,7 +36,6 @@ use crate::core::types::tools::SANDBOX;
 use crate::core::types::tools::ToolRun;
 use crate::core::types::trace::{RunStatus, TraceEvent};
 use crate::runtime::harness::agent::run::{Inputs, Run};
-use crate::runtime::harness::memory::profile::ProfileWriter;
 use crate::runtime::harness::tools::ToolSet;
 
 use crate::core::types::safety::redact::truncate;
@@ -64,10 +62,6 @@ pub struct AgentDeps {
     pub compactor: Option<Arc<dyn Compactor>>,
     /// Checks every response, when configured.
     pub guardrail: Option<Arc<dyn Guardrail>>,
-    /// Records what a turn states about the user, when configured.
-    pub profile: Option<Arc<ProfileWriter>>,
-    /// The profile graph read at assembly time, when configured.
-    pub profile_graph: Option<Arc<dyn ProfileGraph>>,
     /// Workspace a tool result too long to carry is written to, when configured.
     pub sandbox: Option<Arc<dyn Sandbox>>,
     /// Downloads the files a caller attached, when configured. Needs the sandbox too.

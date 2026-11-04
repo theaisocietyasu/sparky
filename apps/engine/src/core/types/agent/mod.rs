@@ -47,8 +47,6 @@ pub struct AgentConfig {
     pub history_turns: usize,
     /// Tokens of recent turns a compaction keeps whole.
     pub history_keep: usize,
-    /// Memories recalled per request.
-    pub memory_recall_limit: usize,
     /// First retry wait, doubled per attempt.
     pub retry_base_ms: u64,
     /// Longest retry wait.

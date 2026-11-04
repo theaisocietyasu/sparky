@@ -15,7 +15,6 @@ use std::time::Duration;
 
 use crate::core::traits::conversation::ConversationStore;
 use crate::core::traits::memory::MemoryStore;
-use crate::core::traits::memory::profile::ProfileGraph;
 use crate::core::traits::safety::confirmation::ConfirmationStore;
 use crate::core::types::agent::AgentConfig;
 use crate::core::types::agent::context::RequestContext;
@@ -26,7 +25,7 @@ use crate::runtime::harness::tools::ToolSet;
 pub use self::conversation::{Recording, Rooms, Row, history_of, push_row};
 pub use self::health::Fixed;
 pub use self::knowledge::{FakeQueries, FixedEmbedder, Stored};
-pub use self::memory::{Known, Recalling};
+pub use self::memory::Recalling;
 pub use self::model::{Scripted, calls, only_thought, text};
 pub use self::oauth::{HostedLogins, Linked};
 pub use self::safety::Held;
@@ -46,8 +45,6 @@ pub fn agent(model: Scripted, tools: ToolSet, cfg: AgentConfig) -> (Agent, Arc<M
         confirmations: None,
         compactor: None,
         guardrail: None,
-        profile: None,
-        profile_graph: None,
         sandbox: None,
         files: None,
     };
@@ -70,8 +67,6 @@ pub fn agent_with_store(
         confirmations: None,
         compactor: None,
         guardrail: None,
-        profile: None,
-        profile_graph: None,
         sandbox: None,
         files: None,
     };
@@ -95,8 +90,6 @@ pub fn agent_holding(
         confirmations: Some(confirmations),
         compactor: None,
         guardrail: None,
-        profile: None,
-        profile_graph: None,
         sandbox: None,
         files: None,
     };
@@ -107,13 +100,8 @@ pub fn ctx() -> RequestContext {
     RequestContext::new("g", "u", Duration::from_secs(5))
 }
 
-/// An agent that recalls memory and reads the profile graph.
-pub fn agent_recalling(
-    model: Scripted,
-    cfg: AgentConfig,
-    memory: Arc<dyn MemoryStore>,
-    graph: Arc<dyn ProfileGraph>,
-) -> Agent {
+/// An agent that recalls memory.
+pub fn agent_recalling(model: Scripted, cfg: AgentConfig, memory: Arc<dyn MemoryStore>) -> Agent {
     let deps = AgentDeps {
         model: Arc::new(model),
         tools: ToolSet::new(),
@@ -124,8 +112,6 @@ pub fn agent_recalling(
         confirmations: None,
         compactor: None,
         guardrail: None,
-        profile: None,
-        profile_graph: Some(graph),
         sandbox: None,
         files: None,
     };

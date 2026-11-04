@@ -5,7 +5,6 @@ mod confirmation;
 mod conversation;
 mod memory;
 mod oauth;
-mod profile;
 mod query;
 mod retrieval;
 mod tools;

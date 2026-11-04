@@ -234,8 +234,6 @@ async fn a_draft_the_guardrail_refuses_is_withdrawn_and_never_shown_again() {
             max_answer_chars: 0,
             replacement: "blocked".into(),
         }))),
-        profile: None,
-        profile_graph: None,
     };
     let answer = Agent::new(deps, AgentConfig::default(), "sys")
         .run(&ctx(), "q")
@@ -286,8 +284,6 @@ async fn a_protected_term_is_redacted_in_a_streamed_draft() {
         files: None,
         compactor: None,
         guardrail: Some(Arc::new(RuleGuardrail::new(rules))),
-        profile: None,
-        profile_graph: None,
     };
     let answer = Agent::new(deps, AgentConfig::default(), "sys")
         .run(&ctx(), "q")

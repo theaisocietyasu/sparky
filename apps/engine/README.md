@@ -16,7 +16,7 @@ cargo test -p engine -- --ignored   # tests that need a container runtime
 | `POST /chat/stream` | the same turn as server-sent events: progress, then the answer |
 | `POST /confirm` | approves or refuses an action the policy held, by token |
 | `POST /conversation/reset` | ends the caller's conversations in a channel |
-| `POST /profile/list`, `/profile/forget` | what the profile graph holds about the caller |
+| `POST /memories/list`, `/memories/forget` | the caller's memories, numbered, and removing one or all |
 | `POST /oauth/{provider}/authorize`, `/oauth/{provider}/logout` | the Platform login link for a provider, and removal of the linked grant |
 | `GET /sandbox`, `DELETE /sandbox/{name}`, `POST /sandbox/enabled` | sandbox containers and the `run_sandbox` switch |
 | `GET /health/live` | the process is up |
@@ -28,10 +28,11 @@ Every route except health requires the bearer `SPARKY_ENGINE__SERVICE_TOKEN`. An
 
 ```
 src/core/       config, telemetry, types, traits, tests. Imports nothing else in the crate.
-src/runtime/    harness (loop, prompt assembly, memory, safety, compaction, tracing),
-                model (Rig client, slot limit), tools (search, account, papers, wiki, mcp, sandbox)
-src/stores/     platform/: conversations, memory, the profile graph, confirmations, knowledge search,
-                live queries, and linked accounts over the Platform HTTP API
+src/runtime/    harness (loop, prompt assembly, safety, compaction, tracing),
+                model (Rig client, slot limit), tools (search, account, memory, papers, wiki, mcp, sandbox)
+src/stores/     sqlite/: conversations, memories, confirmations, backups, prune, import;
+                platform/: knowledge search, live queries, linked accounts, the export the
+                import reads, and the platform fallback store over the Platform HTTP API
 src/routes/     axum handlers
 src/wiring/     builds every adapter from config and composes them; the boot checks live here
 ```
