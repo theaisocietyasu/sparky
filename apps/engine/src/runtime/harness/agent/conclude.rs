@@ -1,7 +1,5 @@
 //! Keeping the turns, recording the outcome, and building the answer.
 
-use tracing::Instrument;
-
 use super::{Agent, ms};
 use crate::core::types::agent::context::RequestContext;
 use crate::core::types::agent::{AgentError, Answer};
@@ -31,34 +29,12 @@ impl Agent {
     ) -> Result<Answer, AgentError> {
         let said: Vec<Message> = run.new_turns.iter().filter(|m| said(m)).cloned().collect();
         self.persist(run.ctx, &said).await?;
-        self.record_profile(run);
         let text = if text.trim().is_empty() {
             status.explain().unwrap_or_default().to_owned()
         } else {
             text
         };
         Ok(self.finish(run, status, text, confirmation))
-    }
-
-    /// Hands the user turns to the profile writer on a detached task.
-    fn record_profile(&self, run: &Run<'_>) {
-        let Some(writer) = self.deps.profile.clone() else {
-            return;
-        };
-        let turn = run
-            .new_turns
-            .iter()
-            .filter(|m| m.role == Role::User)
-            .map(|m| m.content.as_str())
-            .collect::<Vec<_>>()
-            .join("\n");
-        if turn.trim().is_empty() {
-            return;
-        }
-        let (tenant, user) = (run.ctx.tenant_id.clone(), run.ctx.user_id.clone());
-        // A child of the request span, so the write nests under the run without holding it open.
-        let span = tracing::info_span!("profile.write");
-        tokio::spawn(async move { writer.record(tenant, user, turn).await }.instrument(span));
     }
 
     /// Appends the turns of this request to the conversation store, when one is configured.

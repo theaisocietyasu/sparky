@@ -122,8 +122,6 @@ fn agent_with(
         confirmations: None,
         compactor: None,
         guardrail: None,
-        profile: None,
-        profile_graph: None,
         sandbox: Some(workspace),
         files: Some(Arc::new(files)),
     };

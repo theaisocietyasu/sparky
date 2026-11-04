@@ -22,7 +22,6 @@ use crate::core::traits::health::Probe;
 use crate::core::traits::knowledge::query::SourceQueries;
 use crate::core::traits::knowledge::retrieval::{Embedder, Retriever};
 use crate::core::traits::memory::MemoryStore;
-use crate::core::traits::memory::profile::ProfileGraph;
 use crate::core::traits::model::ModelProvider;
 use crate::core::traits::oauth::OAuthStore;
 use crate::core::traits::safety::confirmation::ConfirmationStore;
@@ -37,9 +36,9 @@ use crate::runtime::model::limit::Limited;
 use crate::runtime::model::rig_openai::{self, RigChat, RigEmbedder};
 use crate::runtime::tools::files::HttpFiles;
 
-use self::agent::{agent_config, compactor, guardrail, profile_writer, trace_sink};
+use self::agent::{agent_config, compactor, guardrail, trace_sink};
 use self::boot::{fits_the_prompt, fits_the_slot};
-use self::http::{chat_state, http_router, memory_state, oauth_state, profile_state};
+use self::http::{chat_state, http_router, memory_state, oauth_state};
 use self::prompt::SYSTEM_PROMPT;
 use self::tools::{build_tools, sandbox};
 
@@ -57,8 +56,6 @@ struct Stores {
     memory: Arc<dyn MemoryStore>,
     /// Actions waiting on approval.
     confirmations: Arc<dyn ConfirmationStore>,
-    /// The profile graph, when profile recording is on.
-    profile_graph: Option<Arc<dyn ProfileGraph>>,
     /// Per-user account grants.
     oauth_store: Arc<dyn OAuthStore>,
     /// What readiness checks besides the model.
@@ -118,10 +115,7 @@ pub async fn serve(cfg: Config) -> anyhow::Result<()> {
 
     let agent_cfg = agent_config(&cfg);
 
-    let profile_graph = stores.profile_graph.clone();
     let deps = AgentDeps {
-        profile: profile_writer(&cfg, &model, profile_graph.clone()),
-        profile_graph: profile_graph.clone(),
         compactor: compactor(&cfg, &model),
         guardrail: guardrail(&cfg, &tool_names),
         model,
@@ -143,18 +137,9 @@ pub async fn serve(cfg: Config) -> anyhow::Result<()> {
         .with_mcp_names(mcp_names);
 
     let state = chat_state(&cfg, agent, stores.conversations, stores.confirmations);
-    let profile = profile_state(&cfg, profile_graph, state.rate_limit.clone());
     let memories = memory_state(&cfg, Arc::clone(&stores.memory), state.rate_limit.clone());
     let oauth = oauth_state(&cfg, stores.oauth_store);
-    let router = http_router(
-        &cfg,
-        state,
-        profile,
-        memories,
-        oauth,
-        stores.probes,
-        sandbox,
-    );
+    let router = http_router(&cfg, state, memories, oauth, stores.probes, sandbox);
 
     let listener = tokio::net::TcpListener::bind(&cfg.app.http_addr).await?;
     tracing::info!(addr = %cfg.app.http_addr, "listening");

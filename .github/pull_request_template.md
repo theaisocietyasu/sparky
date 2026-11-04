@@ -14,4 +14,4 @@ Closes #
 - [ ] A change to a Platform API call matches the Platform repo, or names the Platform change it needs
 - [ ] Comments follow the style in `AGENTS.md`: plain ASCII, what and not why
 - [ ] Nothing here lets a credential reach a prompt, a log, a trace or a metric label
-- [ ] Nothing here lets personal memory or the profile graph reach an answer others can read
+- [ ] Nothing here lets personal memory reach an answer others can read

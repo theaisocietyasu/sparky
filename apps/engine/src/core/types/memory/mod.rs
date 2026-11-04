@@ -1,7 +1,6 @@
 //! MemoryKind, Memory, NewMemory: what Sparky remembers about one student.
 
 pub mod listing;
-pub mod profile;
 
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};

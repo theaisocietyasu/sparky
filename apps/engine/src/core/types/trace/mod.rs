@@ -179,7 +179,7 @@ pub enum TraceEvent {
         /// Why it could not be opened.
         error: Option<String>,
     },
-    /// Memory and the profile graph were read for the prompt.
+    /// Memories were read for the prompt.
     MemoryRecalled {
         /// Memories recalled.
         count: usize,

@@ -51,7 +51,7 @@ deploy/           compose, one Dockerfile per image, inference/ (model serving c
 docs/             ROADMAP.md, ARCHITECTURE.md
 ```
 
-Processes talk only via: discord to engine; engine to llama-server and the Platform HTTP API and MCP (see Platform stores in ARCHITECTURE.md); every app to Phoenix for spans and events. Platform ([asusoda/platform](https://github.com/asusoda/platform), a separate repo) holds the profile graph, knowledge, live ASU queries, and linked accounts. The engine opens one SQLite file for its own conversations, memories and confirmations, and no other database.
+Processes talk only via: discord to engine; engine to llama-server and the Platform HTTP API and MCP (see Platform stores in ARCHITECTURE.md); every app to Phoenix for spans and events. Platform ([asusoda/platform](https://github.com/asusoda/platform), a separate repo) holds knowledge, live ASU queries, and linked accounts. The engine opens one SQLite file for its own conversations, memories and confirmations, and no other database.
 
 ## Dependencies we build on
 

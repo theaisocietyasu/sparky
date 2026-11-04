@@ -184,8 +184,6 @@ async fn a_blocked_answer_replaces_the_text_and_ends_the_run() {
         confirmations: None,
         compactor: None,
         guardrail: Some(Arc::new(RuleGuardrail::new(rules(&["ssn"], 0)))),
-        profile: None,
-        profile_graph: None,
         sandbox: None,
         files: None,
     };
@@ -228,8 +226,6 @@ async fn a_leaked_tool_name_is_redacted_before_the_user_sees_it() {
         confirmations: None,
         compactor: None,
         guardrail: Some(Arc::new(RuleGuardrail::new(protecting(&["search_live"])))),
-        profile: None,
-        profile_graph: None,
         sandbox: None,
         files: None,
     };
@@ -276,8 +272,6 @@ async fn a_blocked_capability_branch_stops_before_the_tool_runs() {
         confirmations: None,
         compactor: None,
         guardrail: Some(Arc::new(RuleGuardrail::new(rules(&["ssn"], 0)))),
-        profile: None,
-        profile_graph: None,
         sandbox: None,
         files: None,
     };

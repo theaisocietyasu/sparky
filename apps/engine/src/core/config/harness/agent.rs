@@ -33,8 +33,6 @@ pub struct Agent {
     pub temperature: f32,
     /// Prior turns loaded into the prompt.
     pub history_turns: usize,
-    /// Memories recalled per request.
-    pub memory_recall_limit: usize,
     /// Whole-prompt token budget.
     pub prompt_budget_tokens: usize,
     /// Cap on prior turns.
@@ -97,7 +95,6 @@ impl Default for Agent {
             turn_queue_wait_secs: 20,
             temperature: 0.6,
             history_turns: 20,
-            memory_recall_limit: 10,
             prompt_budget_tokens: 4_000,
             history_budget_tokens: 1_000,
             memory_budget_tokens: 300,

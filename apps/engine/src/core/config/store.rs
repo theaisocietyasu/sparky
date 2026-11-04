@@ -82,6 +82,8 @@ pub struct MemorySettings {
     pub refuse_terms: Vec<String>,
     /// Lowercase fragments that make remember seal the text.
     pub sensitive_terms: Vec<String>,
+    /// Wall-clock budget for one /memories/list or /memories/forget call.
+    pub request_timeout_secs: u64,
 }
 
 impl Default for MemorySettings {
@@ -95,6 +97,7 @@ impl Default for MemorySettings {
             task_soon_days: 7,
             refuse_terms: terms(&["password", "passcode", "ssn", "gpa", "grade", "diagnos"]),
             sensitive_terms: terms(&["address", "phone", "birthday"]),
+            request_timeout_secs: 30,
         }
     }
 }
@@ -128,6 +131,9 @@ pub fn validate_store(store: &Store, memory: &MemorySettings) -> Result<(), Conf
     }
     if memory.max_chars == 0 {
         return invalid("memory.max_chars must be at least 1");
+    }
+    if memory.request_timeout_secs == 0 {
+        return invalid("memory.request_timeout_secs must be at least 1");
     }
     if memory.task_soon_days < 0 {
         return invalid("memory.task_soon_days must not be negative");

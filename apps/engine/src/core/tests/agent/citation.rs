@@ -73,8 +73,6 @@ async fn a_page_a_tool_read_is_cited() {
         files: None,
         compactor: None,
         guardrail: None,
-        profile: None,
-        profile_graph: None,
     };
     let Ok(answer) = Agent::new(deps, AgentConfig::default(), "sys")
         .run(&ctx(), "q")

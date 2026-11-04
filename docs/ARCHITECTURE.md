@@ -12,7 +12,7 @@ This document describes the current shape of the system and its rules. Order of 
 | Model and embed clients | Rig (`rig-core`) OpenAI-compatible client | `apps/engine/src/runtime/model/rig_openai/` |
 | MCP | `rmcp` | `apps/engine/src/runtime/tools/mcp.rs` |
 | Conversations, memories, confirmations | one SQLite file through `sqlx`, opened by the engine only | `apps/engine/src/stores/sqlite/` |
-| Profile graph, knowledge, live ASU queries, linked accounts | Platform HTTP API and MCP | [asusoda/platform](https://github.com/asusoda/platform), a separate repo |
+| Knowledge, live ASU queries, linked accounts | Platform HTTP API and MCP | [asusoda/platform](https://github.com/asusoda/platform), a separate repo |
 | Web | Vite, React, TypeScript, shadcn | `apps/web` |
 | Fine-tuning | lives outside this repo | [loupe](https://github.com/ashworks1706/loupe), a separate repo |
 | Evals | golden cases against the engine, baseline gate | `apps/evals` |
@@ -102,7 +102,7 @@ flowchart LR
     ENG -->|"spans"| OBS
 ```
 
-Processes talk only at these edges. Platform ([asusoda/platform](https://github.com/asusoda/platform)) is a separate service: it holds the profile graph, the knowledge index, the live query registry, and linked accounts, and it alone crawls and queries ASU sites. Beyond Platform, the engine calls only the Microsoft Graph, Google Calendar, Semantic Scholar, and MediaWiki APIs and the attachment hosts in `agent.file_hosts`; with `sandbox.egress` on, a sandbox command reads public pages through the egress proxy. Other MCP servers are optional and none is configured by default.
+Processes talk only at these edges. Platform ([asusoda/platform](https://github.com/asusoda/platform)) is a separate service: it holds the knowledge index, the live query registry, and linked accounts, and it alone crawls and queries ASU sites. Beyond Platform, the engine calls only the Microsoft Graph, Google Calendar, Semantic Scholar, and MediaWiki APIs and the attachment hosts in `agent.file_hosts`; with `sandbox.egress` on, a sandbox command reads public pages through the egress proxy. Other MCP servers are optional and none is configured by default.
 
 The engine serves `/chat` and `/chat/stream` for the bot; both run the same loop. Every route except health requires the bearer token in `SPARKY_ENGINE__SERVICE_TOKEN`, and every route that carries a user applies the per-user `http.rate_limit_per_min`. The sandbox routes carry no user and are gated by the token alone, so any holder of it, `apps/discord` included, can read and stop the sandbox: `GET /sandbox` reports what is running, `DELETE /sandbox/{name}` removes one session container, and `POST /sandbox/enabled` stops the agent being offered `run_sandbox`. `apps/cli` shows and drives the containers through them, since the engine starts the containers outside compose.
 
@@ -113,10 +113,10 @@ The console starts and stops the other units and tails their output. It does not
 ```mermaid
 flowchart TD
     ROUTES["routes and wiring<br/>compose everything, own main"]
-    HARNESS["runtime::harness<br/>agent: run, step, inputs, execute, conclude, task, uploads<br/>agent/call: thinking, relay, draft, thought, retry, spans<br/>agent/prompt: assemble, capability<br/>memory: detect, profile<br/>safety: guardrail, policy<br/>compact, tools, trace"]
+    HARNESS["runtime::harness<br/>agent: run, step, inputs, execute, conclude, task, uploads<br/>agent/call: thinking, relay, draft, thought, retry, spans<br/>agent/prompt: assemble, capability<br/>safety: guardrail, policy<br/>compact, tools, trace"]
     MODEL["runtime::model<br/>rig_openai: chat, embed, convert<br/>limit, props"]
     TOOLS["runtime::tools<br/>knowledge/search: live, stored, sources/ one file per source<br/>account: outlook, gcal, grant<br/>papers, wiki, files, mcp, http<br/>sandbox: container, session, egress, output"]
-    STORES["stores<br/>platform: client, conversation, confirmation, memory, profile, retrieval, query, accounts, health"]
+    STORES["stores<br/>platform: client, conversation, confirmation, memory, retrieval, query, accounts, health"]
     CORE["core<br/>config, telemetry, types, traits, tests"]
 
     ROUTES --> HARNESS
@@ -142,7 +142,6 @@ Folders nest by domain, and the same domain names repeat across `core/types`, `c
 
 | Store | Platform |
 |---|---|
-| `ProfileGraph` | `/api/agents/members/{user_id}/profile...` |
 | `ConversationStore`, `MemoryStore`, `ConfirmationStore`, only with `store.backend = "platform"` | `/api/agents/members/{user_id}/...` |
 | the one-time import | `GET /api/agents/export/conversations` and `/memories` |
 | `Retriever` | `POST /api/knowledge/search`, with the query vector from the engine `Embedder` when `retrieval.dense` is on |
@@ -150,7 +149,7 @@ Folders nest by domain, and the same domain names repeat across `core/types`, `c
 | `OAuthStore` | `/api/accounts/members/{user_id}/{provider}/token` and `/login`; Platform runs the login and refreshes tokens |
 | readiness `Probe` | `GET /health` on Platform |
 
-The engine needs the chat and embedding servers and Platform. Platform takes the organization from the machine token (`Authorization: Bearer plat_...`), so `tenant_id` is not sent, and the member is `user_id`, which Platform requires to be a numeric Discord user id. One engine serves one guild, and its token belongs to the Platform organization of that guild. The token needs the scopes `agents:read`, `agents:write` (the profile graph and the import), `knowledge:read`, `accounts:link`, `accounts:token`, `asu:read`, and `canvas:read`.
+The engine needs the chat and embedding servers and Platform. Platform takes the organization from the machine token (`Authorization: Bearer plat_...`), so `tenant_id` is not sent, and the member is `user_id`, which Platform requires to be a numeric Discord user id. One engine serves one guild, and its token belongs to the Platform organization of that guild. The token needs the scopes `agents:read`, `agents:write` (the import and `store.backend = "platform"`), `knowledge:read`, `accounts:link`, `accounts:token`, `asu:read`, and `canvas:read`.
 
 With `platform.mcp_url` set, the engine also registers the Platform MCP tools with the same token (`runtime/tools/mcp.rs`, `connect_platform`). Each tool is named `platform_<name>` with dots as underscores; `platform.mcp_tools` limits the list, and the token scopes decide which tools Platform offers. The risk comes from the MCP annotations: `readOnlyHint` is `ReadPublic`, `destructiveHint` is `Destructive`, and any other tool is `ExternalWrite`, so `Policy` requires `policy.write_roles` and a confirmation for every write. The Platform `confirm` argument is removed from the schema the model sees; the tool sends `confirm=true` after `Policy` confirmed the call.
 
@@ -272,7 +271,7 @@ pub trait TraceSink {
 }
 ```
 
-The rest follow the same pattern: `Compactor`, `ConfirmationStore`, `ProfileGraph`, `FactDetector`, `Sandbox`, `FileSource`, `Outlook`, `GoogleCalendar`, `OAuthStore`, `Probe`. `OAuthStore` loads a caller's linked grant, removes it, and hands out the Platform `login_link`.
+The rest follow the same pattern: `Compactor`, `ConfirmationStore`, `Sandbox`, `FileSource`, `Outlook`, `GoogleCalendar`, `OAuthStore`, `Probe`. `OAuthStore` loads a caller's linked grant, removes it, and hands out the Platform `login_link`.
 
 ## Request lifecycle
 
@@ -292,7 +291,6 @@ sequenceDiagram
         E->>M: chat agent compacts the oldest turns
     end
     E->>E: recall memory from the SQLite file, private turns only
-    E->>P: read the profile graph, private turns only
     loop one step per model call
         E->>M: streamed completion with tool schemas
         M-->>E: reasoning, text, tool calls
@@ -309,14 +307,13 @@ sequenceDiagram
     E->>E: append the new turns to the SQLite file
     E-->>B: SSE answer, then done
     B->>U: final card with answer, sources, memories
-    E->>E: spawn profile writer, detached
 ```
 
 1. `discord` posts an addressed message to the engine with the Discord identity, role names, the answering channel, its visibility, `continue_channel`, and the bot message a reply answers. A question is never a slash command; the remaining commands only read and clear memory.
 2. The engine checks the bearer token and the per-user rate limit, then builds a `RequestContext`. A given `conversation_id` must belong to the caller. Without one, `continue_channel` continues the caller's newest open conversation in that channel at that visibility; otherwise a new conversation starts.
-3. The loop loads inputs once: the last `agent.history_turns` turns, compacted if they overflow the history budget, and, in a private turn only, memories and the profile graph. A failed memory read is logged and the turn runs without it. Nothing is retrieved before the first model call: the model calls `search_knowledge` and `search_live` as the question needs, several in one step when it words the subject more than one way.
+3. The loop loads inputs once: the last `agent.history_turns` turns, compacted if they overflow the history budget, and, in a private turn only, memories. A failed memory read is logged and the turn runs without it. Nothing is retrieved before the first model call: the model calls `search_knowledge` and `search_live` as the question needs, several in one step when it words the subject more than one way.
 4. The loop runs steps until it stops. On `/chat/stream` each progress event goes out as an SSE frame. A turn about to answer after a tool failed, with `run_sandbox` registered and untried, is handed back once with `prompt.sandbox_retry_line`.
-5. Every exit appends what was said, hands the user's text to the profile writer, and builds the answer with citations, tool runs, memories (empty for a public answer), usage, and cost. Tool calls and results are not stored in history.
+5. Every exit appends what was said and builds the answer with citations, tool runs, memories (empty for a public answer), usage, and cost. Tool calls and results are not stored in history.
 6. An answer with status `AwaitingConfirmation` carries a token. `POST /confirm` with that token runs the held action and resumes the loop from its result.
 
 ## Prompt assembly
@@ -380,8 +377,6 @@ Each sub-agent is a `runtime::harness::agent::task::Task`: its own instructions,
 |---|---|---|---|
 | Sparky (the loop) | every request | tool results, memory, history, capabilities | the turn |
 | Chat | loaded history overflows its budget | the turns being replaced | one compacted turn |
-| Graph | after a turn, when the detector passes it | the user's text | profile facts |
-| Reconcile | a new fact collides with recorded ones | the new fact and the candidates | which recorded facts to withdraw |
 
 ## Capabilities
 
@@ -421,7 +416,7 @@ Everything that could grow with load has a ceiling in `sparky.toml`:
 | Store | `store.max_connections` pooled connections to the SQLite file; a write waits up to `store.busy_timeout_ms` for a lock |
 | Memories | `memory.max_per_user` per student, each at most `memory.max_chars`; at the cap the oldest fact goes, then the oldest preference, then the oldest task |
 
-What is kept on disk is pruned: JSONL traces after `trace.retention_hours`, checked hourly, each capped at `trace.max_file_bytes`; CLI unit logs rotated at `cli.log_file_max_mb` to one `.1` file, lines cut at `cli.log_line_chars`. Memories stay until a student forgets them or a task passes its due date. Conversations stay until `store.conversation_idle_days` of idleness when that is above 0. The profile graph lives on Platform until a user asks to forget.
+What is kept on disk is pruned: JSONL traces after `trace.retention_hours`, checked hourly, each capped at `trace.max_file_bytes`; CLI unit logs rotated at `cli.log_file_max_mb` to one `.1` file, lines cut at `cli.log_line_chars`. Memories stay until a student forgets them or a task passes its due date. Conversations stay until `store.conversation_idle_days` of idleness when that is above 0.
 
 ### Attached files
 
@@ -439,18 +434,6 @@ A compacted turn is stored with role `summary`. It is never retrieval evidence, 
 
 The system prompt is not a stored message; it is rebuilt on every request and always comes first.
 
-## Profile graph
-
-Flat memory rows record what a user said. The profile graph records entities, the relations between them, and an embedding per node, so recall can start from a relation.
-
-Extraction never runs in the request path. When a run ends, the loop spawns the profile writer with the user's text and returns. The writer has its own context and a deadline of `profile.timeout_secs`.
-
-The gate is rules, not a model call. `RuleDetector` passes a sentence with a first-person marker next to a stative cue and rejects questions and turns shorter than `profile.detector.min_words`. Only a turn that passes reaches the Graph agent. Facts below `profile.min_confidence` or with an empty label are dropped. A trained classifier can replace the rules through the `FactDetector` trait.
-
-With `profile.reconcile` on, a new fact is checked against recorded facts for the same subject and relation. The Reconcile agent names the recorded facts the new one makes false, and those are withdrawn. Facts that can both be true are both kept. An unparseable answer or a failed call withdraws nothing.
-
-Recall is scoped to the token's organization and the caller's `user_id` before ranking. `POST /profile/list` and `POST /profile/forget` list and delete what the graph holds; Discord no longer calls them. Relations cascade from the node they run through.
-
 ## Memory
 
 | Kind | Content | Where |
@@ -458,13 +441,12 @@ Recall is scoped to the token's organization and the caller's `user_id` before r
 | Working | the current request | not persisted |
 | Conversation | what was said, the question and the answer | Platform conversation messages |
 | Fact, preference, task | one short line a student stated about themselves | the engine store, written by `remember` |
-| Profile graph | entities and relations | Platform profile graph |
 
 The model writes memories in the normal loop, so a turn costs no extra model call. `remember` takes a kind (`fact`, `preference`, or `task` with a due date), one line of at most `memory.max_chars`, and an optional sensitive flag. It refuses text with a term in `memory.refuse_terms` and seals text with a term in `memory.sensitive_terms`. `forget_memory` takes the short id the memory section shows. Both are `PrepareWrite`, private and sequential, and are registered when `memory.tools` is on and `store.backend` is `sqlite`. `prompt.memory_rules` tells the model what to keep and what never to store; it is added to the system prompt only in a private turn where the tools are registered.
 
-Recall reads every unexpired memory: tasks due within `memory.task_soon_days` first, soonest first, then the rest newest first. The prompt lists them as `[short id] kind: text (date)` until `agent.memory_budget_tokens` is spent, then appends profile graph nodes and relations. A task expires at the end of its due day in `prompt.utc_offset_hours`.
+Recall reads every unexpired memory: tasks due within `memory.task_soon_days` first, soonest first, then the rest newest first. The prompt lists them as `[short id] kind: text (date)` until `agent.memory_budget_tokens` is spent. A task expires at the end of its due day in `prompt.utc_offset_hours`.
 
-A public request recalls no memory and no profile graph, and is offered no private tool. Only an answer no one else can read is private. A public answer never lists the memories its prompt carried.
+A public request recalls no memory and is offered no private tool. Only an answer no one else can read is private. A public answer never lists the memories its prompt carried.
 
 Students see their memories with `/memories` (`POST /memories/list`, numbered in recall order) and remove them with `/forget <number>` or `/forget all` (`POST /memories/forget`).
 
@@ -579,7 +561,6 @@ A conversation belongs to one tenant, user, channel, and visibility. The bot hol
 | Data | Store |
 |---|---|
 | conversations, messages, memories, confirmations | the engine SQLite file (`store.path`) and its backups |
-| profile graph | Platform |
 | knowledge index, live query registry, linked account grants | Platform |
 | local traces, console logs, eval reports | `.sparky/`, ignored |
 
@@ -607,7 +588,7 @@ The engine keeps nothing else. Its schema is `apps/engine/migrations/`; the Plat
 
 ## Tracing
 
-Every request produces one trace covering model calls, tool calls, memory recall, policy decisions, guardrail blocks and redactions, and the outcome. The live pieces of a streaming call (reasoning so far, answer drafts, a withdrawn draft) go only to the watcher; the recorded trace keeps the finished call. A guardrail block or redaction is also recorded as an event on the `agent.run` span, and the profile write that follows a turn runs under that same span. Each `tool` span carries the tool's risk class.
+Every request produces one trace covering model calls, tool calls, memory recall, policy decisions, guardrail blocks and redactions, and the outcome. The live pieces of a streaming call (reasoning so far, answer drafts, a withdrawn draft) go only to the watcher; the recorded trace keeps the finished call. A guardrail block or redaction is also recorded as an event on the `agent.run` span. Each `tool` span carries the tool's risk class.
 
 ```mermaid
 flowchart TD
@@ -657,7 +638,7 @@ Two layers, lowest first: `sparky.toml`, then `SPARKY_<SECTION>__<KEY>` environm
 
 Rust reads the file with figment, `apps/evals` with tomllib through pydantic-settings. `SPARKY_CONFIG_FILE` points at a different file, such as an eval profile. A missing file is not an error.
 
-Sections in `sparky.toml`: `app`, `agent` (with `agent.thinking`), `prompt`, `model` (with `model.sampling`), `embedding`, `retrieval`, `policy`, `tools`, `profile` (with `profile.detector`), `sandbox`, `guardrail`, `compaction`, `query`, `mcp`, `outlook`, `gcal`, `papers`, `wikipedia`, `trace`, `telemetry`, `analytics`, `http`, `bot`, `platform`, `cli`, `evals`. The `engine` and `discord` sections hold only env values: the service token and the guild id; `platform.url` and `platform.token` come from the environment too.
+Sections in `sparky.toml`: `app`, `agent` (with `agent.thinking`), `prompt`, `model` (with `model.sampling`), `embedding`, `retrieval`, `policy`, `tools`, `sandbox`, `guardrail`, `compaction`, `query`, `mcp`, `outlook`, `gcal`, `papers`, `wikipedia`, `trace`, `telemetry`, `analytics`, `http`, `bot`, `platform`, `store`, `memory`, `cli`, `evals`. The `engine` and `discord` sections hold only env values: the service token and the guild id; `platform.url` and `platform.token` come from the environment too.
 
 A default belongs to exactly one settings struct; adapters declare no defaults of their own. `Config::validate` rejects at boot any combination the engine cannot serve, for example both retrieval legs off, a section budget above the prompt budget, a sample ratio out of range, two MCP servers with the same name, a missing or malformed `SPARKY_PLATFORM__URL`, a missing `SPARKY_PLATFORM__TOKEN`, an empty `platform.mcp_private` prefix, or with `retrieval.top_k`, `retrieval.window`, or `agent.confirmation_ttl_secs` past what the platform accepts. An unreadable `prompt.system_file` also stops the boot. Nothing is clamped at runtime.
 

@@ -1,5 +1,3 @@
-//! Memory: profile extraction, the fact detector, and visibility.
+//! Memory: what a turn recalls by visibility.
 
-mod detect;
-mod profile;
 mod visibility;

@@ -5,7 +5,6 @@ use crate::core::types::agent::AgentError;
 use crate::core::types::agent::context::RequestContext;
 use crate::core::types::conversation::message::{Message, Role};
 use crate::core::types::conversation::{Stored, Visibility};
-use crate::core::types::memory::Memory;
 use crate::core::types::trace::TraceEvent;
 use crate::runtime::harness::agent::run::Inputs;
 
@@ -103,7 +102,7 @@ impl Agent {
         let history = self.history(ctx).await?;
         // Memories are personal and reach the prompt only in a private turn.
         let memory = if ctx.visibility == Visibility::Private {
-            let recalled = match &deps.memory {
+            match &deps.memory {
                 Some(store) => match store.recall(ctx).await {
                     Ok(memories) => memories,
                     Err(error) => {
@@ -112,8 +111,7 @@ impl Agent {
                     }
                 },
                 None => Vec::new(),
-            };
-            self.with_profile(ctx, recalled).await
+            }
         } else {
             Vec::new()
         };
@@ -128,22 +126,5 @@ impl Agent {
             memory,
             uploads: Vec::new(),
         })
-    }
-
-    /// Appends this user's profile nodes and relations to recalled memories. Failed reads add none.
-    async fn with_profile(&self, ctx: &RequestContext, mut memory: Vec<Memory>) -> Vec<Memory> {
-        let Some(graph) = &self.deps.profile_graph else {
-            return memory;
-        };
-        let limit = self.cfg.memory_recall_limit;
-        match graph.recall(ctx, limit).await {
-            Ok(nodes) => memory.extend(nodes.iter().map(Memory::from)),
-            Err(error) => tracing::warn!(error = %error, "profile graph recall failed"),
-        }
-        match graph.relations(ctx, limit).await {
-            Ok(relations) => memory.extend(relations.iter().map(Memory::from)),
-            Err(error) => tracing::warn!(error = %error, "profile relation recall failed"),
-        }
-        memory
     }
 }

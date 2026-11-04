@@ -1,20 +1,16 @@
-//! The agent and its helpers: loop limits, task models, profile, compaction, guardrail, traces.
+//! The agent and its helpers: loop limits, task models, compaction, guardrail, traces.
 
 use std::sync::Arc;
 use std::time::Duration;
 
 use crate::core::config::Config;
 use crate::core::traits::conversation::compaction::Compactor;
-use crate::core::traits::memory::detector::FactDetector;
-use crate::core::traits::memory::profile::ProfileGraph;
 use crate::core::traits::model::ModelProvider;
 use crate::core::traits::safety::guardrail::Guardrail;
 use crate::core::traits::trace::TraceSink;
 use crate::core::types::agent::AgentConfig;
 use crate::runtime::harness::agent::task::{Task, TaskConfig};
 use crate::runtime::harness::compact::{self, ChatCompactor};
-use crate::runtime::harness::memory::detect::{RuleDetector, Rules as DetectorRules};
-use crate::runtime::harness::memory::profile::{self, GraphAgent, ProfileWriter, Reconciler};
 use crate::runtime::harness::safety::guardrail::{RuleGuardrail, Rules};
 use crate::runtime::harness::trace::{JsonlSink, NullSink};
 
@@ -35,7 +31,6 @@ pub(super) fn agent_config(cfg: &Config) -> AgentConfig {
         upload_ocr_pages: cfg.agent.upload_ocr_pages,
         history_turns: cfg.agent.history_turns,
         history_keep: cfg.compaction.keep_tokens(cfg.agent.history_budget_tokens),
-        memory_recall_limit: cfg.agent.memory_recall_limit,
         retry_base_ms: cfg.agent.retry_base_ms,
         retry_cap_ms: cfg.agent.retry_cap_ms,
         max_span_value_chars: cfg.agent.max_span_value_chars,
@@ -86,66 +81,6 @@ pub(super) fn compactor(
         },
     );
     Some(Arc::new(ChatCompactor::new(task)))
-}
-
-/// The classifier and the graph agent, when profile recording is on.
-pub(super) fn profile_writer(
-    cfg: &Config,
-    model: &Arc<dyn ModelProvider>,
-    graph: Option<Arc<dyn ProfileGraph>>,
-) -> Option<Arc<ProfileWriter>> {
-    let graph = graph?;
-    let budget = Duration::from_secs(cfg.profile.timeout_secs);
-    let instructions = |set: Option<&String>, fallback: &'static str| {
-        set.map(String::as_str)
-            .map(str::trim)
-            .filter(|s| !s.is_empty())
-            .unwrap_or(fallback)
-            .to_owned()
-    };
-    // The gate is rule based.
-    let detector: Arc<dyn FactDetector> = Arc::new(RuleDetector::new(DetectorRules::from(
-        &cfg.profile.detector,
-    )));
-    let agent = GraphAgent::new(Task::new(
-        Arc::clone(model),
-        "profile.extract",
-        instructions(
-            cfg.profile.graph_instructions.as_ref(),
-            profile::GRAPH_INSTRUCTIONS,
-        ),
-        TaskConfig {
-            max_tokens: cfg.profile.max_tokens,
-            temperature: 0.0,
-            timeout: budget,
-            ..task_config(cfg)
-        },
-    ));
-    let reconciler = cfg.profile.reconcile.then(|| {
-        Reconciler::new(Task::new(
-            Arc::clone(model),
-            "profile.reconcile",
-            instructions(
-                cfg.profile.reconcile_instructions.as_ref(),
-                profile::RECONCILE_INSTRUCTIONS,
-            ),
-            TaskConfig {
-                // A list of numbers, or the word none.
-                max_tokens: 32,
-                temperature: 0.0,
-                timeout: budget,
-                ..task_config(cfg)
-            },
-        ))
-    });
-    Some(Arc::new(ProfileWriter::new(
-        detector,
-        agent,
-        reconciler,
-        graph,
-        budget,
-        cfg.profile.min_confidence,
-    )))
 }
 
 /// The response gate, when it is enabled. The registered tool names are protected from answers.

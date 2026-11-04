@@ -392,9 +392,9 @@ fn a_setting_that_moved_sections_fails_the_boot_rather_than_being_ignored() {
 }
 
 #[test]
-fn a_profile_list_limit_of_zero_is_rejected() {
-    assert!(err("[profile]\nlist_limit = 0").contains("profile.list_limit"));
-    assert_eq!(ok("").profile.list_limit, 50);
+fn a_leftover_profile_section_still_loads() {
+    let cfg = ok("[profile]\nenabled = true\nlist_limit = 0\n[profile.detector]\nmin_words = 4\n");
+    assert_eq!(cfg.memory.max_per_user, 50);
 }
 
 #[test]
