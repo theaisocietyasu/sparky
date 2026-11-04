@@ -27,6 +27,40 @@ impl Default for Outlook {
     }
 }
 
+/// Canvas due dates and events from each student's calendar feed link. Off with store.backend platform.
+#[derive(Debug, Deserialize)]
+#[serde(default)]
+pub struct Canvas {
+    /// Whether the canvas_deadlines tool and the feed link routes are on.
+    pub enabled: bool,
+    /// Hosts a feed link may point at.
+    pub hosts: Vec<String>,
+    /// Budget for one feed request.
+    pub timeout_secs: u64,
+    /// Largest feed read, in bytes.
+    pub max_bytes: usize,
+    /// Days ahead a call covers when the model gives none.
+    pub default_days: u32,
+    /// Most days ahead one call may cover.
+    pub max_days: u32,
+    /// Most items one call returns to the model.
+    pub max_items: usize,
+}
+
+impl Default for Canvas {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            hosts: vec!["canvas.asu.edu".into()],
+            timeout_secs: 15,
+            max_bytes: 2_000_000,
+            default_days: 14,
+            max_days: 60,
+            max_items: 25,
+        }
+    }
+}
+
 /// Google Calendar read-only tool. Off by default; reads the caller's Google account linked on the platform.
 #[derive(Debug, Deserialize)]
 #[serde(default)]

@@ -236,6 +236,19 @@ base_url = "https://www.googleapis.com/calendar/v3"
 timeout_secs = 30
 max_items = 15
 
+# Canvas due dates and course events from each student's Calendar Feed link, read-only, in a
+# direct message only. /canvas link in Discord takes the link in a private form; it is kept sealed
+# with SPARKY_MEMORY__KEY. Nothing read from the feed is stored or traced. No grades. Needs
+# store.backend = "sqlite".
+[canvas]
+enabled = true
+hosts = ["canvas.asu.edu"]     # hosts a feed link may point at
+timeout_secs = 15
+max_bytes = 2000000            # largest feed read
+default_days = 14              # days ahead when the model gives none
+max_days = 60
+max_items = 25
+
 # Academic paper search over Semantic Scholar. Public, no key.
 [papers]
 enabled = true
@@ -295,7 +308,7 @@ max_file_bytes = 2000000
 
 # ---------------------------------------------------------------- platform
 # Knowledge search, live queries and linked accounts come from the platform
-# HTTP API. So do Canvas, the Sun Devil Central clubs and events, and the ASU knowledge. With
+# HTTP API. So do the Sun Devil Central clubs and events, and the ASU knowledge. With
 # store.backend = "platform", conversations, memories and confirmations do too. url and token
 # live in .env and are required.
 # The token needs these scopes:
@@ -304,7 +317,6 @@ max_file_bytes = 2000000
 #   accounts:link               the /login link for a member
 #   accounts:token              the Outlook and Google tokens of a member
 #   asu:read                    platform_asu_clubs and platform_asu_events
-#   canvas:read                 the platform_canvas_* tools
 [platform]
 timeout_secs = 10              # one platform call; a live query uses what is left of the request
 embedding_model = ""           # sent with each query vector; empty sends embedding.name
@@ -316,7 +328,9 @@ mcp_url = ""
 mcp_tools = []                 # e.g. ["org.info", "events.list"]; empty registers every allowed tool
 # Tool name prefixes whose results belong to one member. Such a tool runs only in a direct
 # message, is ReadAuthenticated, and is sent the caller as discord_id in place of the model's value.
-mcp_private = ["canvas."]
+mcp_private = []
+# Tool name prefixes never registered. The engine serves Canvas itself from the calendar feed.
+mcp_skip = ["canvas."]
 
 # ---------------------------------------------------------------- local store
 # Conversations, memories and pending confirmations live in one SQLite file that only the engine

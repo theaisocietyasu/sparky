@@ -1,4 +1,4 @@
-//! Local store composition: conversations, memories and pending actions in the SQLite file.
+//! Local store composition: conversations, memories, pending actions and Canvas feed links in the SQLite file.
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -28,11 +28,11 @@ pub(super) fn seal(cfg: &Config) -> anyhow::Result<Seal> {
     Ok(Seal::new(&key))
 }
 
-/// With store.backend sqlite, moves conversations, memories and pending actions to the file.
+/// With store.backend sqlite, moves conversations, memories, pending actions and feed links to the file.
 pub(super) async fn localize(cfg: &Config, stores: &mut Stores) -> anyhow::Result<()> {
     if cfg.store.backend == StoreBackend::Platform {
         tracing::warn!(
-            "store.backend is platform; conversations and memories stay on the platform"
+            "store.backend is platform; conversations and memories stay on the platform and Canvas is off"
         );
         return Ok(());
     }
@@ -44,6 +44,9 @@ pub(super) async fn localize(cfg: &Config, stores: &mut Stores) -> anyhow::Resul
         utc_offset_hours: cfg.prompt.utc_offset_hours,
     };
     stores.memory = Arc::new(store.memory(seal(cfg)?, limits));
+    if cfg.canvas.enabled {
+        stores.canvas = Some(Arc::new(store.canvas_feeds(seal(cfg)?)));
+    }
     stores.confirmations = Arc::new(store.confirmations());
     stores.probes.push(Arc::new(store.probe()));
     let prune = PrunePlan {

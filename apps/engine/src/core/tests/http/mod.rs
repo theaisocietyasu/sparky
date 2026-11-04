@@ -1,5 +1,6 @@
-//! The HTTP surface: health, login, rate limiting, and the sandbox routes.
+//! The HTTP surface: health, login, Canvas feed links, rate limiting, and the sandbox routes.
 
+mod canvas;
 mod health;
 mod login;
 mod memories;

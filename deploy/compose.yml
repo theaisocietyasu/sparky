@@ -1,7 +1,7 @@
 # Memory ceilings are overridable with SPARKY_MEM_<SERVICE> in .env. sandboxd bounds all run_sandbox containers.
-# The platform holds the ASU knowledge, the live queries, Canvas and the ASU sign-in;
+# The platform holds the ASU knowledge, the live queries and the ASU sign-in;
 # SPARKY_PLATFORM__URL and SPARKY_PLATFORM__TOKEN in .env point the engine at it. The engine keeps
-# conversations, memories and confirmations in a SQLite file on the enginedata volume.
+# conversations, memories, confirmations and Canvas feed links in a SQLite file on the enginedata volume.
 services:
   engine:
     build: { context: .., dockerfile: deploy/docker/rust.Dockerfile }

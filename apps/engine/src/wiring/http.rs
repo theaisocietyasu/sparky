@@ -9,8 +9,10 @@ use crate::core::traits::health::Probe;
 use crate::core::traits::memory::MemoryStore;
 use crate::core::traits::oauth::OAuthStore;
 use crate::core::traits::safety::confirmation::ConfirmationStore;
+use crate::core::traits::tools::canvas::CanvasFeeds;
 use crate::core::traits::tools::sandbox::Sandbox;
 use crate::routes::Limits;
+use crate::routes::canvas::CanvasState;
 use crate::routes::chat::ChatState;
 use crate::routes::health::HealthState;
 use crate::routes::memories::MemoryState;
@@ -78,12 +80,22 @@ pub(super) fn oauth_state(cfg: &Config, store: Arc<dyn OAuthStore>) -> OAuthStat
     }
 }
 
+/// The state the Canvas feed link routes read: the link store when Canvas is on.
+pub(super) fn canvas_state(cfg: &Config, feeds: Option<Arc<dyn CanvasFeeds>>) -> CanvasState {
+    CanvasState {
+        feeds: feeds.filter(|_| cfg.canvas.enabled),
+        hosts: cfg.canvas.hosts.clone(),
+        service_token: cfg.engine.service_token.clone(),
+    }
+}
+
 /// The whole HTTP surface, with the state each group of routes reads.
 pub(super) fn http_router(
     cfg: &Config,
     state: ChatState,
     memories: MemoryState,
     oauth: OAuthState,
+    canvas: CanvasState,
     probes: Vec<Arc<dyn Probe>>,
     sandbox: Option<Arc<ContainerSandbox>>,
 ) -> axum::Router {
@@ -101,6 +113,7 @@ pub(super) fn http_router(
         memories,
         sandbox: sandbox_state(cfg, sandbox),
         oauth,
+        canvas,
     };
     crate::routes::router(states, limits, &cfg.http.cors_origins)
 }

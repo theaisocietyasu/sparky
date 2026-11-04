@@ -25,6 +25,7 @@ use crate::core::traits::memory::MemoryStore;
 use crate::core::traits::model::ModelProvider;
 use crate::core::traits::oauth::OAuthStore;
 use crate::core::traits::safety::confirmation::ConfirmationStore;
+use crate::core::traits::tools::canvas::CanvasFeeds;
 use crate::core::traits::tools::files::FileSource;
 use crate::core::traits::tools::sandbox::Sandbox;
 use crate::core::traits::trace::TraceSink;
@@ -38,7 +39,7 @@ use crate::runtime::tools::files::HttpFiles;
 
 use self::agent::{agent_config, compactor, guardrail, trace_sink};
 use self::boot::{fits_the_prompt, fits_the_slot};
-use self::http::{chat_state, http_router, memory_state, oauth_state};
+use self::http::{canvas_state, chat_state, http_router, memory_state, oauth_state};
 use self::prompt::SYSTEM_PROMPT;
 use self::tools::{build_tools, sandbox};
 
@@ -58,6 +59,8 @@ struct Stores {
     confirmations: Arc<dyn ConfirmationStore>,
     /// Per-user account grants.
     oauth_store: Arc<dyn OAuthStore>,
+    /// Canvas calendar feed links, when the local store holds them.
+    canvas: Option<Arc<dyn CanvasFeeds>>,
     /// What readiness checks besides the model.
     probes: Vec<Arc<dyn Probe>>,
 }
@@ -103,6 +106,7 @@ pub async fn serve(cfg: Config) -> anyhow::Result<()> {
         Arc::clone(&stores.retriever),
         sandbox.clone(),
         Arc::clone(&stores.oauth_store),
+        stores.canvas.clone(),
         memory_tools(&cfg, &stores, &trace),
     )
     .await?;
@@ -139,7 +143,8 @@ pub async fn serve(cfg: Config) -> anyhow::Result<()> {
     let state = chat_state(&cfg, agent, stores.conversations, stores.confirmations);
     let memories = memory_state(&cfg, Arc::clone(&stores.memory), state.rate_limit.clone());
     let oauth = oauth_state(&cfg, stores.oauth_store);
-    let router = http_router(&cfg, state, memories, oauth, stores.probes, sandbox);
+    let canvas = canvas_state(&cfg, stores.canvas);
+    let router = http_router(&cfg, state, memories, oauth, canvas, stores.probes, sandbox);
 
     let listener = tokio::net::TcpListener::bind(&cfg.app.http_addr).await?;
     tracing::info!(addr = %cfg.app.http_addr, "listening");

@@ -168,8 +168,8 @@ fn the_confirm_argument_is_hidden_from_the_model() {
 }
 
 #[test]
-fn canvas_platform_tools_are_private_by_default() {
-    let prefixes = crate::core::config::Platform::default().mcp_private;
+fn a_private_prefix_matches_the_tools_it_names() {
+    let prefixes = vec!["canvas.".to_owned()];
     assert!(is_private("canvas.grades", &prefixes));
     assert!(is_private("canvas.assignment_grades", &prefixes));
     assert!(!is_private("asu.clubs", &prefixes));

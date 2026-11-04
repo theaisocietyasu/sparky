@@ -1,6 +1,7 @@
 //! serenity client setup, the guards every question passes, and event dispatch.
 
 mod address;
+mod canvas;
 mod commands;
 mod confirm;
 mod destination;
@@ -273,8 +274,12 @@ impl EventHandler for Handler {
                 commands::FORGET => self.forget(&ctx, &cmd).await,
                 commands::LOGIN => self.login(&ctx, &cmd).await,
                 commands::LOGOUT => self.logout(&ctx, &cmd).await,
+                commands::CANVAS => self.canvas(&ctx, &cmd).await,
                 other => tracing::warn!(command = other, "unknown command"),
             },
+            Interaction::Modal(form) if form.data.custom_id == commands::CANVAS_FORM => {
+                self.canvas_form(&ctx, &form).await;
+            }
             _ => {}
         }
     }

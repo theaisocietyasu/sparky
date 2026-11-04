@@ -64,6 +64,7 @@ async fn registered(cfg: &Config, keys: &[&str]) -> Vec<ToolDefinition> {
         None,
         Arc::new(HostedLogins),
         None,
+        None,
     )
     .await;
     match built {
