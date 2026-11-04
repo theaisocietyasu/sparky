@@ -47,6 +47,14 @@ impl WebState {
         format!("{}_state", self.auth.cookie_name)
     }
 
+    /// Path of the sign-in routes as the browser sees them, under the path of the public URL.
+    fn state_path(&self) -> String {
+        let base = url::Url::parse(&self.public_url)
+            .map(|u| u.path().trim_end_matches('/').to_owned())
+            .unwrap_or_default();
+        format!("{base}/web")
+    }
+
     /// Where Discord sends the student back.
     fn redirect_uri(&self) -> String {
         format!("{}/web/callback", self.public_url)
@@ -56,7 +64,7 @@ impl WebState {
     fn back(&self, outcome: &str, session: Option<String>) -> Response {
         let target = format!("{}/chat?signin={outcome}", self.auth.site);
         let mut response = (StatusCode::SEE_OTHER, [(header::LOCATION, target)]).into_response();
-        let clear = set_cookie(&self.state_cookie(), "", "/web", 0);
+        let clear = set_cookie(&self.state_cookie(), "", &self.state_path(), 0);
         append_cookie(&mut response, &clear);
         if let Some(value) = session {
             let set = set_cookie(&self.auth.cookie_name, &value, "/", self.session_secs);
@@ -102,7 +110,12 @@ pub async fn login(State(state): State<WebState>) -> Response {
         .into_response();
     append_cookie(
         &mut response,
-        &set_cookie(&state.state_cookie(), &value, "/web", STATE_SECS),
+        &set_cookie(
+            &state.state_cookie(),
+            &value,
+            &state.state_path(),
+            STATE_SECS,
+        ),
     );
     response
 }
@@ -165,8 +178,7 @@ pub async fn me(State(state): State<WebState>, headers: HeaderMap) -> Response {
 
 /// Ends the session. Only the site may ask.
 pub async fn logout(State(state): State<WebState>, headers: HeaderMap) -> Response {
-    let origin = headers.get(header::ORIGIN).and_then(|v| v.to_str().ok());
-    if origin.map(|o| o.trim_end_matches('/')) != Some(state.auth.site.as_str()) {
+    if !state.auth.is_from_site(&headers) {
         return (StatusCode::FORBIDDEN, "wrong origin").into_response();
     }
     let mut response = StatusCode::NO_CONTENT.into_response();

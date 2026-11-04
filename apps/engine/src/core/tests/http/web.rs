@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use axum::body::Body;
-use axum::http::{HeaderMap, Request, StatusCode, header};
+use axum::http::{HeaderMap, HeaderValue, Request, StatusCode, header};
 use tower::ServiceExt as _;
 
 use crate::core::traits::identity::DiscordIdentity;
@@ -77,6 +77,36 @@ fn a_session_is_read_only_from_the_site_origin() {
     let mut no_origin = browser(SITE, &sealed);
     no_origin.remove(header::ORIGIN);
     assert!(auth.session(&no_origin).is_none());
+    let mut proxied = no_origin.clone();
+    proxied.insert("sec-fetch-site", HeaderValue::from_static("same-origin"));
+    assert!(
+        auth.session(&proxied).is_some(),
+        "same-origin GET via the site proxy"
+    );
+    let mut cross = no_origin;
+    cross.insert("sec-fetch-site", HeaderValue::from_static("cross-site"));
+    assert!(auth.session(&cross).is_none());
+    let mut lying = browser("https://evil.example.com", &sealed);
+    lying.insert("sec-fetch-site", HeaderValue::from_static("same-origin"));
+    assert!(auth.session(&lying).is_none(), "a wrong Origin wins");
+}
+
+#[tokio::test]
+async fn the_state_cookie_path_follows_the_public_url_path() {
+    let path_of = |headers: &HeaderMap| {
+        headers
+            .get(header::SET_COOKIE)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.split("; ").find_map(|p| p.strip_prefix("Path=")))
+            .map(str::to_owned)
+    };
+    let (_, direct, _) = call(router(state(vec![])), "GET", "/web/login", HeaderMap::new()).await;
+    assert_eq!(path_of(&direct).as_deref(), Some("/web"));
+    let mut proxied = state(vec![]);
+    proxied.public_url = "https://sparky.example.org/api/engine".into();
+    let (_, headers, _) = call(router(proxied), "GET", "/web/login", HeaderMap::new()).await;
+    assert_eq!(path_of(&headers).as_deref(), Some("/api/engine/web"));
+    assert!(location(&headers).contains("api%2Fengine%2Fweb%2Fcallback"));
 }
 
 /// A Discord that signs in one account.
