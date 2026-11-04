@@ -14,7 +14,7 @@ body:
     attributes:
       label: How you do it today
   - type: input
-    id: roadmap
+    id: parent
     attributes:
-      label: Roadmap
-      description: The phase in docs/ROADMAP.md this belongs to, if you know it.
+      label: Parent issue
+      description: The phase sub-issue of #79 this belongs to, if you know it.
