@@ -24,10 +24,12 @@ pub fn assemble(ctx: &RequestContext, s: &Sections<'_>, budget: Budget) -> Assem
             .replace("{roles}", &ctx.roles.join(", "))
     };
     let mut system = format!("{}\n\n{role_line}", s.system.trim());
-    let rules = s.templates.memory_rules.trim();
-    if ctx.visibility == Visibility::Private && !rules.is_empty() {
-        system.push_str("\n\n");
-        system.push_str(rules);
+    for rules in [s.templates.memory_rules, s.templates.discovery_rules] {
+        let rules = rules.trim();
+        if ctx.visibility == Visibility::Private && !rules.is_empty() {
+            system.push_str("\n\n");
+            system.push_str(rules);
+        }
     }
     if !s.date.is_empty() {
         let date_line = s.templates.date_line.replace("{date}", s.date);

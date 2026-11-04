@@ -82,3 +82,34 @@ fn forget_ids_carry_the_asker_and_survive_the_round_trip() {
     });
     assert_eq!(lost, crate::render::reply::UNAVAILABLE);
 }
+
+#[test]
+fn feedback_ids_carry_the_request_and_the_asker() {
+    let request = Uuid::new_v4();
+    let user = 123_456_789_012_345_678_u64;
+    let row = crate::render::components::feedback_row(request, user);
+    assert_eq!(labels_of(&row), vec!["Helpful", "Not helpful"]);
+    for (button, helpful) in row.iter().zip([true, false]) {
+        let crate::render::components::ButtonSpec::Press { id, .. } = button else {
+            unreachable!("a rating is a press")
+        };
+        assert_eq!(
+            *id,
+            CustomId::Feedback {
+                helpful,
+                request,
+                user
+            }
+        );
+        let wire = id.to_string();
+        assert!(wire.len() <= 100, "{wire}");
+        assert_eq!(CustomId::parse(&wire), Some(*id));
+        assert!(id.may_press(user));
+        assert!(!id.may_press(user + 1));
+    }
+    assert_eq!(CustomId::parse("sparky:helpful:not-a-uuid:1"), None);
+    assert_eq!(
+        CustomId::parse(&format!("sparky:helpful:{}", request.simple())),
+        None
+    );
+}

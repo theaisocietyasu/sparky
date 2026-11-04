@@ -15,6 +15,10 @@ const PREFIX: &str = "sparky";
 const FORGET_ALL: &str = "forget_all";
 /// Tag of the button that closes the forget prompt.
 const KEEP_ALL: &str = "keep_all";
+/// Tag of the button that marks an answer helpful.
+const HELPFUL: &str = "helpful";
+/// Tag of the button that marks an answer not helpful.
+const UNHELPFUL: &str = "unhelpful";
 
 /// What a confirmation button does when someone presses it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -64,6 +68,15 @@ pub enum CustomId {
         /// Discord id of the user who asked.
         user: u64,
     },
+    /// Rates one answer.
+    Feedback {
+        /// Whether the answer helped.
+        helpful: bool,
+        /// The request the answer came from.
+        request: Uuid,
+        /// Discord id of the user who asked.
+        user: u64,
+    },
 }
 
 impl CustomId {
@@ -80,7 +93,9 @@ impl CustomId {
     pub fn may_press(&self, presser: u64) -> bool {
         match self {
             Self::Confirm { .. } => true,
-            Self::ForgetAll { user } | Self::KeepAll { user } => *user == presser,
+            Self::ForgetAll { user } | Self::KeepAll { user } | Self::Feedback { user, .. } => {
+                *user == presser
+            }
         }
     }
 
@@ -95,6 +110,11 @@ impl CustomId {
                 user: parts.next()?.parse().ok()?,
             },
             KEEP_ALL => Self::KeepAll {
+                user: parts.next()?.parse().ok()?,
+            },
+            tag @ (HELPFUL | UNHELPFUL) => Self::Feedback {
+                helpful: tag == HELPFUL,
+                request: Uuid::parse_str(parts.next()?).ok()?,
                 user: parts.next()?.parse().ok()?,
             },
             other => Self::Confirm {
@@ -126,6 +146,14 @@ impl std::fmt::Display for CustomId {
             ),
             Self::ForgetAll { user } => write!(f, "{PREFIX}:{FORGET_ALL}:{user}"),
             Self::KeepAll { user } => write!(f, "{PREFIX}:{KEEP_ALL}:{user}"),
+            Self::Feedback {
+                helpful,
+                request,
+                user,
+            } => {
+                let tag = if *helpful { HELPFUL } else { UNHELPFUL };
+                write!(f, "{PREFIX}:{tag}:{}:{user}", request.simple())
+            }
         }
     }
 }
@@ -185,6 +213,22 @@ pub fn rows_for(resp: &ChatResponse) -> Vec<Vec<ButtonSpec>> {
         rows.push(sources);
     }
     rows
+}
+
+/// The rating buttons under a finished answer, bound to the user who asked.
+pub fn feedback_row(request: Uuid, user: u64) -> Vec<ButtonSpec> {
+    [(true, "Helpful"), (false, "Not helpful")]
+        .into_iter()
+        .map(|(helpful, label)| ButtonSpec::Press {
+            id: CustomId::Feedback {
+                helpful,
+                request,
+                user,
+            },
+            label,
+            danger: false,
+        })
+        .collect()
 }
 
 /// The buttons under the forget everything prompt, bound to the user who asked.

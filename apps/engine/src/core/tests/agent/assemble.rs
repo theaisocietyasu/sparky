@@ -556,12 +556,13 @@ fn a_memory_line_carries_its_short_id_and_lines_stop_at_the_budget() {
 }
 
 #[test]
-fn the_memory_rules_are_only_in_a_private_turn() {
+fn the_memory_and_discovery_rules_are_only_in_a_private_turn() {
     let sections = Sections {
         system: "s",
         input: "q",
         templates: Templates {
             memory_rules: "MEMORY RULES",
+            discovery_rules: "DISCOVERY RULES",
             ..Templates::default()
         },
         ..Sections::default()
@@ -577,4 +578,6 @@ fn the_memory_rules_are_only_in_a_private_turn() {
     };
     assert!(!text(&public).contains("MEMORY RULES"));
     assert!(text(&private).contains("MEMORY RULES"));
+    assert!(!text(&public).contains("DISCOVERY RULES"));
+    assert!(text(&private).contains("DISCOVERY RULES"));
 }

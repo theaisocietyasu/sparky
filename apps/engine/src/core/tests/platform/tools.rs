@@ -98,3 +98,37 @@ async fn search_live_offers_only_the_sources_the_platform_publishes() {
     // The fallback stays offered, so a call that names no source still has one.
     assert!(offered.iter().any(|k| k == "web"), "{offered:?}");
 }
+
+#[tokio::test]
+async fn upcoming_is_registered_only_with_a_source_and_follows_its_switch() {
+    let names =
+        |defs: Vec<ToolDefinition>| -> Vec<String> { defs.into_iter().map(|d| d.name).collect() };
+    let none = names(registered(&config(), &["events"]).await);
+    assert!(!none.iter().any(|n| n == "upcoming"), "{none:?}");
+    let with_gcal = |extra: &str| -> Config {
+        match Figment::new()
+            .merge(Toml::string(&format!(
+                "{BASE}[gcal]\nenabled = true\n{extra}"
+            )))
+            .extract()
+        {
+            Ok(cfg) => cfg,
+            Err(e) => unreachable!("the test config parses: {e}"),
+        }
+    };
+    let on = names(registered(&with_gcal(""), &["events"]).await);
+    assert!(on.iter().any(|n| n == "upcoming"), "{on:?}");
+    let off = names(registered(&with_gcal("[upcoming]\nenabled = false\n"), &["events"]).await);
+    assert!(!off.iter().any(|n| n == "upcoming"), "{off:?}");
+    let source_off = names(
+        registered(
+            &with_gcal("[tools]\ndisabled = [\"google_calendar\"]\n"),
+            &["events"],
+        )
+        .await,
+    );
+    assert!(
+        !source_off.iter().any(|n| n == "upcoming"),
+        "{source_off:?}"
+    );
+}

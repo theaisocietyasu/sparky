@@ -3,16 +3,18 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use chrono::{FixedOffset, NaiveDate, Utc};
+use chrono::{DateTime, FixedOffset, NaiveDate, Utc};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
 use crate::core::config::MemorySettings;
 use crate::core::traits::memory::MemoryStore;
 use crate::core::traits::tools::Tool;
+use crate::core::traits::tools::upcoming::UpcomingSource;
 use crate::core::traits::trace::TraceSink;
 use crate::core::types::agent::context::RequestContext;
 use crate::core::types::memory::{MemoryKind, NewMemory, short_id};
+use crate::core::types::tools::upcoming::UpcomingItem;
 use crate::core::types::tools::{
     FORGET_MEMORY, REMEMBER, RiskClass, ToolDefinition, ToolError, ToolOutput,
 };
@@ -286,4 +288,53 @@ pub fn tools(
         )),
         Arc::new(ForgetMemoryTool::new(Arc::clone(store), Arc::clone(trace))),
     ]
+}
+
+/// The caller's remembered tasks, as a source of the upcoming tool.
+pub struct MemoryTasks {
+    store: Arc<dyn MemoryStore>,
+}
+
+impl MemoryTasks {
+    /// Builds the source over the memory store.
+    pub fn new(store: Arc<dyn MemoryStore>) -> Self {
+        Self { store }
+    }
+}
+
+#[async_trait]
+impl UpcomingSource for MemoryTasks {
+    fn label(&self) -> &'static str {
+        "Reminder"
+    }
+
+    fn tool(&self) -> &'static str {
+        REMEMBER
+    }
+
+    async fn upcoming(
+        &self,
+        ctx: &RequestContext,
+        from: DateTime<Utc>,
+        until: DateTime<Utc>,
+    ) -> Result<Vec<UpcomingItem>, String> {
+        let memories = self.store.recall(ctx).await.map_err(|error| {
+            tracing::error!(%error, "could not recall tasks");
+            "could not read your reminders".to_owned()
+        })?;
+        Ok(memories
+            .into_iter()
+            .filter(|m| m.kind == MemoryKind::Task)
+            .filter_map(|m| {
+                let due = m.expires_at?;
+                (due >= from && due <= until).then_some(UpcomingItem {
+                    at: due,
+                    all_day: true,
+                    title: m.content,
+                    detail: None,
+                    url: None,
+                })
+            })
+            .collect())
+    }
 }

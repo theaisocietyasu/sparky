@@ -61,6 +61,31 @@ impl Default for Canvas {
     }
 }
 
+/// One dated list of the caller's tasks, Canvas due dates and calendar events.
+#[derive(Debug, Deserialize)]
+#[serde(default)]
+pub struct Upcoming {
+    /// Whether the upcoming tool is registered when at least one source is.
+    pub enabled: bool,
+    /// Days ahead a call covers when the model gives none.
+    pub default_days: u32,
+    /// Most days ahead one call may cover.
+    pub max_days: u32,
+    /// Most items one call returns to the model.
+    pub max_items: usize,
+}
+
+impl Default for Upcoming {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            default_days: 7,
+            max_days: 30,
+            max_items: 30,
+        }
+    }
+}
+
 /// Google Calendar read-only tool. Off by default; reads the caller's Google account linked on the platform.
 #[derive(Debug, Deserialize)]
 #[serde(default)]

@@ -84,7 +84,12 @@ impl Handler {
                     "answered"
                 );
                 let messages = card::answer(&steps.lines(), &resp, limit);
-                let rows = components::rows_for(&resp);
+                let mut rows = components::rows_for(&resp);
+                if resp.confirmation.is_none()
+                    && let Ok(user) = req.user_id.parse::<u64>()
+                {
+                    rows.push(components::feedback_row(resp.request_id, user));
+                }
                 self.show(ctx, dest, card_id, messages, &rows).await;
             }
             Err(e) => {

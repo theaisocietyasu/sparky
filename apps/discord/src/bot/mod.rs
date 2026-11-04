@@ -5,6 +5,7 @@ mod canvas;
 mod commands;
 mod confirm;
 mod destination;
+mod feedback;
 mod login;
 pub(crate) mod memory;
 mod respond;
@@ -263,6 +264,13 @@ impl EventHandler for Handler {
                 }
                 Some(id @ (CustomId::ForgetAll { .. } | CustomId::KeepAll { .. })) => {
                     self.forget_pressed(&ctx, &press, id).await;
+                }
+                Some(CustomId::Feedback {
+                    helpful,
+                    request,
+                    user,
+                }) => {
+                    self.feedback(&ctx, &press, helpful, request, user).await;
                 }
                 None => {
                     tracing::debug!(custom_id = %press.data.custom_id, "component is not ours");
