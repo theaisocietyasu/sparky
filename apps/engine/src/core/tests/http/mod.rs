@@ -6,6 +6,7 @@ mod login;
 mod memories;
 mod rate_limit;
 mod sandbox;
+pub(crate) mod web;
 
 #[test]
 fn a_secret_matches_only_when_every_byte_does() {

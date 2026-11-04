@@ -16,8 +16,9 @@ use crate::core::types::memory::listing::{
     ListedMemory, MemoryForgetRequest, MemoryForgetResponse, MemoryList, MemoryListRequest,
 };
 use crate::core::types::memory::{Memory, MemoryKind};
-use crate::routes::auth::{authorized, too_many};
+use crate::routes::auth::{Caller, caller, too_many};
 use crate::routes::rate_limit::RateLimiter;
+use crate::routes::session::WebAuth;
 
 /// What the memory routes need.
 #[derive(Clone)]
@@ -34,6 +35,8 @@ pub struct MemoryState {
     pub default_tenant: String,
     /// Bearer token every caller must present.
     pub service_token: SecretString,
+    /// Reads web sessions. None while the web sign-in is off.
+    pub web: Option<WebAuth>,
 }
 
 impl MemoryState {
@@ -44,9 +47,10 @@ impl MemoryState {
         user_id: String,
         tenant_id: Option<String>,
     ) -> Result<RequestContext, Response> {
-        if !authorized(headers, &self.service_token) {
-            return Err((StatusCode::UNAUTHORIZED, "missing or wrong bearer token").into_response());
-        }
+        let (user_id, tenant_id) = match caller(headers, &self.service_token, self.web.as_ref())? {
+            Caller::Service => (user_id, tenant_id),
+            Caller::Web(session) => (session.user_id, None),
+        };
         if !self.rate_limit.allow(&user_id) {
             return Err(too_many(&user_id));
         }

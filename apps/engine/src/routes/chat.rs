@@ -25,14 +25,17 @@ use crate::core::traits::conversation::ConversationStore;
 use crate::core::traits::safety::confirmation::ConfirmationStore;
 use crate::core::types::agent::Answer;
 use crate::core::types::agent::context::RequestContext;
+use crate::core::types::conversation::Visibility;
 use crate::core::types::conversation::file::FileAttachment;
 use crate::core::types::conversation::image::Attachment;
 use crate::core::types::http::chat::{ChatRequest, ChatResponse, ConfirmRequest};
+use crate::core::types::http::web::Session;
 use crate::core::types::store::StoreError;
 use crate::core::types::trace::progress::Progress;
-use crate::routes::auth::{authorized, too_many};
+use crate::routes::auth::{Caller, caller, too_many};
 use crate::routes::failure::{Failure, NO_SUCH_CONVERSATION};
 use crate::routes::rate_limit::RateLimiter;
+use crate::routes::session::{WEB_CHANNEL, WebAuth};
 use crate::runtime::harness::agent::Agent;
 use uuid::Uuid;
 
@@ -65,6 +68,17 @@ pub struct ChatState {
     pub service_token: SecretString,
     /// Per-user request limit.
     pub rate_limit: RateLimiter,
+    /// Reads web sessions. None while the web sign-in is off.
+    pub web: Option<WebAuth>,
+}
+
+/// Rewrites a turn to run as the signed-in student in their private web chat.
+fn as_web(req: &mut ChatRequest, session: Session) {
+    req.user_id = session.user_id;
+    req.roles = session.roles;
+    req.tenant_id = None;
+    req.visibility = Visibility::Private;
+    WEB_CHANNEL.clone_into(&mut req.channel_id);
 }
 
 /// Parses a W3C traceparent header into a remote parent context.
@@ -150,10 +164,12 @@ fn record_outcome(span: &tracing::Span, outcome: &Result<ChatResponse, Failure>)
 pub async fn chat(
     State(state): State<ChatState>,
     headers: HeaderMap,
-    Json(req): Json<ChatRequest>,
+    Json(mut req): Json<ChatRequest>,
 ) -> Response {
-    if !authorized(&headers, &state.service_token) {
-        return (StatusCode::UNAUTHORIZED, "missing or wrong bearer token").into_response();
+    match caller(&headers, &state.service_token, state.web.as_ref()) {
+        Ok(Caller::Service) => {}
+        Ok(Caller::Web(session)) => as_web(&mut req, session),
+        Err(refused) => return refused,
     }
     if !state.rate_limit.allow(&req.user_id) {
         return too_many(&req.user_id);
@@ -172,10 +188,12 @@ pub async fn chat(
 pub async fn stream(
     State(state): State<ChatState>,
     headers: HeaderMap,
-    Json(req): Json<ChatRequest>,
+    Json(mut req): Json<ChatRequest>,
 ) -> Response {
-    if !authorized(&headers, &state.service_token) {
-        return (StatusCode::UNAUTHORIZED, "missing or wrong bearer token").into_response();
+    match caller(&headers, &state.service_token, state.web.as_ref()) {
+        Ok(Caller::Service) => {}
+        Ok(Caller::Web(session)) => as_web(&mut req, session),
+        Err(refused) => return refused,
     }
     if !state.rate_limit.allow(&req.user_id) {
         return too_many(&req.user_id);
@@ -341,10 +359,16 @@ async fn open(
 pub async fn confirm(
     State(state): State<ChatState>,
     headers: HeaderMap,
-    Json(req): Json<ConfirmRequest>,
+    Json(mut req): Json<ConfirmRequest>,
 ) -> Response {
-    if !authorized(&headers, &state.service_token) {
-        return (StatusCode::UNAUTHORIZED, "missing or wrong bearer token").into_response();
+    match caller(&headers, &state.service_token, state.web.as_ref()) {
+        Ok(Caller::Service) => {}
+        Ok(Caller::Web(session)) => {
+            req.user_id = session.user_id;
+            req.tenant_id = None;
+            req.visibility = Visibility::Private;
+        }
+        Err(refused) => return refused,
     }
     let Some(store) = &state.confirmations else {
         return (

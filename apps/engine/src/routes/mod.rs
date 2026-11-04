@@ -1,8 +1,8 @@
-//! Router assembly: /chat, /conversation, /memories, /sandbox, /oauth, /canvas, and /health.
+//! Router assembly: /chat, /conversation, /memories, /sandbox, /oauth, /canvas, /web, and /health.
 
 use axum::Router;
 use axum::extract::DefaultBodyLimit;
-use axum::http::HeaderValue;
+use axum::http::{HeaderValue, Method, header};
 use axum::routing::{delete, get, post};
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
@@ -17,6 +17,8 @@ pub mod memories;
 pub mod oauth;
 pub mod rate_limit;
 pub mod sandbox;
+pub mod session;
+pub mod web;
 
 /// Limits applied to the whole HTTP surface. Built from the http section; no Default.
 #[derive(Debug, Clone, Copy)]
@@ -28,7 +30,8 @@ pub struct Limits {
 }
 
 /// Cross-origin policy. A single * in origins allows any; an empty list adds no CORS headers.
-pub fn cors(origins: &[String]) -> Option<CorsLayer> {
+/// With credentials, the listed origins may send cookies and only the headers the page uses pass.
+pub fn cors(origins: &[String], credentials: bool) -> Option<CorsLayer> {
     if origins.is_empty() {
         return None;
     }
@@ -49,12 +52,34 @@ pub fn cors(origins: &[String]) -> Option<CorsLayer> {
             }
         }
     }
+    if credentials {
+        return Some(
+            CorsLayer::new()
+                .allow_origin(parsed)
+                .allow_methods([Method::GET, Method::POST])
+                .allow_headers([header::CONTENT_TYPE])
+                .allow_credentials(true),
+        );
+    }
     Some(
         CorsLayer::new()
             .allow_origin(parsed)
             .allow_methods(Any)
             .allow_headers(Any),
     )
+}
+
+/// The sign-in routes, or none while the web sign-in is off.
+fn web_routes(state: Option<web::WebState>) -> Router {
+    let Some(state) = state else {
+        return Router::new();
+    };
+    Router::new()
+        .route("/web/login", get(web::login))
+        .route("/web/callback", get(web::callback))
+        .route("/web/me", get(web::me))
+        .route("/web/logout", post(web::logout))
+        .with_state(state)
 }
 
 /// The state each group of routes reads.
@@ -71,6 +96,8 @@ pub struct States {
     pub oauth: oauth::OAuthState,
     /// Canvas feed link routes.
     pub canvas: canvas::CanvasState,
+    /// Web sign-in routes. None while the web sign-in is off.
+    pub web: Option<web::WebState>,
 }
 
 /// Full application router.
@@ -82,7 +109,9 @@ pub fn router(states: States, limits: Limits, cors_origins: &[String]) -> Router
         sandbox: sandbox_state,
         oauth: oauth_state,
         canvas: canvas_state,
+        web: web_state,
     } = states;
+    let credentials = web_state.is_some();
     let health = Router::new()
         .route("/health/live", get(health::live))
         .route("/health/ready", get(health::ready))
@@ -117,9 +146,10 @@ pub fn router(states: States, limits: Limits, cors_origins: &[String]) -> Router
         .merge(sandbox)
         .merge(oauth)
         .merge(canvas)
+        .merge(web_routes(web_state))
         .layer(DefaultBodyLimit::max(limits.max_body_bytes))
         .layer(TraceLayer::new_for_http());
-    if let Some(layer) = cors(cors_origins) {
+    if let Some(layer) = cors(cors_origins, credentials) {
         router = router.layer(layer);
     }
     if limits.concurrency > 0 {

@@ -7,18 +7,25 @@ use axum::response::{IntoResponse, Response};
 
 use crate::core::types::agent::context::RequestContext;
 use crate::core::types::conversation::{ResetRequest, ResetResponse};
-use crate::routes::auth::{authorized, too_many};
+use crate::routes::auth::{Caller, caller, too_many};
 use crate::routes::chat::ChatState;
 use crate::routes::failure::Failure;
+use crate::routes::session::WEB_CHANNEL;
 
 /// Ends every open conversation of the caller in the channel, any visibility. Next turn starts new.
 pub async fn reset(
     State(state): State<ChatState>,
     headers: HeaderMap,
-    Json(req): Json<ResetRequest>,
+    Json(mut req): Json<ResetRequest>,
 ) -> Response {
-    if !authorized(&headers, &state.service_token) {
-        return (StatusCode::UNAUTHORIZED, "missing or wrong bearer token").into_response();
+    match caller(&headers, &state.service_token, state.web.as_ref()) {
+        Ok(Caller::Service) => {}
+        Ok(Caller::Web(session)) => {
+            req.user = session.user_id;
+            req.tenant = None;
+            WEB_CHANNEL.clone_into(&mut req.channel);
+        }
+        Err(refused) => return refused,
     }
     if !state.rate_limit.allow(&req.user) {
         return too_many(&req.user);
