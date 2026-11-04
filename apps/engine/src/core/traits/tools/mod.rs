@@ -5,6 +5,7 @@ pub mod files;
 pub mod gcal;
 pub mod outlook;
 pub mod sandbox;
+pub mod upcoming;
 
 use async_trait::async_trait;
 use serde_json::Value;

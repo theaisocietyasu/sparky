@@ -7,3 +7,4 @@ mod mcp;
 mod memory;
 mod outlook;
 mod sandbox;
+mod upcoming;

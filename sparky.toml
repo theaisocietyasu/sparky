@@ -78,6 +78,8 @@ role_line_no_roles = "The user is `{user}`. They hold no special roles."
 memory_header = "What you remember about this user:"
 # Added to the system prompt in a direct message when the memory tools are registered.
 memory_rules = "Memory. Call remember when the student states something about themselves that helps later: their major, year, campus, clubs, how they want answers, or a task with its due date. Only what they said, never a guess. Never store grades, GPA, health, disability, immigration status, finances, passwords or codes, or anything about another person. Call forget_memory with the id in brackets when they ask you to forget something."
+# Added to the system prompt in a direct message when search_live is registered.
+discovery_rules = "Discovery. When the student asks for something to do, join or attend, take their major, interests, clubs and campus from what you remember, use them as the words of a search_live query on events or clubs, and say which memory you used."
 capabilities_header = "What you can do. Each line is a name, how it runs, and what it does."
 # {date} is filled in at assembly.
 date_line = "Today is {date}. Search results are labelled by day or date; read the label the question asks for, never the first value in a row."
@@ -248,6 +250,14 @@ max_bytes = 2000000            # largest feed read
 default_days = 14              # days ahead when the model gives none
 max_days = 60
 max_items = 25
+
+# upcoming lists the caller's remembered tasks, Canvas due dates, and Google and Outlook events
+# in one call, soonest first, in a direct message only. It reads the sources that are registered.
+[upcoming]
+enabled = true
+default_days = 7               # days ahead when the model gives none
+max_days = 30
+max_items = 30
 
 # Academic paper search over Semantic Scholar. Public, no key.
 [papers]

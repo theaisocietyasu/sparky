@@ -83,6 +83,6 @@ async fn events_are_listed_with_summary_and_start() {
 #[test]
 fn the_tool_builds_from_its_config() {
     let cfg = crate::core::config::Gcal::default();
-    let built = tools(&cfg, Arc::new(Linked(None)));
-    assert!(built.is_ok_and(|tools| tools.len() == 1));
+    let built = tools(&cfg, Arc::new(Linked(None)), -7);
+    assert!(built.is_ok_and(|b| b.tools.len() == 1 && b.upcoming.len() == 1));
 }

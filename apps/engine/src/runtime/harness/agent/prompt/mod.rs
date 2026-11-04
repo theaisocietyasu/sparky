@@ -34,6 +34,8 @@ pub struct PromptText {
     pub upload_failed_line: String,
     /// What to remember and what never to store, for a private turn with the memory tools.
     pub memory_rules: String,
+    /// How to find events and clubs from memories, for a private turn with search_live.
+    pub discovery_rules: String,
     /// Hours from UTC the date is rendered in.
     pub utc_offset_hours: i32,
 }
@@ -60,6 +62,7 @@ impl From<&crate::core::config::Prompt> for PromptText {
             upload_raw_line: cfg.upload_raw_line.clone(),
             upload_failed_line: cfg.upload_failed_line.clone(),
             memory_rules: cfg.memory_rules.clone(),
+            discovery_rules: cfg.discovery_rules.clone(),
             utc_offset_hours: cfg.utc_offset_hours,
         }
     }
@@ -95,6 +98,7 @@ impl PromptText {
             reply_header: &self.reply_header,
             result_cut_line: &self.result_cut_line,
             memory_rules: &self.memory_rules,
+            discovery_rules: &self.discovery_rules,
         }
     }
 }

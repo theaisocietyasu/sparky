@@ -84,6 +84,9 @@ pub struct Config {
     /// Canvas calendar feed integration.
     #[serde(default)]
     pub canvas: Canvas,
+    /// The upcoming tool over tasks, Canvas and calendars.
+    #[serde(default)]
+    pub upcoming: Upcoming,
     /// Academic paper search.
     #[serde(default)]
     pub papers: Papers,
@@ -408,6 +411,7 @@ fn validate_mcp_risks(mcp: &Mcp) -> Result<(), ConfigError> {
 
 fn validate_integrations(cfg: &Config) -> Result<(), ConfigError> {
     validate_canvas(cfg)?;
+    validate_upcoming(&cfg.upcoming)?;
     if cfg.outlook.enabled {
         if !cfg.outlook.base_url.starts_with("https://") {
             return Err(ConfigError::Invalid(
@@ -419,6 +423,23 @@ fn validate_integrations(cfg: &Config) -> Result<(), ConfigError> {
                 "outlook: timeout_secs and max_items must be at least 1".into(),
             ));
         }
+    }
+    Ok(())
+}
+
+fn validate_upcoming(upcoming: &Upcoming) -> Result<(), ConfigError> {
+    if !upcoming.enabled {
+        return Ok(());
+    }
+    if upcoming.default_days == 0 || upcoming.default_days > upcoming.max_days {
+        return Err(ConfigError::Invalid(
+            "upcoming: default_days must be from 1 to max_days".into(),
+        ));
+    }
+    if upcoming.max_items == 0 {
+        return Err(ConfigError::Invalid(
+            "upcoming: max_items must be at least 1".into(),
+        ));
     }
     Ok(())
 }

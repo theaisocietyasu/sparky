@@ -7,16 +7,19 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use chrono::{FixedOffset, Utc};
+use chrono::{DateTime, FixedOffset, Utc};
 use serde_json::{Value, json};
 
 use crate::core::config::Canvas as CanvasConfig;
 use crate::core::traits::tools::Tool;
 use crate::core::traits::tools::canvas::{CanvasCalendar, CanvasFeeds};
+use crate::core::traits::tools::upcoming::UpcomingSource;
 use crate::core::types::agent::context::RequestContext;
 use crate::core::types::conversation::Visibility;
 use crate::core::types::tools::canvas::{CanvasError, CanvasItem, parse_ics};
+use crate::core::types::tools::upcoming::UpcomingItem;
 use crate::core::types::tools::{RiskClass, ToolDefinition, ToolError, ToolOutput};
+use crate::runtime::tools::Built;
 use crate::runtime::tools::account::canvas::client::FeedClient;
 
 /// Name the model calls.
@@ -123,6 +126,54 @@ impl Tool for CanvasTool {
             ));
         }
         let days = self.days(&args)?;
+        let now = Utc::now();
+        let end = now + chrono::Duration::days(i64::from(days));
+        let items = self.items(ctx, now, end).await?;
+        Ok(render(&items, days, self.window.max_items, self.offset))
+    }
+}
+
+#[async_trait]
+impl UpcomingSource for CanvasTool {
+    fn label(&self) -> &'static str {
+        "Canvas"
+    }
+
+    fn tool(&self) -> &'static str {
+        CANVAS_DEADLINES
+    }
+
+    async fn upcoming(
+        &self,
+        ctx: &RequestContext,
+        from: DateTime<Utc>,
+        until: DateTime<Utc>,
+    ) -> Result<Vec<UpcomingItem>, String> {
+        let items = self
+            .items(ctx, from, until)
+            .await
+            .map_err(|e| e.to_string())?;
+        Ok(items
+            .into_iter()
+            .map(|i| UpcomingItem {
+                at: i.at,
+                all_day: i.all_day,
+                title: i.title,
+                detail: i.course,
+                url: i.url,
+            })
+            .collect())
+    }
+}
+
+impl CanvasTool {
+    /// The caller's feed items from from until until, soonest first.
+    async fn items(
+        &self,
+        ctx: &RequestContext,
+        from: DateTime<Utc>,
+        until: DateTime<Utc>,
+    ) -> Result<Vec<CanvasItem>, ToolError> {
         let link = self.feeds.load(&ctx.user_id).await.map_err(|error| {
             tracing::error!(%error, "could not read a Canvas feed link");
             ToolError::Failed("could not read your Canvas link".to_owned())
@@ -135,16 +186,15 @@ impl Tool for CanvasTool {
             ));
         };
         let text = self.calendar.fetch(&link).await.map_err(failed)?;
-        let now = Utc::now();
-        let end = now + chrono::Duration::days(i64::from(days));
         let mut items: Vec<CanvasItem> = parse_ics(&text, self.offset)
             .into_iter()
             .filter(|i| {
-                i.at <= end && (i.at >= now || i.all_day && i.at + chrono::Duration::days(1) > now)
+                i.at <= until
+                    && (i.at >= from || i.all_day && i.at + chrono::Duration::days(1) > from)
             })
             .collect();
         items.sort_by_key(|i| i.at);
-        Ok(render(&items, days, self.window.max_items, self.offset))
+        Ok(items)
     }
 }
 
@@ -191,7 +241,7 @@ pub fn tools(
     cfg: &CanvasConfig,
     feeds: Arc<dyn CanvasFeeds>,
     utc_offset_hours: i32,
-) -> Result<Vec<Arc<dyn Tool>>, String> {
+) -> Result<Built, String> {
     let calendar: Arc<dyn CanvasCalendar> = Arc::new(
         FeedClient::new(Duration::from_secs(cfg.timeout_secs), cfg.max_bytes)
             .map_err(|e| e.to_string())?,
@@ -203,6 +253,9 @@ pub fn tools(
         max_days: cfg.max_days,
         max_items: cfg.max_items,
     };
-    let tool: Arc<dyn Tool> = Arc::new(CanvasTool::new(feeds, calendar, window, offset));
-    Ok(vec![tool])
+    let tool = Arc::new(CanvasTool::new(feeds, calendar, window, offset));
+    Ok(Built {
+        tools: vec![tool.clone() as Arc<dyn Tool>],
+        upcoming: vec![tool as Arc<dyn UpcomingSource>],
+    })
 }

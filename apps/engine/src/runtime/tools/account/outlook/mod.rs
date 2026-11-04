@@ -7,16 +7,20 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
+use chrono::{DateTime, Offset, Utc};
 use serde_json::{Value, json};
 
 use crate::core::config::Outlook as OutlookConfig;
 use crate::core::traits::oauth::OAuthStore;
 use crate::core::traits::tools::Tool;
 use crate::core::traits::tools::outlook::Outlook;
+use crate::core::traits::tools::upcoming::UpcomingSource;
 use crate::core::types::agent::context::RequestContext;
 use crate::core::types::conversation::Visibility;
 use crate::core::types::tools::outlook::OutlookError;
+use crate::core::types::tools::upcoming::{UpcomingItem, parse_start};
 use crate::core::types::tools::{RiskClass, ToolDefinition, ToolError, ToolOutput};
+use crate::runtime::tools::Built;
 use crate::runtime::tools::account::grant::Credentials;
 use crate::runtime::tools::account::outlook::client::GraphClient;
 use crate::runtime::tools::account::outlook::render::{calendar_output, mail_output};
@@ -135,18 +139,74 @@ impl Tool for OutlookTool {
     }
 }
 
-/// The Outlook tools, over the Graph client, the per-user grant store, and the refresh client.
-pub fn tools(
-    cfg: &OutlookConfig,
-    store: Arc<dyn OAuthStore>,
-) -> Result<Vec<Arc<dyn Tool>>, OutlookError> {
+/// The caller's Outlook events, as a source of the upcoming tool.
+pub struct OutlookSource {
+    client: Arc<dyn Outlook>,
+    creds: Arc<Credentials>,
+}
+
+impl OutlookSource {
+    /// Builds the source over the Graph client and the shared credentials.
+    pub fn new(client: Arc<dyn Outlook>, creds: Arc<Credentials>) -> Self {
+        Self { client, creds }
+    }
+}
+
+#[async_trait]
+impl UpcomingSource for OutlookSource {
+    fn label(&self) -> &'static str {
+        "Outlook"
+    }
+
+    fn tool(&self) -> &'static str {
+        Query::Calendar.name()
+    }
+
+    async fn upcoming(
+        &self,
+        ctx: &RequestContext,
+        from: DateTime<Utc>,
+        until: DateTime<Utc>,
+    ) -> Result<Vec<UpcomingItem>, String> {
+        let token = self
+            .creds
+            .resolve(ctx)
+            .await
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| "not connected; send /login and choose Outlook".to_owned())?;
+        let events = self
+            .client
+            .calendar(&token)
+            .await
+            .map_err(|e| failed(e).to_string())?;
+        Ok(events
+            .into_iter()
+            .filter_map(|e| {
+                // Graph returns start times in UTC with no offset.
+                let (at, all_day) = parse_start(e.start.as_deref()?, Utc.fix())?;
+                (at >= from && at <= until).then_some(UpcomingItem {
+                    at,
+                    all_day,
+                    title: e.subject,
+                    detail: e.location,
+                    url: e.url,
+                })
+            })
+            .collect())
+    }
+}
+
+/// The Outlook tools and the calendar source, over the Graph client and the per-user grant store.
+pub fn tools(cfg: &OutlookConfig, store: Arc<dyn OAuthStore>) -> Result<Built, OutlookError> {
     let client: Arc<dyn Outlook> = Arc::new(GraphClient::new(
         &cfg.base_url,
         Duration::from_secs(cfg.timeout_secs),
         cfg.max_items,
     )?);
     let creds = Arc::new(Credentials::new(store, PROVIDER));
-    Ok(ALL
+    let source: Arc<dyn UpcomingSource> =
+        Arc::new(OutlookSource::new(client.clone(), creds.clone()));
+    let tools = ALL
         .into_iter()
         .map(|q| {
             Arc::new(OutlookTool::new(
@@ -156,5 +216,9 @@ pub fn tools(
                 cfg.max_items,
             )) as Arc<dyn Tool>
         })
-        .collect())
+        .collect();
+    Ok(Built {
+        tools,
+        upcoming: vec![source],
+    })
 }

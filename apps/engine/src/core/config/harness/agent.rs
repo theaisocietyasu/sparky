@@ -216,6 +216,8 @@ pub struct Prompt {
     pub memory_header: String,
     /// What to remember and what never to store. Added to the system prompt in a private turn.
     pub memory_rules: String,
+    /// How to find events and clubs from memories. Added to the system prompt in a private turn.
+    pub discovery_rules: String,
     /// Heading above what the model may do.
     pub capabilities_header: String,
     /// Heading above the message of ours a reply answers.
@@ -249,6 +251,7 @@ impl Default for Prompt {
             role_line_no_roles: assemble::ROLE_LINE_NO_ROLES.into(),
             memory_header: assemble::MEMORY_HEADER.into(),
             memory_rules: assemble::MEMORY_RULES.into(),
+            discovery_rules: assemble::DISCOVERY_RULES.into(),
             capabilities_header: assemble::CAPABILITIES_HEADER.into(),
             reply_header: assemble::REPLY_HEADER.into(),
             result_cut_line: assemble::RESULT_CUT_LINE.into(),

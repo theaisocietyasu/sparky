@@ -3,6 +3,8 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use chrono::FixedOffset;
+
 use secrecy::ExposeSecret;
 
 use crate::core::config::Config;
@@ -12,6 +14,7 @@ use crate::core::traits::memory::MemoryStore;
 use crate::core::traits::oauth::OAuthStore;
 use crate::core::traits::tools::Tool;
 use crate::core::traits::tools::canvas::CanvasFeeds;
+use crate::core::traits::tools::upcoming::UpcomingSource;
 use crate::core::traits::trace::TraceSink;
 use crate::core::types::tools::sandbox::Limits as SandboxLimits;
 use crate::runtime::harness::tools::ToolSet;
@@ -20,14 +23,15 @@ use crate::runtime::tools::knowledge::search;
 use crate::runtime::tools::knowledge::search::live::{LiveSearch, Wording as LiveWording};
 use crate::runtime::tools::knowledge::search::stored::{StoredSearch, Wording as StoredWording};
 use crate::runtime::tools::mcp::{self, McpLimits};
-use crate::runtime::tools::memory::{self, MemoryRules};
+use crate::runtime::tools::memory::{self, MemoryRules, MemoryTasks};
 use crate::runtime::tools::sandbox::{
     ContainerSandbox, SandboxTool, Wording as SandboxWording, reap_sessions,
 };
-use crate::runtime::tools::{papers, wiki};
+use crate::runtime::tools::upcoming::{UpcomingTool, Window as UpcomingWindow};
+use crate::runtime::tools::{Built, papers, wiki};
 
-/// Builds the tools of one integration, or says why it could not.
-type Build<'a> = Box<dyn FnOnce() -> Result<Vec<Arc<dyn Tool>>, String> + 'a>;
+/// Builds the tools and upcoming sources of one integration, or says why it could not.
+type Build<'a> = Box<dyn FnOnce() -> Result<Built, String> + 'a>;
 
 /// One integration: its name, whether it is enabled, and how its tools are built.
 type Integration<'a> = (&'static str, bool, Build<'a>);
@@ -116,24 +120,41 @@ pub(crate) async fn build_tools(
         }
         tracing::info!(url = %url, count = registered, "platform mcp tools registered");
     }
-    if let Some((store, trace)) = memory {
-        let rules = MemoryRules::new(&cfg.memory, cfg.prompt.utc_offset_hours);
-        tools = register(
-            tools,
-            memory::tools(&store, &trace, rules),
-            &disabled,
-            "memory",
-        );
-    }
-    for (integration, enabled, build) in integrations(cfg, &oauth_store, canvas) {
+    let mut sources: Vec<Arc<dyn UpcomingSource>> = Vec::new();
+    for (integration, enabled, build) in integrations(cfg, &oauth_store, canvas, memory) {
         if !enabled {
             continue;
         }
         let built = build().map_err(|e| anyhow::anyhow!("{integration}: {e}"))?;
-        tools = register(tools, built, &disabled, integration);
+        sources.extend(built.upcoming);
+        tools = register(tools, built.tools, &disabled, integration);
+    }
+    sources.retain(|s| !disabled(s.tool()));
+    if let Some(tool) = upcoming(cfg, sources)? {
+        tools = register(tools, vec![tool], &disabled, "upcoming");
     }
     tracing::info!(tools = ?tools, "tool set");
     Ok((tools, mcp_names))
+}
+
+/// The upcoming tool over the sources, when it is on and has at least one source.
+fn upcoming(
+    cfg: &Config,
+    sources: Vec<Arc<dyn UpcomingSource>>,
+) -> anyhow::Result<Option<Arc<dyn Tool>>> {
+    if !cfg.upcoming.enabled || sources.is_empty() {
+        return Ok(None);
+    }
+    let offset = FixedOffset::east_opt(cfg.prompt.utc_offset_hours * 3600)
+        .ok_or_else(|| anyhow::anyhow!("prompt.utc_offset_hours is out of range"))?;
+    let window = UpcomingWindow {
+        default_days: cfg.upcoming.default_days,
+        max_days: cfg.upcoming.max_days,
+        max_items: cfg.upcoming.max_items,
+    };
+    let labels: Vec<&str> = sources.iter().map(|s| s.label()).collect();
+    tracing::info!(sources = %labels.join(", "), "upcoming sources");
+    Ok(Some(Arc::new(UpcomingTool::new(sources, window, offset))))
 }
 
 /// Every integration that adds tools, in registration order.
@@ -141,9 +162,24 @@ fn integrations<'a>(
     cfg: &'a Config,
     oauth_store: &'a Arc<dyn OAuthStore>,
     canvas_feeds: Option<Arc<dyn CanvasFeeds>>,
+    memory: Option<(Arc<dyn MemoryStore>, Arc<dyn TraceSink>)>,
 ) -> Vec<Integration<'a>> {
     let mut all: Vec<Integration<'a>> = Vec::new();
-    all.extend::<[Integration<'a>; 5]>([
+    all.extend::<[Integration<'a>; 6]>([
+        (
+            "memory",
+            memory.is_some(),
+            Box::new(move || {
+                let Some((store, trace)) = memory else {
+                    return Ok(Built::default());
+                };
+                let rules = MemoryRules::new(&cfg.memory, cfg.prompt.utc_offset_hours);
+                Ok(Built {
+                    tools: memory::tools(&store, &trace, rules),
+                    upcoming: vec![Arc::new(MemoryTasks::new(store))],
+                })
+            }),
+        ),
         (
             "outlook",
             cfg.outlook.enabled,
@@ -155,7 +191,8 @@ fn integrations<'a>(
             "gcal",
             cfg.gcal.enabled,
             Box::new(move || {
-                gcal::tools(&cfg.gcal, oauth_store.clone()).map_err(|e| e.to_string())
+                gcal::tools(&cfg.gcal, oauth_store.clone(), cfg.prompt.utc_offset_hours)
+                    .map_err(|e| e.to_string())
             }),
         ),
         (
@@ -163,18 +200,18 @@ fn integrations<'a>(
             cfg.canvas.enabled && canvas_feeds.is_some(),
             Box::new(move || match canvas_feeds {
                 Some(feeds) => canvas::tools(&cfg.canvas, feeds, cfg.prompt.utc_offset_hours),
-                None => Ok(Vec::new()),
+                None => Ok(Built::default()),
             }),
         ),
         (
             "papers",
             cfg.papers.enabled,
-            Box::new(move || papers::tools(&cfg.papers)),
+            Box::new(move || papers::tools(&cfg.papers).map(Built::from)),
         ),
         (
             "wikipedia",
             cfg.wikipedia.enabled,
-            Box::new(move || wiki::tools(&cfg.wikipedia)),
+            Box::new(move || wiki::tools(&cfg.wikipedia).map(Built::from)),
         ),
     ]);
     all

@@ -5,6 +5,7 @@ pub mod gcal;
 pub mod oauth;
 pub mod outlook;
 pub mod sandbox;
+pub mod upcoming;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

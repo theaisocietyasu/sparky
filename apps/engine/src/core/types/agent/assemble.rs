@@ -39,6 +39,8 @@ pub struct Templates<'a> {
     pub result_cut_line: &'a str,
     /// What to remember and what never to store. Added to the system prompt in a private turn.
     pub memory_rules: &'a str,
+    /// How to use memories to find events and clubs. Added to the system prompt in a private turn.
+    pub discovery_rules: &'a str,
 }
 
 /// Default line naming the user, with {user} and {roles}.
@@ -53,6 +55,8 @@ later: their major, year, campus, clubs, how they want answers, or a task with i
 Only what they said, never a guess. Never store grades, GPA, health, disability, immigration \
 status, finances, passwords or codes, or anything about another person. Call forget_memory \
 with the id in brackets when they ask you to forget something.";
+/// Default rule for finding events and clubs from memories, added in a private turn.
+pub const DISCOVERY_RULES: &str = "Discovery. When the student asks for something to do, join or attend, take their major, interests, clubs and campus from what you remember, use them as the words of a search_live query on events or clubs, and say which memory you used.";
 /// Default line naming the current date, with {date}.
 pub const DATE_LINE: &str = "Today is {date}. Search results are labelled by day or date; read \
                              the label the question asks for, never the first value in a row.";
@@ -97,6 +101,7 @@ impl Default for Templates<'_> {
             reply_header: REPLY_HEADER,
             result_cut_line: RESULT_CUT_LINE,
             memory_rules: MEMORY_RULES,
+            discovery_rules: DISCOVERY_RULES,
         }
     }
 }
