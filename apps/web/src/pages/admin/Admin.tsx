@@ -1,12 +1,14 @@
 import { NavLink, useParams } from "react-router-dom";
 import Gated from "../../components/chat/Gated";
-import { Approvals, History, Instructions, Limits, Tools } from "./Tabs";
+import { Approvals, History, Instructions, Limits, Sources, Tools, Traces } from "./Tabs";
 
 const TABS = [
   { path: "tools", label: "Tools", view: Tools },
   { path: "instructions", label: "Instructions", view: Instructions },
   { path: "history", label: "History", view: History },
   { path: "approvals", label: "Approvals", view: Approvals },
+  { path: "traces", label: "Traces", view: Traces },
+  { path: "sources", label: "Sources", view: Sources },
   { path: "limits", label: "Limits", view: Limits },
 ] as const;
 
@@ -37,7 +39,7 @@ const Panel = () => {
   );
 };
 
-/** /admin: tools, instructions, history, approvals and limits for a server manager. */
+/** /admin: tools, instructions, history, approvals, traces, sources and limits for a server manager. */
 const Admin = () => <Gated>{() => <Panel />}</Gated>;
 
 export default Admin;

@@ -10,6 +10,8 @@ pub struct Admin {
     pub max_instructions_chars: usize,
     /// Changes GET /admin/history returns, newest first.
     pub history_limit: usize,
+    /// Traces GET /admin/traces returns, newest first.
+    pub traces_limit: usize,
 }
 
 impl Default for Admin {
@@ -17,6 +19,7 @@ impl Default for Admin {
         Self {
             max_instructions_chars: 20_000,
             history_limit: 50,
+            traces_limit: 100,
         }
     }
 }

@@ -223,9 +223,12 @@ impl Config {
         validate_platform(self)?;
         validate_store(&self.store, &self.memory)?;
         validate_web(self)?;
-        if self.admin.max_instructions_chars == 0 || self.admin.history_limit == 0 {
+        if self.admin.max_instructions_chars == 0
+            || self.admin.history_limit == 0
+            || self.admin.traces_limit == 0
+        {
             return invalid(
-                "admin.max_instructions_chars and admin.history_limit must be above 0".into(),
+                "admin.max_instructions_chars, admin.history_limit and admin.traces_limit must be above 0".into(),
             );
         }
         if self.retrieval.window < 0 {

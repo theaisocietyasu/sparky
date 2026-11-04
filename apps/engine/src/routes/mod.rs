@@ -151,6 +151,9 @@ pub fn router(states: States, limits: Limits, cors_origins: &[String]) -> Router
         .route("/admin/history", get(admin::history))
         .route("/admin/rollback/{id}", post(admin::rollback))
         .route("/admin/limits", get(admin::limits))
+        .route("/admin/traces", get(admin::traces))
+        .route("/admin/traces/{id}", get(admin::trace))
+        .route("/admin/sources", get(admin::sources))
         .route("/admin/approvals", get(admin::approvals))
         .route("/admin/approvals/{token}/deny", post(admin::deny))
         .with_state(admin_state);

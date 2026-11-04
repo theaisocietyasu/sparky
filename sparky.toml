@@ -264,10 +264,13 @@ discord_authorize_url = "https://discord.com/oauth2/authorize"
 timeout_secs = 10
 
 # The admin pages at /admin: a session whose roles include policy.write_roles[0] switches tools,
-# edits the system instructions with history and rollback, and denies held actions.
+# edits the system instructions with history and rollback, denies held actions, and reads full
+# traces from trace.dir, direct messages included. Results of tools that read a student's linked
+# accounts are masked in the trace.
 [admin]
 max_instructions_chars = 20000
 history_limit = 50
+traces_limit = 100
 
 # upcoming lists the caller's remembered tasks, Canvas due dates, and Google and Outlook events
 # in one call, soonest first, in a direct message only. It reads the sources that are registered.
