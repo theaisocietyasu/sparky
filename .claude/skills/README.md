@@ -3,7 +3,7 @@
 | Skill | Purpose | Origin |
 |---|---|---|
 | `check` | the gate: fmt, clippy, test, check-deps for every unit | ours |
-| `roadmap` | progress against ROADMAP.md | ours |
+| `roadmap` | progress against the master issue #79 and its sub-issues | ours |
 | `code-quality` | refactor and cleanup pass: naming, workspace deps, registries over enumeration, dead code and silent fallbacks. User-invoked only. | ours (adapted, Rust-specific) |
 | `rust-skills` | 265 Rust rules across 26 categories; the Rust style reference | [leonardomso/rust-skills](https://github.com/leonardomso/rust-skills), MIT |
 | `postgres-strict` | schema, indexing, migration safety, RLS, pgvector | [0xMassi/claude-skills](https://github.com/0xMassi/claude-skills), MIT |

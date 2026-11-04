@@ -1,0 +1,34 @@
+name: Task
+description: A chore, cleanup or doc change with a clear end
+labels: [task]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+  - type: textarea
+    id: done
+    attributes:
+      label: Done when
+    validations:
+      required: true
+  - type: dropdown
+    id: unit
+    attributes:
+      label: Unit
+      options:
+        - engine
+        - discord
+        - cli
+        - evals
+        - web
+        - deploy
+        - docs
+    validations:
+      required: true

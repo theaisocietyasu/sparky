@@ -1,6 +1,8 @@
 # SparkyAI agent guide
 
-Rust rebuild of an ASU student copilot. `docs/ROADMAP.md` says what we build and in what order; `docs/ARCHITECTURE.md` gives crate boundaries, traits, and invariants. Do not contradict either; propose an edit to the doc instead.
+Rust rebuild of an ASU student copilot. The master issue [#79](https://github.com/theaisocietyasu/sparky/issues/79) and its sub-issues say what we build and in what order; `docs/ROADMAP.md` gives the direction and what is out of scope; `docs/ARCHITECTURE.md` gives crate boundaries, traits, and invariants. Do not contradict either doc; propose an edit to the doc instead.
+
+Principles and per-language rules for every change: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Commands
 

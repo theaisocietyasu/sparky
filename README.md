@@ -7,6 +7,7 @@
 <p align="center">
   <a href="docs/ARCHITECTURE.md">Architecture</a> |
   <a href="docs/ROADMAP.md">Roadmap</a> |
+  <a href="https://github.com/theaisocietyasu/sparky/issues/79">v1.0 issues</a> |
   <a href="deploy/README.md">Setup</a>
 </p>
 
@@ -92,7 +93,8 @@ Platform fetches the public ASU pages SparkyAI answers from, and SparkyAI cites 
 ## Docs
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): crate boundaries, traits, Platform stores, and invariants
-- [docs/ROADMAP.md](docs/ROADMAP.md): what is built next, and what is out of scope
+- [docs/ROADMAP.md](docs/ROADMAP.md): the direction, and what is out of scope
+- [#79 SparkyAI v1.0](https://github.com/theaisocietyasu/sparky/issues/79): what is built next, in order
 - [AGENTS.md](AGENTS.md): commands and rules for contributors and coding agents
 
 The 2024 to 2025 prototype is on [`archive/v1`](https://github.com/theaisocietyasu/sparky/tree/archive/v1), with a write-up in [docs/blog/sparkyai-v1.md](docs/blog/sparkyai-v1.md).

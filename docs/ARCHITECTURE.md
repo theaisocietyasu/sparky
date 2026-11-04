@@ -2,7 +2,7 @@
 
 SparkyAI is a Discord copilot for the AI Society at ASU. It answers questions from public ASU sources, keeps conversation history and a profile of each user, and gates moderator actions behind policy and confirmation.
 
-This document describes the current shape of the system and its rules. Order of work is in [ROADMAP.md](ROADMAP.md). Decisions are recorded in the commits that settle them.
+This document describes the current shape of the system and its rules. Order of work is in the master issue [#79](https://github.com/theaisocietyasu/sparky/issues/79); direction and scope are in [ROADMAP.md](ROADMAP.md). Decisions are recorded in the commits that settle them.
 
 ## Stack
 
