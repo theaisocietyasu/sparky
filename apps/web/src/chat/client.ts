@@ -34,6 +34,17 @@ const failure = async (res: Response) => {
   return new EngineError(res.status, message || res.statusText);
 };
 
+/** Calls the engine with the session cookie and reads the JSON answer, throwing on a refusal. */
+export const call = async <T>(method: string, path: string, body?: unknown): Promise<T> =>
+  json<T>(
+    await fetch(`${engineUrl()}${path}`, {
+      method,
+      credentials: "include",
+      headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    }),
+  );
+
 const json = async <T>(res: Response): Promise<T> => {
   if (!res.ok) throw await failure(res);
   return (await res.json()) as T;

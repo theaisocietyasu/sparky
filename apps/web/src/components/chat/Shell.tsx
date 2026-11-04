@@ -19,6 +19,11 @@ const Shell = ({ me, onSignOut, children }: { me: Me | null; onSignOut?: () => v
             <Link to="/memories" className="text-ink-soft hover:text-ink">
               Memories
             </Link>
+            {me.roles.length > 0 && (
+              <Link to="/admin" className="text-ink-soft hover:text-ink">
+                Admin
+              </Link>
+            )}
             <span className="ml-auto truncate text-ink-soft">{me.name}</span>
             <button type="button" onClick={onSignOut} className="font-medium text-shu hover:text-shu-deep">
               Sign out
