@@ -82,7 +82,7 @@ Two layers, lowest first: `sparky.toml` (committed), then `SPARKY_<SECTION>__<KE
 
 ## Skills
 
-Listed in `.claude/skills/README.md`. Use `rust-skills` when writing Rust, `postgres-strict` for schema and migrations, `test-driven-development` for features and fixes, `systematic-debugging` for bugs, `verification-before-completion` before saying anything is done, `security-audit-standard` before a release, `/code-quality` for cleanup and refactor passes. `/check` is the gate.
+Listed in `.claude/skills/README.md`. Use `rust-skills` when writing Rust, `postgres-strict` for schema and migrations, `test-driven-development` for features and fixes, `systematic-debugging` for bugs, `verification-before-completion` before saying anything is done, `security-audit-standard` before a release, `/code-quality` for cleanup and refactor passes. `/check` is the gate. While coding, follow `karpathy-guidelines`; for module interfaces, `codebase-design`; for docs, comments and commit text, `technical-writing`; for pull request bodies, `pr`; for review feedback, `receiving-code-review`; for `apps/web`, `frontend-design` and the `better-*` set.
 
 ## Conventions
 
