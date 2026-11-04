@@ -58,7 +58,7 @@ just discord
 | `apps/discord/` | Rust: the Discord bot, an HTTP client of the engine |
 | `apps/cli/` | Rust: a terminal console that runs and tails every unit |
 | `apps/evals/` | Python: golden cases, scorers, and the baseline gate |
-| `apps/web/` | Vite and React: the static site and admin UI |
+| `apps/web/` | Vite and React: the static site, web chat and memories pages |
 | `deploy/` | Compose files, Dockerfiles, and model server config |
 | `docs/` | `ARCHITECTURE.md` and `ROADMAP.md` |
 
