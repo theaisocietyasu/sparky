@@ -130,6 +130,8 @@ Details: `deploy/inference/README.md`.
 
 `apps/web` builds to static files (`npm run build` to `apps/web/dist`). Deploy to Vercel (root directory `apps/web`) or any static host. It is not part of a Docker image.
 
+The `/chat` and `/memories` pages call the engine from the browser. Build with `VITE_ENGINE_URL` set to the engine's public https origin (on RunPod, the pod's proxy URL for the engine port); without it the pages say the chat is not set up. On the engine, set `[web] enabled = true`, the `SPARKY_WEB__*` values in `.env.example`, and list the site origin in `http.cors_origins`. Register `<SPARKY_WEB__PUBLIC_URL>/web/callback` as a redirect on the Discord application. `apps/web/vercel.json` sends every path without a file extension to `index.html`.
+
 ## The sandbox
 
 `run_sandbox` needs a container runtime. Compose provides `sandboxd`, a `docker:27-dind` daemon with no host port; the engine reaches it over `DOCKER_HOST=tcp://sandboxd:2375`, and the engine image carries only the client. On a developer host running `just engine`, the local `docker` serves.
