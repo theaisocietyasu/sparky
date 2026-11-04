@@ -42,6 +42,7 @@ pub(super) fn stores(cfg: &Config, embedder: &Arc<dyn Embedder>) -> anyhow::Resu
         memory: Arc::new(PlatformMemory::new(client.clone())),
         confirmations: Arc::new(PlatformConfirmations::new(client.clone())),
         oauth_store: Arc::new(PlatformAccounts::new(client.clone())),
+        canvas: None,
         probes: vec![Arc::new(PlatformProbe::new(client))],
     })
 }

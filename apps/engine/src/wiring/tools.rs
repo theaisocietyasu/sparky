@@ -11,10 +11,11 @@ use crate::core::traits::knowledge::retrieval::Retriever;
 use crate::core::traits::memory::MemoryStore;
 use crate::core::traits::oauth::OAuthStore;
 use crate::core::traits::tools::Tool;
+use crate::core::traits::tools::canvas::CanvasFeeds;
 use crate::core::traits::trace::TraceSink;
 use crate::core::types::tools::sandbox::Limits as SandboxLimits;
 use crate::runtime::harness::tools::ToolSet;
-use crate::runtime::tools::account::{gcal, outlook};
+use crate::runtime::tools::account::{canvas, gcal, outlook};
 use crate::runtime::tools::knowledge::search;
 use crate::runtime::tools::knowledge::search::live::{LiveSearch, Wording as LiveWording};
 use crate::runtime::tools::knowledge::search::stored::{StoredSearch, Wording as StoredWording};
@@ -38,6 +39,7 @@ pub(crate) async fn build_tools(
     retriever: Arc<dyn Retriever>,
     sandbox: Option<Arc<ContainerSandbox>>,
     oauth_store: Arc<dyn OAuthStore>,
+    canvas: Option<Arc<dyn CanvasFeeds>>,
     memory: Option<(Arc<dyn MemoryStore>, Arc<dyn TraceSink>)>,
 ) -> anyhow::Result<(ToolSet, Vec<String>)> {
     let disabled = |name: &str| cfg.tools.disabled.iter().any(|d| d == name);
@@ -98,6 +100,7 @@ pub(crate) async fn build_tools(
             token.expose_secret(),
             &cfg.platform.mcp_tools,
             &cfg.platform.mcp_private,
+            &cfg.platform.mcp_skip,
             &McpLimits::from(&cfg.mcp),
         )
         .await
@@ -122,7 +125,7 @@ pub(crate) async fn build_tools(
             "memory",
         );
     }
-    for (integration, enabled, build) in integrations(cfg, &oauth_store) {
+    for (integration, enabled, build) in integrations(cfg, &oauth_store, canvas) {
         if !enabled {
             continue;
         }
@@ -134,9 +137,13 @@ pub(crate) async fn build_tools(
 }
 
 /// Every integration that adds tools, in registration order.
-fn integrations<'a>(cfg: &'a Config, oauth_store: &'a Arc<dyn OAuthStore>) -> Vec<Integration<'a>> {
+fn integrations<'a>(
+    cfg: &'a Config,
+    oauth_store: &'a Arc<dyn OAuthStore>,
+    canvas_feeds: Option<Arc<dyn CanvasFeeds>>,
+) -> Vec<Integration<'a>> {
     let mut all: Vec<Integration<'a>> = Vec::new();
-    all.extend::<[Integration<'a>; 4]>([
+    all.extend::<[Integration<'a>; 5]>([
         (
             "outlook",
             cfg.outlook.enabled,
@@ -149,6 +156,14 @@ fn integrations<'a>(cfg: &'a Config, oauth_store: &'a Arc<dyn OAuthStore>) -> Ve
             cfg.gcal.enabled,
             Box::new(move || {
                 gcal::tools(&cfg.gcal, oauth_store.clone()).map_err(|e| e.to_string())
+            }),
+        ),
+        (
+            "canvas",
+            cfg.canvas.enabled && canvas_feeds.is_some(),
+            Box::new(move || match canvas_feeds {
+                Some(feeds) => canvas::tools(&cfg.canvas, feeds, cfg.prompt.utc_offset_hours),
+                None => Ok(Vec::new()),
             }),
         ),
         (

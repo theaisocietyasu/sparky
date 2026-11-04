@@ -181,6 +181,8 @@ pub struct Platform {
     /// Prefixes of platform tool names whose results belong to one member. Such a tool runs only
     /// in a direct message, reads as ReadAuthenticated, and gets the caller as discord_id.
     pub mcp_private: Vec<String>,
+    /// Prefixes of platform tool names never registered. The engine serves these itself.
+    pub mcp_skip: Vec<String>,
 }
 
 impl Default for Platform {
@@ -193,7 +195,8 @@ impl Default for Platform {
             max_query_chars: 1000,
             mcp_url: None,
             mcp_tools: Vec::new(),
-            mcp_private: vec!["canvas.".into()],
+            mcp_private: Vec::new(),
+            mcp_skip: vec!["canvas.".into()],
         }
     }
 }

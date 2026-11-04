@@ -1,8 +1,9 @@
-//! Adapters over one SQLite file: conversations, memories and pending actions.
+//! Adapters over one SQLite file: conversations, memories, pending actions and Canvas feed links.
 //!
 //! Every query binds tenant_id and user_id from the request; no query reads across users.
 
 mod backup;
+mod canvas;
 mod confirmation;
 mod conversation;
 mod health;
@@ -24,6 +25,7 @@ use crate::core::types::store::StoreError;
 #[cfg(test)]
 pub use backup::backup_once;
 pub use backup::{BackupPlan, run_backups};
+pub use canvas::SqliteCanvasFeeds;
 pub use confirmation::SqliteConfirmations;
 pub use conversation::SqliteConversations;
 pub use health::SqliteProbe;
@@ -107,6 +109,11 @@ impl SqliteStore {
     /// Pending actions in this file.
     pub fn confirmations(&self) -> SqliteConfirmations {
         SqliteConfirmations::new(self.pool.clone())
+    }
+
+    /// Canvas calendar feed links in this file, sealed and opened with seal.
+    pub fn canvas_feeds(&self, seal: Seal) -> SqliteCanvasFeeds {
+        SqliteCanvasFeeds::new(self.pool.clone(), seal)
     }
 
     /// Readiness of this file.

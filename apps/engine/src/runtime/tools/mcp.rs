@@ -206,6 +206,11 @@ fn take_property(schema: &mut Map<String, Value>, name: &str) -> bool {
 
 /// Whether a platform tool returns one member's own data: its remote name starts with a prefix.
 pub fn is_private(remote: &str, prefixes: &[String]) -> bool {
+    has_prefix(remote, prefixes)
+}
+
+/// Whether a remote tool name starts with one of the non-empty prefixes.
+fn has_prefix(remote: &str, prefixes: &[String]) -> bool {
     prefixes
         .iter()
         .any(|p| !p.is_empty() && remote.starts_with(p.as_str()))
@@ -349,11 +354,13 @@ pub async fn connect(
 /// takes confirm loses it from the schema; Policy confirms with the member, and the call sends confirm=true.
 /// A tool whose name starts with one of private reads one member's data: a read is ReadAuthenticated,
 /// it runs only in a direct message, and it loses discord_id from the schema and gets the caller.
+/// A tool whose name starts with one of skip is not registered.
 pub async fn connect_platform(
     url: &str,
     token: &str,
     allow: &[String],
     private: &[String],
+    skip: &[String],
     limits: &McpLimits,
 ) -> Result<Vec<Arc<dyn Tool>>, String> {
     let config = StreamableHttpClientTransportConfig::with_uri(url).auth_header(token);
@@ -361,7 +368,7 @@ pub async fn connect_platform(
     let mut tools: Vec<Arc<dyn Tool>> = Vec::new();
     for t in remote {
         let name = t.name.to_string();
-        if !allow.is_empty() && !allow.iter().any(|a| a == &name) {
+        if !allow.is_empty() && !allow.iter().any(|a| a == &name) || has_prefix(&name, skip) {
             continue;
         }
         let annotations = t.annotations.as_ref();

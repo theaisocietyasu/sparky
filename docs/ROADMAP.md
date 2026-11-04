@@ -14,4 +14,4 @@ The order of work and each phase's checklist are in the master issue [#79 Sparky
 
 ## Out of scope until stated otherwise
 
-GPA or coursework access · browser automation of any kind · university-wide deployment · FERPA claims · one agent per domain · RL before evals exist.
+GPA or grade access · storing coursework · browser automation of any kind · university-wide deployment · FERPA claims · one agent per domain · RL before evals exist.

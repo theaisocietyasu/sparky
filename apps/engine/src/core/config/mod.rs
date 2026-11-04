@@ -81,6 +81,9 @@ pub struct Config {
     /// Google Calendar integration. Off by default.
     #[serde(default)]
     pub gcal: Gcal,
+    /// Canvas calendar feed integration.
+    #[serde(default)]
+    pub canvas: Canvas,
     /// Academic paper search.
     #[serde(default)]
     pub papers: Papers,
@@ -323,6 +326,11 @@ fn validate_platform(cfg: &Config) -> Result<(), ConfigError> {
             "platform.mcp_private holds an empty prefix, which would match every tool".into(),
         );
     }
+    if platform.mcp_skip.iter().any(|p| p.trim().is_empty()) {
+        return invalid(
+            "platform.mcp_skip holds an empty prefix, which would match every tool".into(),
+        );
+    }
     Ok(())
 }
 
@@ -399,6 +407,7 @@ fn validate_mcp_risks(mcp: &Mcp) -> Result<(), ConfigError> {
 }
 
 fn validate_integrations(cfg: &Config) -> Result<(), ConfigError> {
+    validate_canvas(cfg)?;
     if cfg.outlook.enabled {
         if !cfg.outlook.base_url.starts_with("https://") {
             return Err(ConfigError::Invalid(
@@ -410,6 +419,24 @@ fn validate_integrations(cfg: &Config) -> Result<(), ConfigError> {
                 "outlook: timeout_secs and max_items must be at least 1".into(),
             ));
         }
+    }
+    Ok(())
+}
+
+fn validate_canvas(cfg: &Config) -> Result<(), ConfigError> {
+    let canvas = &cfg.canvas;
+    if !canvas.enabled {
+        return Ok(());
+    }
+    let invalid = |m: &str| Err(ConfigError::Invalid(format!("canvas: {m}")));
+    if canvas.hosts.is_empty() || canvas.hosts.iter().any(|h| h.trim().is_empty()) {
+        return invalid("hosts must name at least one host and no empty one");
+    }
+    if canvas.timeout_secs == 0 || canvas.max_bytes == 0 || canvas.max_items == 0 {
+        return invalid("timeout_secs, max_bytes and max_items must be at least 1");
+    }
+    if canvas.default_days == 0 || canvas.default_days > canvas.max_days {
+        return invalid("default_days must be from 1 to max_days");
     }
     Ok(())
 }

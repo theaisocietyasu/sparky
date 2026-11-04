@@ -14,7 +14,7 @@ use tokio::sync::mpsc::UnboundedSender;
 use crate::core::types::{
     AuthorizeRequest, AuthorizeResponse, ChatRequest, ChatResponse, ConfirmRequest,
     DisconnectResponse, ERROR_BODY_CHARS, EngineError, ForgetRequest, ForgetResponse, MemoryList,
-    MemoryRequest, ResetRequest, ResetResponse, Update,
+    MemoryRequest, ResetRequest, ResetResponse, SaveFeedRequest, SaveFeedResponse, Update,
 };
 use crate::engine::sse::{decode, drain_frames, take_complete};
 
@@ -83,6 +83,22 @@ impl EngineClient {
         req: &AuthorizeRequest,
     ) -> Result<DisconnectResponse, EngineError> {
         self.post(&format!("/oauth/{provider}/logout"), req).await
+    }
+
+    /// Keeps the caller's Canvas calendar feed link.
+    pub async fn canvas_save(
+        &self,
+        req: &SaveFeedRequest,
+    ) -> Result<SaveFeedResponse, EngineError> {
+        self.post("/canvas/feed", req).await
+    }
+
+    /// Removes the caller's Canvas calendar feed link.
+    pub async fn canvas_remove(
+        &self,
+        req: &AuthorizeRequest,
+    ) -> Result<DisconnectResponse, EngineError> {
+        self.post("/canvas/feed/remove", req).await
     }
 
     /// A POST of a JSON body to path, with the service token and the current traceparent.
