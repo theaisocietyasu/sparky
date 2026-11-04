@@ -9,6 +9,7 @@ mod memory;
 mod model;
 mod platform;
 mod safety;
+mod sqlite;
 mod support;
 mod tools;
 mod trace;

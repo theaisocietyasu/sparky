@@ -23,12 +23,12 @@ just prod-logs engine
 
 ## RunPod
 
-`deploy/docker/runpod.Dockerfile` builds `ghcr.io/theaisocietyasu/sparkyai-runpod`: all of Sparky in one GPU pod. A RunPod pod cannot start containers, so supervisord (`deploy/runpod/supervisord.conf`) runs chat and embed `llama-server`, the engine, and the bot as processes. The stores, knowledge search, live queries and linked accounts live on Platform. It differs from compose in two ways:
+`deploy/docker/runpod.Dockerfile` builds `ghcr.io/theaisocietyasu/sparkyai-runpod`: all of Sparky in one GPU pod. A RunPod pod cannot start containers, so supervisord (`deploy/runpod/supervisord.conf`) runs chat and embed `llama-server`, the engine, and the bot as processes. Knowledge search, live queries and linked accounts live on Platform; conversations, memories and confirmations are in the engine SQLite file on the volume. It differs from compose in two ways:
 
 - `run_sandbox` is off (`SPARKY_SANDBOX__ENABLED=false`).
 - Phoenix is not included; export stays off until `SPARKY_TELEMETRY__PHOENIX_URL` points at one.
 
-Create the pod with the image, a volume at `/workspace` (the model cache), a host CUDA version of at least 12.8, and these environment variables: `SPARKY_DISCORD__TOKEN`, `SPARKY_DISCORD__GUILD_ID`, `SPARKY_ENGINE__SERVICE_TOKEN`, `SPARKY_PLATFORM__URL`, `SPARKY_PLATFORM__TOKEN`, `SPARKY_PLATFORM__MCP_URL`, `SPARKY_APP__ENV=production`, and `HF_TOKEN` (a read token; community hosts share an IP that the Hugging Face Hub rate-limits without one). Every service listens on `127.0.0.1`; the pod exposes no port. The first boot downloads the GGUFs into `/workspace/models`. The scopes the Platform token needs are listed in the `[platform]` section of `sparky.toml`.
+Create the pod with the image, a volume at `/workspace` (the model cache), a host CUDA version of at least 12.8, and these environment variables: `SPARKY_DISCORD__TOKEN`, `SPARKY_DISCORD__GUILD_ID`, `SPARKY_ENGINE__SERVICE_TOKEN`, `SPARKY_PLATFORM__URL`, `SPARKY_PLATFORM__TOKEN`, `SPARKY_PLATFORM__MCP_URL`, `SPARKY_MEMORY__KEY`, `SPARKY_APP__ENV=production`, and `HF_TOKEN` (a read token; community hosts share an IP that the Hugging Face Hub rate-limits without one). Every service listens on `127.0.0.1`; the pod exposes no port. The first boot downloads the GGUFs into `/workspace/models`. The scopes the Platform token needs are listed in the `[platform]` section of `sparky.toml`.
 
 `SPARKY_MODELS_API_KEY` makes both model servers listen on every interface and require that key. Expose `8000/http` (chat) and `8001/http` (embed) on the pod to let other apps use them: Platform's `EMBEDDINGS_URL` for indexing, so its vectors match Sparky's queries, and Hermes or another agent for chat. The engine uses the same key.
 
@@ -83,7 +83,20 @@ The GPU deploy was one always-on community RTX 3070 pod named `sparky` at $0.13/
 | Run a one-off command | Set the container start command to `bash -c "<command>; exec /usr/local/bin/sparky-start"`, restart, read the output at the top of the logs, then clear the start command. The pod has no SSH key registered, so this is the way in. |
 | Check the GPU | Run `nvidia-smi` as above. The console GPU memory reading is not reliable. |
 
-State on the pod is the GGUF cache under `/workspace/models`; conversations, memory and the index live on Platform. If the host fails, create a new pod as above; the first boot downloads the models again.
+State on the pod is the GGUF cache under `/workspace/models` and the engine store under `/workspace/sparky`: `sparky.db` and a daily copy in `backups/` (the newest 7 are kept). The index lives on Platform. If the host fails, create a new pod as above, copy the newest backup to `/workspace/sparky/sparky.db`, and start it; the first boot downloads the models again.
+
+### The engine store
+
+The engine keeps conversations, memories and pending confirmations in one SQLite file (`[store]` in `sparky.toml`). Only the engine opens it. `SPARKY_MEMORY__KEY` seals sensitive memories; without the same key they do not open, so keep it with the other pod secrets.
+
+| | compose | RunPod pod |
+|---|---|---|
+| File | `/data/sparky.db` on the `enginedata` volume | `$SPARKY_DATA_DIR/sparky/sparky.db` |
+| Backups | `/data/backups` | `$SPARKY_DATA_DIR/sparky/backups` |
+
+To restore: stop the engine, copy a backup over the file (remove `sparky.db-wal` and `sparky.db-shm` beside it), and start the engine.
+
+To move from Platform once: set `SPARKY_STORE__BACKEND=platform`, deploy, run `engine import-platform` (`just import-platform`) on the host, check the counts it logs, then remove `SPARKY_STORE__BACKEND` and restart. A second run is refused unless `--again` is passed. Turns written between the import and the restart stay on Platform. The token needs `agents:read` and Platform needs the `/api/agents/export/*` routes.
 
 ### Troubleshooting
 

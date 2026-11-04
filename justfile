@@ -64,6 +64,10 @@ check-rust:
 engine *ARGS:
     cargo run -p engine -- {{ARGS}}
 
+# Copy the platform agents export into the engine SQLite file once; --again for a second run
+import-platform *ARGS:
+    cargo run -p engine -- import-platform {{ARGS}}
+
 # Run the discord bot
 discord *ARGS:
     cargo run -p discord -- {{ARGS}}

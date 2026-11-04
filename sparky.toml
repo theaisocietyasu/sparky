@@ -312,11 +312,12 @@ max_files = 4
 max_file_bytes = 2000000
 
 # ---------------------------------------------------------------- platform
-# Conversations, memories, the profile graph, confirmations, knowledge search, live queries and
-# linked accounts come from the platform HTTP API. So do Canvas, the Sun Devil Central clubs and
-# events, and the ASU knowledge. url and token live in .env and are required.
+# The profile graph, knowledge search, live queries and linked accounts come from the platform
+# HTTP API. So do Canvas, the Sun Devil Central clubs and events, and the ASU knowledge. With
+# store.backend = "platform", conversations, memories and confirmations do too. url and token
+# live in .env and are required.
 # The token needs these scopes:
-#   agents:read, agents:write   conversations, memories, the profile graph, confirmations
+#   agents:read, agents:write   the profile graph; the export the import reads; store.backend platform
 #   knowledge:read              knowledge search and the live queries
 #   accounts:link               the /login link for a member
 #   accounts:token              the Outlook and Google tokens of a member
@@ -334,6 +335,21 @@ mcp_tools = []                 # e.g. ["org.info", "events.list"]; empty registe
 # Tool name prefixes whose results belong to one member. Such a tool runs only in a direct
 # message, is ReadAuthenticated, and is sent the caller as discord_id in place of the model's value.
 mcp_private = ["canvas."]
+
+# ---------------------------------------------------------------- local store
+# Conversations, memories and pending confirmations live in one SQLite file that only the engine
+# opens. SPARKY_MEMORY__KEY in .env seals sensitive memories. backend = "platform" keeps them on
+# the platform agents routes for one release, as the rollback.
+[store]
+backend = "sqlite"
+path = ".sparky/sparky.db"
+max_connections = 4
+busy_timeout_ms = 5000
+backup_dir = ""                # empty turns backups off; a VACUUM INTO copy per run
+backup_every_hours = 24
+backups_kept = 7
+import_days = 30               # engine import-platform leaves out older conversations
+import_page_size = 100         # rows per page of the platform export, 1 to 500
 
 # ---------------------------------------------------------------- the developer console
 [cli]

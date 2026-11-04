@@ -1,4 +1,5 @@
-//! Platform composition: every store over the platform HTTP API.
+//! Platform composition: every store over the platform HTTP API. The store composition may move
+//! conversations, memories and pending actions to the SQLite file.
 
 use std::sync::Arc;
 use std::time::Duration;

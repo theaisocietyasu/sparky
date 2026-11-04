@@ -25,6 +25,8 @@ base_url = "http://localhost:8001/v1"
 api_key = ""
 name = "e"
 dim = 1024
+[memory]
+key = "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc="
 "#;
 
 /// A complete platform section.
