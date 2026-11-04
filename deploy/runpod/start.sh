@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Prepares the model cache, then runs supervisord. The stores live on the platform, so the pod
-# runs only the two model servers, the engine and the bot. With SPARKY_POD_ROLE=models only the
+# Prepares the model cache and the store folder, then runs supervisord. The pod runs the two model
+# servers, the engine and the bot. The engine SQLite file and its backups are on the volume. With SPARKY_POD_ROLE=models only the
 # two model servers run, for an engine and bot that run elsewhere.
 set -euo pipefail
 
@@ -22,5 +22,7 @@ if [ "${SPARKY_POD_ROLE:-all}" = "models" ]; then
     export SPARKY_RUN_APPS=false
 fi
 
-mkdir -p "$data/models"
+mkdir -p "$data/models" "$data/sparky/backups"
+export SPARKY_STORE__PATH="${SPARKY_STORE__PATH:-$data/sparky/sparky.db}"
+export SPARKY_STORE__BACKUP_DIR="${SPARKY_STORE__BACKUP_DIR:-$data/sparky/backups}"
 exec /usr/bin/supervisord -c /etc/sparky/supervisord.conf

@@ -17,6 +17,8 @@ api_key = ""
 [platform]
 url = "https://platform.example.org"
 token = "plat_x"
+[memory]
+key = "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc="
 [embedding]
 base_url = "http://localhost:8001/v1"
 api_key = ""
@@ -149,6 +151,8 @@ max_tokens = 256
 [platform]
 url = "https://platform.example.org"
 token = "plat_x"
+[memory]
+key = "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc="
 [embedding]
 base_url = "http://localhost:8001/v1"
 api_key = ""
@@ -466,4 +470,36 @@ fn platform_tools_need_an_http_mcp_url() {
     );
     let e = err(&format!("{on}mcp_url = \"127.0.0.1:8001\"\n"));
     assert!(e.contains("platform.mcp_url"), "{e}");
+}
+
+#[test]
+fn the_store_defaults_to_the_sqlite_file_with_backups_off() {
+    let cfg = ok("");
+    assert_eq!(cfg.store.backend, crate::core::config::StoreBackend::Sqlite);
+    assert_eq!(cfg.store.path, ".sparky/sparky.db");
+    assert_eq!(cfg.store.backup_dir, "");
+    assert_eq!(cfg.store.import_days, 30);
+}
+
+#[test]
+fn a_store_that_cannot_open_or_back_up_is_rejected() {
+    let e = err("[store]\npath = \"\"\n");
+    assert!(e.contains("store.path"), "{e}");
+    let e = err("[store]\nmax_connections = 0\n");
+    assert!(e.contains("store.max_connections"), "{e}");
+    let e = err("[store]\nbackup_dir = \"b\"\nbackups_kept = 0\n");
+    assert!(e.contains("store.backups_kept"), "{e}");
+}
+
+#[test]
+fn the_memory_key_must_be_32_bytes_of_base64_unless_the_store_is_the_platform() {
+    let e = err("[memory]\nkey = \"not base64!\"\n");
+    assert!(e.contains("SPARKY_MEMORY__KEY"), "{e}");
+    let e = err("[memory]\nkey = \"AAAA\"\n");
+    assert!(e.contains("32 bytes"), "{e}");
+    let cfg = ok("[store]\nbackend = \"platform\"\n[memory]\nkey = \"AAAA\"\n");
+    assert_eq!(
+        cfg.store.backend,
+        crate::core::config::StoreBackend::Platform
+    );
 }

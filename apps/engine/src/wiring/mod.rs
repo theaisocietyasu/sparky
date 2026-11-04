@@ -1,12 +1,16 @@
 //! Construct concrete adapters, hand them to the harness, build the router, serve.
 //!
-//! Every store is the platform's; everything past Stores sees traits alone.
+//! Knowledge, live queries and linked accounts are the platform's. Conversations, memories and
+//! pending actions are in the SQLite file unless store.backend is platform. Everything past
+//! Stores sees traits alone.
 
 mod agent;
 mod boot;
 mod http;
+mod import;
 mod platform;
 mod prompt;
+mod store;
 pub(crate) mod tools;
 
 use std::sync::Arc;
@@ -38,6 +42,8 @@ use self::boot::{fits_the_prompt, fits_the_slot};
 use self::http::{chat_state, http_router, oauth_state, profile_state};
 use self::prompt::SYSTEM_PROMPT;
 use self::tools::{build_tools, sandbox};
+
+pub use self::import::import_platform;
 
 /// Every store the harness, tools and routes read, from whichever mode is on.
 struct Stores {
@@ -91,7 +97,8 @@ pub async fn serve(cfg: Config) -> anyhow::Result<()> {
     ));
 
     // Every configured dependency must be reachable at boot.
-    let stores = platform::stores(&cfg, &embedder)?;
+    let mut stores = platform::stores(&cfg, &embedder)?;
+    store::localize(&cfg, &mut stores).await?;
     let sandbox = sandbox(&cfg).await?;
     let (tools, mcp_names) = build_tools(
         &cfg,

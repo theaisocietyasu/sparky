@@ -1,6 +1,7 @@
 # Memory ceilings are overridable with SPARKY_MEM_<SERVICE> in .env. sandboxd bounds all run_sandbox containers.
-# The platform holds the stores, the ASU knowledge, the live queries, Canvas and the ASU sign-in;
-# SPARKY_PLATFORM__URL and SPARKY_PLATFORM__TOKEN in .env point the engine at it.
+# The platform holds the ASU knowledge, the live queries, Canvas and the ASU sign-in;
+# SPARKY_PLATFORM__URL and SPARKY_PLATFORM__TOKEN in .env point the engine at it. The engine keeps
+# conversations, memories and confirmations in a SQLite file on the enginedata volume.
 services:
   engine:
     build: { context: .., dockerfile: deploy/docker/rust.Dockerfile }
@@ -14,6 +15,9 @@ services:
       SPARKY_TELEMETRY__PHOENIX_URL: ${SPARKY_PHOENIX_URL:-}
       # run_sandbox uses the sandboxd daemon.
       DOCKER_HOST: tcp://sandboxd:2375
+      SPARKY_STORE__PATH: /data/sparky.db
+      SPARKY_STORE__BACKUP_DIR: /data/backups
+    volumes: [enginedata:/data]
     ports: ["8080:8080"]
     depends_on:
       sandboxd: { condition: service_started }
@@ -186,6 +190,7 @@ services:
     restart: unless-stopped
 
 volumes:
+  enginedata:
   modelcache:
   phoenixdata:
   promdata:

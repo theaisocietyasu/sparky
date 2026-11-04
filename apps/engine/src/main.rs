@@ -6,8 +6,33 @@ mod runtime;
 mod stores;
 mod wiring;
 
-/// Starts telemetry outside the tokio runtime, serves, then drops the runtime before telemetry.
+/// What the engine runs, from its arguments.
+enum Command {
+    /// Serve HTTP until shutdown.
+    Serve,
+    /// Copy the platform agents export into the SQLite file; again allows a second run.
+    ImportPlatform { again: bool },
+}
+
+impl Command {
+    /// The command named by args, without the program name.
+    fn parse(args: &[String]) -> anyhow::Result<Self> {
+        match args {
+            [] => Ok(Self::Serve),
+            [name, rest @ ..] if name == "import-platform" => match rest {
+                [] => Ok(Self::ImportPlatform { again: false }),
+                [flag] if flag == "--again" => Ok(Self::ImportPlatform { again: true }),
+                _ => anyhow::bail!("usage: engine import-platform [--again]"),
+            },
+            _ => anyhow::bail!("usage: engine [import-platform [--again]]"),
+        }
+    }
+}
+
+/// Starts telemetry outside the tokio runtime, runs the command, then drops the runtime first.
 fn main() -> anyhow::Result<()> {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let command = Command::parse(&args)?;
     if let Err(e) = dotenvy::dotenv()
         && !e.not_found()
     {
@@ -19,8 +44,11 @@ fn main() -> anyhow::Result<()> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
-    let served = runtime.block_on(wiring::serve(cfg));
+    let done = match command {
+        Command::Serve => runtime.block_on(wiring::serve(cfg)),
+        Command::ImportPlatform { again } => runtime.block_on(wiring::import_platform(&cfg, again)),
+    };
     drop(runtime);
     drop(guard);
-    served
+    done
 }

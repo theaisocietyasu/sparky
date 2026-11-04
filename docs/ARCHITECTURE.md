@@ -11,7 +11,8 @@ This document describes the current shape of the system and its rules. Order of 
 | Engine, Discord bot, console | tokio, axum, serenity, ratatui, serde, thiserror, figment | `apps/engine`, `apps/discord`, `apps/cli` |
 | Model and embed clients | Rig (`rig-core`) OpenAI-compatible client | `apps/engine/src/runtime/model/rig_openai/` |
 | MCP | `rmcp` | `apps/engine/src/runtime/tools/mcp.rs` |
-| Stores, knowledge, live ASU queries, linked accounts | Platform HTTP API and MCP | [asusoda/platform](https://github.com/asusoda/platform), a separate repo |
+| Conversations, memories, confirmations | one SQLite file through `sqlx`, opened by the engine only | `apps/engine/src/stores/sqlite/` |
+| Profile graph, knowledge, live ASU queries, linked accounts | Platform HTTP API and MCP | [asusoda/platform](https://github.com/asusoda/platform), a separate repo |
 | Web | Vite, React, TypeScript, shadcn | `apps/web` |
 | Fine-tuning | lives outside this repo | [loupe](https://github.com/ashworks1706/loupe), a separate repo |
 | Evals | golden cases against the engine, baseline gate | `apps/evals` |
@@ -27,7 +28,7 @@ This document describes the current shape of the system and its rules. Order of 
 - Open models only, served by `llama-server` behind an OpenAI-compatible HTTP API.
 - Facts come from retrieval or from a live source query, never from model weights.
 - The engine never fetches a page for the index. Platform crawls ASU pages, writes the retrieval index, and runs live queries.
-- The engine opens no database connection. Every store is the Platform HTTP API.
+- The engine opens one SQLite file for its own conversations, memories and confirmations; every other store is the Platform HTTP API.
 - Every request carries its own `RequestContext`. There is no global mutable state.
 - Every replaceable dependency is a trait in `engine/src/core/traits` with a test double in `core/tests/support`.
 - The harness owns the loop, policy, context assembly, memory, and tracing. Provider JSON never leaves `runtime/model`.
@@ -101,7 +102,7 @@ flowchart LR
     ENG -->|"spans"| OBS
 ```
 
-Processes talk only at these edges. Platform ([asusoda/platform](https://github.com/asusoda/platform)) is a separate service: it holds conversations, memories, the profile graph, confirmations, the knowledge index, the live query registry, and linked accounts, and it alone crawls and queries ASU sites. Beyond Platform, the engine calls only the Microsoft Graph, Google Calendar, Semantic Scholar, and MediaWiki APIs and the attachment hosts in `agent.file_hosts`; with `sandbox.egress` on, a sandbox command reads public pages through the egress proxy. Other MCP servers are optional and none is configured by default.
+Processes talk only at these edges. Platform ([asusoda/platform](https://github.com/asusoda/platform)) is a separate service: it holds the profile graph, the knowledge index, the live query registry, and linked accounts, and it alone crawls and queries ASU sites. Beyond Platform, the engine calls only the Microsoft Graph, Google Calendar, Semantic Scholar, and MediaWiki APIs and the attachment hosts in `agent.file_hosts`; with `sandbox.egress` on, a sandbox command reads public pages through the egress proxy. Other MCP servers are optional and none is configured by default.
 
 The engine serves `/chat` and `/chat/stream` for the bot; both run the same loop. Every route except health requires the bearer token in `SPARKY_ENGINE__SERVICE_TOKEN`, and every route that carries a user applies the per-user `http.rate_limit_per_min`. The sandbox routes carry no user and are gated by the token alone, so any holder of it, `apps/discord` included, can read and stop the sandbox: `GET /sandbox` reports what is running, `DELETE /sandbox/{name}` removes one session container, and `POST /sandbox/enabled` stops the agent being offered `run_sandbox`. `apps/cli` shows and drives the containers through them, since the engine starts the containers outside compose.
 
@@ -137,21 +138,29 @@ Folders nest by domain, and the same domain names repeat across `core/types`, `c
 
 ## Platform stores
 
-Every store is the Platform HTTP API. `wiring/platform.rs` builds a `Stores` value of trait objects over `stores/platform/`; the harness, tools, routes, and `core` see the traits alone. `SPARKY_PLATFORM__URL` and `SPARKY_PLATFORM__TOKEN` are required.
+`wiring/platform.rs` builds a `Stores` value of trait objects over `stores/platform/`, and `wiring/store.rs` moves conversations, memories and confirmations to the local store; the harness, tools, routes, and `core` see the traits alone. `SPARKY_PLATFORM__URL` and `SPARKY_PLATFORM__TOKEN` are required.
 
 | Store | Platform |
 |---|---|
-| `ConversationStore`, `MemoryStore`, `ProfileGraph`, `ConfirmationStore` | `/api/agents/members/{user_id}/...` |
+| `ProfileGraph` | `/api/agents/members/{user_id}/profile...` |
+| `ConversationStore`, `MemoryStore`, `ConfirmationStore`, only with `store.backend = "platform"` | `/api/agents/members/{user_id}/...` |
+| the one-time import | `GET /api/agents/export/conversations` and `/memories` |
 | `Retriever` | `POST /api/knowledge/search`, with the query vector from the engine `Embedder` when `retrieval.dense` is on |
 | `SourceQueries` | `GET /api/asu/queries`, `POST /api/asu/query`, run while the call waits, bounded by the request deadline |
 | `OAuthStore` | `/api/accounts/members/{user_id}/{provider}/token` and `/login`; Platform runs the login and refreshes tokens |
 | readiness `Probe` | `GET /health` on Platform |
 
-The engine needs the chat and embedding servers and Platform. Platform takes the organization from the machine token (`Authorization: Bearer plat_...`), so `tenant_id` is not sent, and the member is `user_id`, which Platform requires to be a numeric Discord user id. One engine serves one guild, and its token belongs to the Platform organization of that guild. The token needs the scopes `agents:read`, `agents:write`, `knowledge:read`, `accounts:link`, `accounts:token`, `asu:read`, and `canvas:read`.
+The engine needs the chat and embedding servers and Platform. Platform takes the organization from the machine token (`Authorization: Bearer plat_...`), so `tenant_id` is not sent, and the member is `user_id`, which Platform requires to be a numeric Discord user id. One engine serves one guild, and its token belongs to the Platform organization of that guild. The token needs the scopes `agents:read`, `agents:write` (the profile graph and the import), `knowledge:read`, `accounts:link`, `accounts:token`, `asu:read`, and `canvas:read`.
 
 With `platform.mcp_url` set, the engine also registers the Platform MCP tools with the same token (`runtime/tools/mcp.rs`, `connect_platform`). Each tool is named `platform_<name>` with dots as underscores; `platform.mcp_tools` limits the list, and the token scopes decide which tools Platform offers. The risk comes from the MCP annotations: `readOnlyHint` is `ReadPublic`, `destructiveHint` is `Destructive`, and any other tool is `ExternalWrite`, so `Policy` requires `policy.write_roles` and a confirmation for every write. The Platform `confirm` argument is removed from the schema the model sees; the tool sends `confirm=true` after `Policy` confirmed the call.
 
 A Platform tool whose name starts with a prefix in `platform.mcp_private` (default `canvas.`) returns one member's own data. A read-only one is `ReadAuthenticated`, the tool refuses outside a direct message, and its `discord_id` argument is removed from the schema the model sees; the call sends the caller's `user_id` in its place, so a member reads only their own account (`mcp::Fill`).
+
+## Local store
+
+`stores/sqlite/` holds `ConversationStore`, `MemoryStore` and `ConfirmationStore` over one SQLite file (`store.path`), with the migrations in `apps/engine/migrations/` embedded and run at boot. Every row has `tenant_id` and `user_id`, and every query binds both from the `RequestContext`. A memory marked sensitive is sealed with XChaCha20-Poly1305 under `SPARKY_MEMORY__KEY`; a row that does not open is left out of recall and logged by id. A claim is one `UPDATE ... RETURNING`, so a confirmation is answered once. With `store.backup_dir` set, a `VACUUM INTO` copy is written every `store.backup_every_hours` and the newest `store.backups_kept` are kept. A readiness `Probe` named `store` runs `SELECT 1`.
+
+`engine import-platform` copies the Platform export once: conversations updated in the last `store.import_days` days with their messages, each summary's `covers` rewritten to the new positions, and every memory, sealed when Platform marked it sensitive. The `imports` table refuses a second run unless `--again` is passed.
 
 What Platform serves beside the stores:
 
@@ -276,11 +285,12 @@ sequenceDiagram
     U->>B: @mention, a reply in the thread, or a direct message
     B->>B: resolve roles, destination, visibility
     B->>E: POST /chat/stream with bearer token and traceparent
-    E->>P: ensure conversation, load recent turns
+    E->>E: ensure conversation, load recent turns from the SQLite file
     opt history over its budget
         E->>M: chat agent compacts the oldest turns
     end
-    E->>P: recall memory and profile graph, private turns only
+    E->>E: recall memory from the SQLite file, private turns only
+    E->>P: read the profile graph, private turns only
     loop one step per model call
         E->>M: streamed completion with tool schemas
         M-->>E: reasoning, text, tool calls
@@ -294,7 +304,7 @@ sequenceDiagram
             P-->>E: result text
         end
     end
-    E->>P: append the new turns
+    E->>E: append the new turns to the SQLite file
     E-->>B: SSE answer, then done
     B->>U: final card with answer, sources, memories
     E->>E: spawn profile writer, detached
@@ -406,6 +416,7 @@ Everything that could grow with load has a ceiling in `sparky.toml`:
 | Attachments | `agent.max_files` of `agent.max_file_bytes`, streamed with the cap enforced |
 | Live results | `query.timeout_secs` per query; past `agent.tool_result_to_file_chars` the rest goes to the workspace |
 | Containers | a `mem_limit` on every compose service, overridable with `SPARKY_MEM_<SERVICE>` |
+| Store | `store.max_connections` pooled connections to the SQLite file; a write waits up to `store.busy_timeout_ms` for a lock |
 
 What is kept on disk is pruned: JSONL traces after `trace.retention_hours`, checked hourly, each capped at `trace.max_file_bytes`; CLI unit logs rotated at `cli.log_file_max_mb` to one `.1` file, lines cut at `cli.log_line_chars`. Conversations, messages, memories and the profile graph live on Platform until a user asks to forget.
 
@@ -558,11 +569,12 @@ A conversation belongs to one tenant, user, channel, and visibility. The bot hol
 
 | Data | Store |
 |---|---|
-| conversations, messages, memories, profile graph, confirmations | Platform |
+| conversations, messages, memories, confirmations | the engine SQLite file (`store.path`) and its backups |
+| profile graph | Platform |
 | knowledge index, live query registry, linked account grants | Platform |
 | local traces, console logs, eval reports | `.sparky/`, ignored |
 
-The engine keeps nothing else. The Platform schema lives in the Platform repo.
+The engine keeps nothing else. Its schema is `apps/engine/migrations/`; the Platform schema lives in the Platform repo.
 
 ## Failure behavior
 

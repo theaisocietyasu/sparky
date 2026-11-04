@@ -4,6 +4,7 @@ pub mod harness;
 pub mod http;
 pub mod integrations;
 pub mod services;
+pub mod store;
 
 use figment::Figment;
 use figment::providers::{Env, Format, Toml};
@@ -17,6 +18,7 @@ pub use self::harness::*;
 pub use self::http::*;
 pub use self::integrations::*;
 pub use self::services::*;
+pub use self::store::*;
 
 /// TOML layer read when SPARKY_CONFIG_FILE is unset. Missing is not an error.
 pub const DEFAULT_CONFIG_FILE: &str = "sparky.toml";
@@ -88,9 +90,15 @@ pub struct Config {
     /// Wikipedia lookups.
     #[serde(default)]
     pub wikipedia: Wikipedia,
-    /// The platform that holds every store, the knowledge base, and the linked accounts.
+    /// The platform that holds the knowledge base, the live queries, and the linked accounts.
     #[serde(default)]
     pub platform: Platform,
+    /// Where conversations, memories and pending actions live.
+    #[serde(default)]
+    pub store: Store,
+    /// The key that seals sensitive memories.
+    #[serde(default)]
+    pub memory: MemorySeal,
 }
 
 /// Default budgets. Every field comes from the agent section.
@@ -211,6 +219,7 @@ impl Config {
         validate_mcp_risks(&self.mcp)?;
         validate_integrations(self)?;
         validate_platform(self)?;
+        validate_store(&self.store, &self.memory)?;
         if self.retrieval.window < 0 {
             return invalid(format!(
                 "retrieval.window must not be negative, got {}",

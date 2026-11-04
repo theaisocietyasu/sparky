@@ -42,7 +42,7 @@ A change is not done until `just check` passes.
 Everything that runs is under `apps/`. Language is never a folder; ASU domain is never a folder.
 
 ```
-apps/engine/      Rust bin: the agent and HTTP surface. core/{config,telemetry,types,traits,tests}, runtime/{harness,model,tools}, stores (over the Platform HTTP API), routes. One concern per file; split a module that grows past that.
+apps/engine/      Rust bin: the agent and HTTP surface. core/{config,telemetry,types,traits,tests}, runtime/{harness,model,tools}, stores (sqlite: the engine's own file; platform: the Platform HTTP API), routes. One concern per file; split a module that grows past that.
 apps/discord/     Rust bin: serenity bot, HTTP client of engine, never links it. core/{config,telemetry,types,tests}, bot, engine, render, access, analytics. One span per interaction and per product event.
 apps/cli/         Rust bin sparky: developer console (ratatui). Drives just recipes and docker compose and tails their output. Links nothing in-repo. app/{control,keys,ui}, units/{catalog,health,logs,output,runner,sandbox}, core/{config,types,tests}.
 apps/web/         static frontend + admin UI (Vite + React)
@@ -51,7 +51,7 @@ deploy/           compose, one Dockerfile per image, inference/ (model serving c
 docs/             ROADMAP.md, ARCHITECTURE.md
 ```
 
-Processes talk only via: discord to engine; engine to llama-server and the Platform HTTP API and MCP (see Platform stores in ARCHITECTURE.md); every app to Phoenix for spans and events. Platform ([asusoda/platform](https://github.com/asusoda/platform), a separate repo) holds conversations, memories, the profile graph, confirmations, knowledge, live ASU queries, and linked accounts. The engine opens no database connection.
+Processes talk only via: discord to engine; engine to llama-server and the Platform HTTP API and MCP (see Platform stores in ARCHITECTURE.md); every app to Phoenix for spans and events. Platform ([asusoda/platform](https://github.com/asusoda/platform), a separate repo) holds the profile graph, knowledge, live ASU queries, and linked accounts. The engine opens one SQLite file for its own conversations, memories and confirmations, and no other database.
 
 ## Dependencies we build on
 
