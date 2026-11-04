@@ -45,7 +45,7 @@ Everything that runs is under `apps/`. Language is never a folder; ASU domain is
 apps/engine/      Rust bin: the agent and HTTP surface. core/{config,telemetry,types,traits,tests}, runtime/{harness,model,tools}, stores (sqlite: the engine's own file; platform: the Platform HTTP API), routes. One concern per file; split a module that grows past that.
 apps/discord/     Rust bin: serenity bot, HTTP client of engine, never links it. core/{config,telemetry,types,tests}, bot, engine, render, access, analytics. One span per interaction and per product event.
 apps/cli/         Rust bin sparky: developer console (ratatui). Drives just recipes and docker compose and tails their output. Links nothing in-repo. app/{control,keys,ui}, units/{catalog,health,logs,output,runner,sandbox}, core/{config,types,tests}.
-apps/web/         static site, web chat and memories pages (Vite + React)
+apps/web/         static site, web chat, memories and admin pages (Vite + React)
 apps/evals/       Python: eval runners, suites, cases, and the baseline gate. core/{settings,types,tests}, cli, runner, suites, cases.
 deploy/           compose, one Dockerfile per image, inference/ (model serving config)
 docs/             ROADMAP.md, ARCHITECTURE.md

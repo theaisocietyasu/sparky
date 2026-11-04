@@ -1,0 +1,34 @@
+import { call } from "../chat/client";
+
+/** One tool and whether it is offered. */
+export type ToolState = { name: string; description: string; on: boolean; private: boolean };
+
+/** The instructions in force and the configured ones. */
+export type Instructions = { text: string; default_text: string; changed: boolean; max_chars: number };
+
+/** One recorded admin change. */
+export type Change = {
+  id: number;
+  kind: "tool" | "instructions";
+  key: string;
+  value: unknown;
+  actor: string;
+  created_at: string;
+};
+
+/** An action waiting on a student. */
+export type Held = { token: string; user_id: string; tool: string; created_at: string; expires_at: string };
+
+/** The settings that bound load. */
+export type Limits = Record<string, number>;
+
+export const tools = () => call<ToolState[]>("GET", "/admin/tools");
+export const switchTool = (name: string, on: boolean) =>
+  call<Change>("POST", `/admin/tools/${encodeURIComponent(name)}`, { on });
+export const instructions = () => call<Instructions>("GET", "/admin/instructions");
+export const setInstructions = (text: string | null) => call<Change>("PUT", "/admin/instructions", { text });
+export const history = () => call<Change[]>("GET", "/admin/history");
+export const rollback = (id: number) => call<Change>("POST", `/admin/rollback/${id}`);
+export const limits = () => call<Limits>("GET", "/admin/limits");
+export const approvals = () => call<Held[]>("GET", "/admin/approvals");
+export const deny = (token: string) => call<{ denied: boolean }>("POST", `/admin/approvals/${encodeURIComponent(token)}/deny`);

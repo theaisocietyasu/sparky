@@ -1,6 +1,6 @@
 # apps/web
 
-Public landing site, plus the web chat (`/chat`) and memory list (`/memories`). Vite, React, TypeScript, Tailwind 4. Self-hosted fonts. Runtime dependencies: React, React Router, motion, lenis and lucide-react.
+Public landing site, plus the web chat (`/chat`), memory list (`/memories`) and the admin pages (`/admin`). Vite, React, TypeScript, Tailwind 4. Self-hosted fonts. Runtime dependencies: React, React Router, motion, lenis and lucide-react.
 
 ```bash
 just web          # dev server on :5173
