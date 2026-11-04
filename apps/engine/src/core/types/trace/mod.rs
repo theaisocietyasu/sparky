@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
 
+use crate::core::types::memory::MemoryKind;
 use crate::core::types::model::{FinishReason, Usage};
 use crate::core::types::safety::guardrail::Stage;
 use crate::core::types::safety::policy::Decision;
@@ -183,6 +184,13 @@ pub enum TraceEvent {
         /// Memories recalled.
         count: usize,
     },
+    /// A memory was written for the caller. The text stays in the redacted tool span.
+    MemoryWritten {
+        /// Kind of the memory.
+        memory: MemoryKind,
+    },
+    /// A memory of the caller was removed.
+    MemoryForgotten,
     /// The loop finished.
     Completed {
         /// How it ended.
@@ -221,6 +229,8 @@ impl TraceEvent {
             Self::ToolResultStored { .. } => "tool_result_stored",
             Self::FileAttached { .. } => "file_attached",
             Self::MemoryRecalled { .. } => "memory_recalled",
+            Self::MemoryWritten { .. } => "memory_written",
+            Self::MemoryForgotten => "memory_forgotten",
             Self::Completed { .. } => "completed",
         }
     }

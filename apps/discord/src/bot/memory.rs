@@ -1,4 +1,4 @@
-//! The /reset, /memory, and /forget commands, and the forget everything buttons.
+//! The /reset, /memories, and /forget commands, and the forget everything buttons.
 
 use serenity::all::{
     CommandInteraction, ComponentInteraction, Context, CreateInteractionResponse,
@@ -9,9 +9,32 @@ use tracing::Instrument;
 use super::commands;
 use super::respond::{defer_private, finish, tell};
 use super::{Handler, error_kind, event, option_str};
-use crate::core::types::{ForgetRequest, ProfileRequest, ResetRequest};
+use crate::core::types::{ForgetRequest, MemoryRequest, ResetRequest};
 use crate::render::components::{self, CustomId};
 use crate::render::reply;
+
+/// What the which option of /forget asks for.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Which {
+    /// Every memory.
+    All,
+    /// The memory with this number in /memories.
+    One(usize),
+    /// Neither a number nor all.
+    Unclear,
+}
+
+/// Reads the which option: a number from 1, or all.
+pub fn parse_which(text: &str) -> Which {
+    let text = text.trim().trim_start_matches('#');
+    if text.eq_ignore_ascii_case("all") {
+        return Which::All;
+    }
+    match text.parse::<usize>() {
+        Ok(n) if n > 0 => Which::One(n),
+        _ => Which::Unclear,
+    }
+}
 
 /// Asked before erasing everything.
 const FORGET_ALL_PROMPT: &str = "Forget everything I remember about you? This cannot be undone.";
@@ -58,8 +81,8 @@ impl Handler {
         finish(ctx, cmd, vec![text]).await;
     }
 
-    /// Lists what the engine remembers about the caller.
-    pub(super) async fn memory(&self, ctx: &Context, cmd: &CommandInteraction) {
+    /// Lists what the engine remembers about the caller, numbered.
+    pub(super) async fn memories(&self, ctx: &Context, cmd: &CommandInteraction) {
         let Some(guild_id) = cmd.guild_id else {
             tell(ctx, cmd, "Use this in the server.").await;
             return;
@@ -67,32 +90,26 @@ impl Handler {
         if !defer_private(ctx, cmd).await {
             return;
         }
-        let req = ProfileRequest {
+        let req = MemoryRequest {
             user_id: cmd.user.id.to_string(),
             tenant_id: guild_id.to_string(),
         };
         let span = tracing::info_span!(
-            "discord.memory",
-            "discord.command" = "memory",
+            "discord.memories",
+            "discord.command" = "memories",
             "user.id" = %cmd.user.id,
         );
-        let messages = match self.engine.profile_list(&req).instrument(span).await {
-            Ok(profile) => {
-                tracing::info!(
-                    user = %cmd.user.id,
-                    nodes = profile.nodes.len(),
-                    relations = profile.relations.len(),
-                    "profile listed"
-                );
+        let messages = match self.engine.memories(&req).instrument(span).await {
+            Ok(list) => {
+                tracing::info!(user = %cmd.user.id, memories = list.memories.len(), "memories listed");
                 self.record(
                     event("discord_memory", cmd.user.id, cmd.guild_id, cmd.channel_id)
-                        .with("nodes", profile.nodes.len())
-                        .with("relations", profile.relations.len()),
+                        .with("memories", list.memories.len()),
                 );
-                reply::render_profile(&profile, self.max_message_chars)
+                reply::render_memories(&list, self.max_message_chars)
             }
             Err(e) => {
-                tracing::warn!(error = %e, user = %cmd.user.id, "profile list failed");
+                tracing::warn!(error = %e, user = %cmd.user.id, "memory list failed");
                 self.record(
                     event("discord_error", cmd.user.id, cmd.guild_id, cmd.channel_id)
                         .with("stage", "memory")
@@ -104,28 +121,33 @@ impl Handler {
         finish(ctx, cmd, messages).await;
     }
 
-    /// Forgets one thing by label, or asks before forgetting everything.
+    /// Forgets one memory by its number, or asks before forgetting every memory.
     pub(super) async fn forget(&self, ctx: &Context, cmd: &CommandInteraction) {
         let Some(guild_id) = cmd.guild_id else {
             tell(ctx, cmd, "Use this in the server.").await;
             return;
         };
-        let label = option_str(cmd, commands::LABEL)
-            .map(|l| l.trim().to_owned())
-            .filter(|l| !l.is_empty());
-        let Some(label) = label else {
-            let rows = components::forget_rows(cmd.user.id.get());
-            let msg = CreateInteractionResponseMessage::new()
-                .content(FORGET_ALL_PROMPT)
-                .components(components::to_action_rows(&rows))
-                .ephemeral(true);
-            if let Err(e) = cmd
-                .create_response(&ctx.http, CreateInteractionResponse::Message(msg))
-                .await
-            {
-                tracing::warn!(error = %e, "forget prompt failed");
+        let which = option_str(cmd, commands::WHICH).unwrap_or_default();
+        let number = match parse_which(&which) {
+            Which::All => {
+                let rows = components::forget_rows(cmd.user.id.get());
+                let msg = CreateInteractionResponseMessage::new()
+                    .content(FORGET_ALL_PROMPT)
+                    .components(components::to_action_rows(&rows))
+                    .ephemeral(true);
+                if let Err(e) = cmd
+                    .create_response(&ctx.http, CreateInteractionResponse::Message(msg))
+                    .await
+                {
+                    tracing::warn!(error = %e, "forget prompt failed");
+                }
+                return;
             }
-            return;
+            Which::Unclear => {
+                tell(ctx, cmd, "Give a number from /memories, or all.").await;
+                return;
+            }
+            Which::One(number) => number,
         };
         if !defer_private(ctx, cmd).await {
             return;
@@ -133,7 +155,7 @@ impl Handler {
         let req = ForgetRequest {
             user_id: cmd.user.id.to_string(),
             tenant_id: guild_id.to_string(),
-            label: Some(label),
+            number: Some(number),
         };
         let span = tracing::info_span!(
             "discord.forget",
@@ -143,13 +165,13 @@ impl Handler {
         );
         let text = match self.engine.forget(&req).instrument(span).await {
             Ok(done) => {
-                tracing::info!(user = %cmd.user.id, removed = done.removed, "forgot by label");
+                tracing::info!(user = %cmd.user.id, removed = done.removed, "forgot one memory");
                 self.record(
                     event("discord_forget", cmd.user.id, cmd.guild_id, cmd.channel_id)
                         .with("removed", done.removed)
                         .with("everything", false),
                 );
-                reply::forgot(done.removed, true)
+                reply::forgot(done.removed, Some(number))
             }
             Err(e) => {
                 tracing::warn!(error = %e, user = %cmd.user.id, "forget failed");
@@ -158,7 +180,7 @@ impl Handler {
                         .with("stage", "forget")
                         .with("kind", error_kind(&e)),
                 );
-                reply::memory_failure(&e)
+                reply::forget_failure(&e, number)
             }
         };
         finish(ctx, cmd, vec![text]).await;
@@ -195,7 +217,7 @@ impl Handler {
                 let req = ForgetRequest {
                     user_id: press.user.id.to_string(),
                     tenant_id: guild_id.to_string(),
-                    label: None,
+                    number: None,
                 };
                 let span = tracing::info_span!(
                     "discord.forget",
@@ -216,7 +238,7 @@ impl Handler {
                             .with("removed", done.removed)
                             .with("everything", true),
                         );
-                        reply::forgot(done.removed, false)
+                        reply::forgot(done.removed, None)
                     }
                     Err(e) => {
                         tracing::warn!(error = %e, user = %press.user.id, "forget failed");

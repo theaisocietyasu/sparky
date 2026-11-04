@@ -20,6 +20,7 @@ impl Tool for Echo {
             description: "echoes".into(),
             parameters: json!({"type": "object"}),
             risk: self.0,
+            private: false,
             sequential: false,
             timeout_secs: None,
         }
@@ -40,6 +41,7 @@ impl Tool for Named {
             description: "does whatever it is named for".into(),
             parameters: json!({"type": "object"}),
             risk: RiskClass::ReadPublic,
+            private: false,
             sequential: false,
             timeout_secs: None,
         }
@@ -60,6 +62,7 @@ impl Tool for Slow {
             description: "sleeps".into(),
             parameters: json!({"type": "object"}),
             risk: RiskClass::ReadPublic,
+            private: false,
             sequential: false,
             timeout_secs: None,
         }
@@ -81,6 +84,7 @@ impl Tool for Ordered {
             description: "stateful".into(),
             parameters: json!({"type": "object"}),
             risk: self.0,
+            private: false,
             sequential: true,
             timeout_secs: None,
         }
@@ -103,6 +107,7 @@ impl Tool for Boom {
             description: "always fails".into(),
             parameters: serde_json::json!({"type": "object"}),
             risk: RiskClass::ReadPublic,
+            private: false,
             sequential: false,
             timeout_secs: None,
         }

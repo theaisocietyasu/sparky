@@ -5,6 +5,7 @@ pub mod files;
 pub mod http;
 pub mod knowledge;
 pub mod mcp;
+pub mod memory;
 pub mod papers;
 pub mod sandbox;
 pub mod wiki;

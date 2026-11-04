@@ -6,6 +6,7 @@ use std::time::Duration;
 use crate::core::config::Config;
 use crate::core::traits::conversation::ConversationStore;
 use crate::core::traits::health::Probe;
+use crate::core::traits::memory::MemoryStore;
 use crate::core::traits::memory::profile::ProfileGraph;
 use crate::core::traits::oauth::OAuthStore;
 use crate::core::traits::safety::confirmation::ConfirmationStore;
@@ -13,6 +14,7 @@ use crate::core::traits::tools::sandbox::Sandbox;
 use crate::routes::Limits;
 use crate::routes::chat::ChatState;
 use crate::routes::health::HealthState;
+use crate::routes::memories::MemoryState;
 use crate::routes::oauth::OAuthState;
 use crate::routes::profile::ProfileState;
 use crate::routes::rate_limit::RateLimiter;
@@ -59,6 +61,22 @@ pub(super) fn profile_state(
     }
 }
 
+/// What the memory routes need: the store, the clock offset, and the chat rate limit.
+pub(super) fn memory_state(
+    cfg: &Config,
+    store: Arc<dyn MemoryStore>,
+    rate_limit: RateLimiter,
+) -> MemoryState {
+    MemoryState {
+        store,
+        request_budget: Duration::from_secs(cfg.profile.request_timeout_secs),
+        utc_offset_hours: cfg.prompt.utc_offset_hours,
+        rate_limit,
+        default_tenant: cfg.discord.guild_id.to_string(),
+        service_token: cfg.engine.service_token.clone(),
+    }
+}
+
 /// What the sandbox routes read and drive.
 pub(super) fn sandbox_state(
     cfg: &Config,
@@ -83,6 +101,7 @@ pub(super) fn http_router(
     cfg: &Config,
     state: ChatState,
     profile: ProfileState,
+    memories: MemoryState,
     oauth: OAuthState,
     probes: Vec<Arc<dyn Probe>>,
     sandbox: Option<Arc<ContainerSandbox>>,
@@ -95,13 +114,13 @@ pub(super) fn http_router(
         max_body_bytes: cfg.http.max_body_bytes,
         concurrency: cfg.http.concurrency_limit,
     };
-    crate::routes::router(
-        state,
+    let states = crate::routes::States {
+        chat: state,
         health,
         profile,
-        sandbox_state(cfg, sandbox),
+        memories,
+        sandbox: sandbox_state(cfg, sandbox),
         oauth,
-        limits,
-        &cfg.http.cors_origins,
-    )
+    };
+    crate::routes::router(states, limits, &cfg.http.cors_origins)
 }

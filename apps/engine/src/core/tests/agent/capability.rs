@@ -11,6 +11,7 @@ fn definition(name: &str, risk: RiskClass) -> ToolDefinition {
         description: "does a thing".into(),
         parameters: serde_json::json!({"type": "object"}),
         risk,
+        private: false,
         sequential: false,
         timeout_secs: None,
     }
@@ -104,4 +105,30 @@ fn the_section_reaches_the_prompt_and_is_capped_by_its_budget() {
     );
     let joined: String = tight.messages.iter().map(|m| m.content.clone()).collect();
     assert!(!joined.contains("search_library_hours (tool)"), "{joined}");
+}
+
+#[test]
+fn a_public_turn_is_offered_no_private_tool() {
+    use std::sync::Arc;
+
+    use crate::core::config::MemorySettings;
+    use crate::core::tests::support::{MemorySink, Recalling};
+    use crate::core::traits::memory::MemoryStore;
+    use crate::core::traits::trace::TraceSink;
+    use crate::core::types::conversation::Visibility;
+    use crate::runtime::harness::tools::ToolSet;
+    use crate::runtime::tools::memory::{MemoryRules, tools};
+
+    let store: Arc<dyn MemoryStore> = Arc::new(Recalling::default());
+    let trace: Arc<dyn TraceSink> = Arc::new(MemorySink::new());
+    let mut set = ToolSet::new();
+    for tool in tools(
+        &store,
+        &trace,
+        MemoryRules::new(&MemorySettings::default(), 0),
+    ) {
+        set = set.with(tool);
+    }
+    assert_eq!(set.definitions_for(Visibility::Public), Vec::new());
+    assert_eq!(set.definitions_for(Visibility::Private).len(), 2);
 }

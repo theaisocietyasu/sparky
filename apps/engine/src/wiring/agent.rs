@@ -36,7 +36,6 @@ pub(super) fn agent_config(cfg: &Config) -> AgentConfig {
         history_turns: cfg.agent.history_turns,
         history_keep: cfg.compaction.keep_tokens(cfg.agent.history_budget_tokens),
         memory_recall_limit: cfg.agent.memory_recall_limit,
-        recall_in_public: cfg.agent.recall_in_public,
         retry_base_ms: cfg.agent.retry_base_ms,
         retry_cap_ms: cfg.agent.retry_cap_ms,
         max_span_value_chars: cfg.agent.max_span_value_chars,

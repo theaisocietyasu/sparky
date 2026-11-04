@@ -105,3 +105,52 @@ fn each_frame_decodes_to_its_update_and_unknown_frames_to_none() {
 
     assert!(decode("done", "{}").is_none());
 }
+
+#[test]
+fn the_memory_requests_have_the_shape_the_engine_routes_read() {
+    use crate::core::types::{ForgetRequest, MemoryList, MemoryRequest};
+
+    let list = serde_json::to_value(MemoryRequest {
+        user_id: "111".into(),
+        tenant_id: "guild".into(),
+    });
+    assert_eq!(
+        list.ok(),
+        Some(serde_json::json!({"user_id": "111", "tenant_id": "guild"}))
+    );
+    let one = serde_json::to_value(ForgetRequest {
+        user_id: "111".into(),
+        tenant_id: "guild".into(),
+        number: Some(2),
+    });
+    assert_eq!(
+        one.ok(),
+        Some(serde_json::json!({"user_id": "111", "tenant_id": "guild", "number": 2}))
+    );
+    let all = serde_json::to_value(ForgetRequest {
+        user_id: "111".into(),
+        tenant_id: "guild".into(),
+        number: None,
+    });
+    assert_eq!(
+        all.ok(),
+        Some(serde_json::json!({"user_id": "111", "tenant_id": "guild"}))
+    );
+    let body = r#"{"memories":[{"number":1,"id":"0a1b2c3d","kind":"task","text":"essay","created_at":"2026-10-30","due":"2026-11-12"}]}"#;
+    let parsed: Result<MemoryList, _> = serde_json::from_str(body);
+    assert_eq!(
+        parsed.ok().map(|l| l.memories[0].due.clone()),
+        Some(Some("2026-11-12".into()))
+    );
+}
+
+#[test]
+fn forget_reads_a_number_or_all() {
+    use crate::bot::memory::{Which, parse_which};
+
+    assert_eq!(parse_which("2"), Which::One(2));
+    assert_eq!(parse_which(" #3 "), Which::One(3));
+    assert_eq!(parse_which("ALL"), Which::All);
+    assert_eq!(parse_which("0"), Which::Unclear);
+    assert_eq!(parse_which("parking"), Which::Unclear);
+}

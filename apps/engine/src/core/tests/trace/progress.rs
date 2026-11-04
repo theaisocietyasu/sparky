@@ -147,6 +147,20 @@ fn a_model_call_a_thought_and_recalled_memory_each_get_a_line() {
             .contains("remembering 1 thing about you")
     );
     assert!(line(&TraceEvent::MemoryRecalled { count: 0 }).is_none());
+    let written = TraceEvent::MemoryWritten {
+        memory: crate::core::types::memory::MemoryKind::Fact,
+    };
+    assert!(
+        line(&written)
+            .unwrap_or_default()
+            .contains("remembering that")
+    );
+    assert_eq!(written.kind(), "memory_written");
+    assert!(
+        line(&TraceEvent::MemoryForgotten)
+            .unwrap_or_default()
+            .contains("forgetting that")
+    );
 }
 
 #[test]

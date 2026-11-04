@@ -503,3 +503,17 @@ fn the_memory_key_must_be_32_bytes_of_base64_unless_the_store_is_the_platform() 
         crate::core::config::StoreBackend::Platform
     );
 }
+
+#[test]
+fn memory_limits_and_the_prune_interval_must_be_positive() {
+    let e = err("[memory]\nmax_per_user = 0\n");
+    assert!(e.contains("memory.max_per_user"), "{e}");
+    let e = err("[memory]\nmax_chars = 0\n");
+    assert!(e.contains("memory.max_chars"), "{e}");
+    let e = err("[store]\nprune_every_hours = 0\n");
+    assert!(e.contains("store.prune_every_hours"), "{e}");
+    let cfg = ok("");
+    assert_eq!(cfg.store.conversation_idle_days, 0);
+    assert!(cfg.memory.tools);
+    assert_eq!(cfg.memory.max_per_user, 50);
+}

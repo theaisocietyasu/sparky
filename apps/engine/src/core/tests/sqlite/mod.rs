@@ -5,12 +5,13 @@ mod confirmation;
 mod conversation;
 mod import;
 mod memory;
+mod prune;
 mod seal;
 
 use std::time::Duration;
 
 use crate::core::types::agent::context::RequestContext;
-use crate::stores::sqlite::{Seal, SqliteStore, StoreOptions};
+use crate::stores::sqlite::{MemoryLimits, Seal, SqliteStore, StoreOptions};
 
 /// A fresh in-memory store with its migrations applied.
 async fn store() -> SqliteStore {
@@ -28,6 +29,15 @@ async fn store() -> SqliteStore {
 /// A seal over a fixed test key.
 fn seal() -> Seal {
     Seal::new(&[7; 32])
+}
+
+/// A cap of 3 memories, tasks due within 7 days first, days in UTC.
+fn limits() -> MemoryLimits {
+    MemoryLimits {
+        max_per_user: 3,
+        task_soon_days: 7,
+        utc_offset_hours: 0,
+    }
 }
 
 /// User 111 in tenant guild.

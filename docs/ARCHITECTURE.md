@@ -158,7 +158,7 @@ A Platform tool whose name starts with a prefix in `platform.mcp_private` (defau
 
 ## Local store
 
-`stores/sqlite/` holds `ConversationStore`, `MemoryStore` and `ConfirmationStore` over one SQLite file (`store.path`), with the migrations in `apps/engine/migrations/` embedded and run at boot. Every row has `tenant_id` and `user_id`, and every query binds both from the `RequestContext`. A memory marked sensitive is sealed with XChaCha20-Poly1305 under `SPARKY_MEMORY__KEY`; a row that does not open is left out of recall and logged by id. A claim is one `UPDATE ... RETURNING`, so a confirmation is answered once. With `store.backup_dir` set, a `VACUUM INTO` copy is written every `store.backup_every_hours` and the newest `store.backups_kept` are kept. A readiness `Probe` named `store` runs `SELECT 1`.
+`stores/sqlite/` holds `ConversationStore`, `MemoryStore` and `ConfirmationStore` over one SQLite file (`store.path`), with the migrations in `apps/engine/migrations/` embedded and run at boot. Every row has `tenant_id` and `user_id`, and every query binds both from the `RequestContext`. A memory marked sensitive is sealed with XChaCha20-Poly1305 under `SPARKY_MEMORY__KEY`; a row that does not open is left out of recall and logged by id. A claim is one `UPDATE ... RETURNING`, so a confirmation is answered once. With `store.backup_dir` set, a `VACUUM INTO` copy is written every `store.backup_every_hours` and the newest `store.backups_kept` are kept. A readiness `Probe` named `store` runs `SELECT 1`. Every `store.prune_every_hours` the store deletes expired memories, answered or expired pending actions, and, when `store.conversation_idle_days` is above 0, conversations idle that long with their messages.
 
 `engine import-platform` copies the Platform export once: conversations updated in the last `store.import_days` days with their messages, each summary's `covers` rewritten to the new positions, and every memory, sealed when Platform marked it sensitive. The `imports` table refuses a second run unless `--again` is passed.
 
@@ -250,8 +250,10 @@ pub trait ConversationStore {
 
 #[async_trait]
 pub trait MemoryStore {
-    async fn recall(&self, ctx: &RequestContext, q: &MemoryQuery) -> Result<Vec<Memory>, StoreError>;
-    // No write method yet.
+    async fn recall(&self, ctx: &RequestContext) -> Result<Vec<Memory>, StoreError>;
+    async fn remember(&self, ctx: &RequestContext, memory: &NewMemory) -> Result<Memory, StoreError>;
+    async fn forget(&self, ctx: &RequestContext, id: Uuid) -> Result<bool, StoreError>;
+    async fn forget_all(&self, ctx: &RequestContext) -> Result<u64, StoreError>;
 }
 
 #[async_trait]
@@ -312,7 +314,7 @@ sequenceDiagram
 
 1. `discord` posts an addressed message to the engine with the Discord identity, role names, the answering channel, its visibility, `continue_channel`, and the bot message a reply answers. A question is never a slash command; the remaining commands only read and clear memory.
 2. The engine checks the bearer token and the per-user rate limit, then builds a `RequestContext`. A given `conversation_id` must belong to the caller. Without one, `continue_channel` continues the caller's newest open conversation in that channel at that visibility; otherwise a new conversation starts.
-3. The loop loads inputs once: the last `agent.history_turns` turns, compacted if they overflow the history budget, and memories and the profile graph unless the request is public and `agent.recall_in_public` is off. A failed memory read is logged and the turn runs without it. Nothing is retrieved before the first model call: the model calls `search_knowledge` and `search_live` as the question needs, several in one step when it words the subject more than one way.
+3. The loop loads inputs once: the last `agent.history_turns` turns, compacted if they overflow the history budget, and, in a private turn only, memories and the profile graph. A failed memory read is logged and the turn runs without it. Nothing is retrieved before the first model call: the model calls `search_knowledge` and `search_live` as the question needs, several in one step when it words the subject more than one way.
 4. The loop runs steps until it stops. On `/chat/stream` each progress event goes out as an SSE frame. A turn about to answer after a tool failed, with `run_sandbox` registered and untried, is handed back once with `prompt.sandbox_retry_line`.
 5. Every exit appends what was said, hands the user's text to the profile writer, and builds the answer with citations, tool runs, memories (empty for a public answer), usage, and cost. Tool calls and results are not stored in history.
 6. An answer with status `AwaitingConfirmation` carries a token. `POST /confirm` with that token runs the held action and resumes the loop from its result.
@@ -417,8 +419,9 @@ Everything that could grow with load has a ceiling in `sparky.toml`:
 | Live results | `query.timeout_secs` per query; past `agent.tool_result_to_file_chars` the rest goes to the workspace |
 | Containers | a `mem_limit` on every compose service, overridable with `SPARKY_MEM_<SERVICE>` |
 | Store | `store.max_connections` pooled connections to the SQLite file; a write waits up to `store.busy_timeout_ms` for a lock |
+| Memories | `memory.max_per_user` per student, each at most `memory.max_chars`; at the cap the oldest fact goes, then the oldest preference, then the oldest task |
 
-What is kept on disk is pruned: JSONL traces after `trace.retention_hours`, checked hourly, each capped at `trace.max_file_bytes`; CLI unit logs rotated at `cli.log_file_max_mb` to one `.1` file, lines cut at `cli.log_line_chars`. Conversations, messages, memories and the profile graph live on Platform until a user asks to forget.
+What is kept on disk is pruned: JSONL traces after `trace.retention_hours`, checked hourly, each capped at `trace.max_file_bytes`; CLI unit logs rotated at `cli.log_file_max_mb` to one `.1` file, lines cut at `cli.log_line_chars`. Memories stay until a student forgets them or a task passes its due date. Conversations stay until `store.conversation_idle_days` of idleness when that is above 0. The profile graph lives on Platform until a user asks to forget.
 
 ### Attached files
 
@@ -446,7 +449,7 @@ The gate is rules, not a model call. `RuleDetector` passes a sentence with a fir
 
 With `profile.reconcile` on, a new fact is checked against recorded facts for the same subject and relation. The Reconcile agent names the recorded facts the new one makes false, and those are withdrawn. Facts that can both be true are both kept. An unparseable answer or a failed call withdraws nothing.
 
-Recall is scoped to the token's organization and the caller's `user_id` before ranking. Users list and delete what the graph holds with `/memory` and `/forget` (`POST /profile/list`, `POST /profile/forget`). Relations cascade from the node they run through.
+Recall is scoped to the token's organization and the caller's `user_id` before ranking. `POST /profile/list` and `POST /profile/forget` list and delete what the graph holds; Discord no longer calls them. Relations cascade from the node they run through.
 
 ## Memory
 
@@ -454,12 +457,16 @@ Recall is scoped to the token's organization and the caller's `user_id` before r
 |---|---|---|
 | Working | the current request | not persisted |
 | Conversation | what was said, the question and the answer | Platform conversation messages |
-| Episodic, semantic, profile, task | durable facts about a user | Platform memories, read by recall |
+| Fact, preference, task | one short line a student stated about themselves | the engine store, written by `remember` |
 | Profile graph | entities and relations | Platform profile graph |
 
-The engine recalls memories, unexpired, newest and most confident first, and appends profile graph nodes and relations. It does not write memories yet.
+The model writes memories in the normal loop, so a turn costs no extra model call. `remember` takes a kind (`fact`, `preference`, or `task` with a due date), one line of at most `memory.max_chars`, and an optional sensitive flag. It refuses text with a term in `memory.refuse_terms` and seals text with a term in `memory.sensitive_terms`. `forget_memory` takes the short id the memory section shows. Both are `PrepareWrite`, private and sequential, and are registered when `memory.tools` is on and `store.backend` is `sqlite`. `prompt.memory_rules` tells the model what to keep and what never to store; it is added to the system prompt only in a private turn where the tools are registered.
 
-A public request recalls no memory and no profile graph unless `agent.recall_in_public` is set. Only an answer no one else can read is private. A public answer never lists the memories its prompt carried.
+Recall reads every unexpired memory: tasks due within `memory.task_soon_days` first, soonest first, then the rest newest first. The prompt lists them as `[short id] kind: text (date)` until `agent.memory_budget_tokens` is spent, then appends profile graph nodes and relations. A task expires at the end of its due day in `prompt.utc_offset_hours`.
+
+A public request recalls no memory and no profile graph, and is offered no private tool. Only an answer no one else can read is private. A public answer never lists the memories its prompt carried.
+
+Students see their memories with `/memories` (`POST /memories/list`, numbered in recall order) and remove them with `/forget <number>` or `/forget all` (`POST /memories/forget`).
 
 ## Tool risk classes
 
@@ -467,12 +474,14 @@ A public request recalls no memory and no profile graph unless `agent.recall_in_
 |---|---|---|
 | `ReadPublic` | `search_knowledge`, `search_live` | run |
 | `ReadAuthenticated` | `platform_canvas_courses`, `outlook_mail`, `google_calendar`, a page inside the user's own session | allowed in a direct message; elsewhere deny unless `policy.allow_authenticated_reads` |
-| `PrepareWrite` | `run_sandbox`, a draft, a form filled without submitting | run |
+| `PrepareWrite` | `run_sandbox`, `remember`, `forget_memory`, a draft, a form filled without submitting | run |
 | `ExternalWrite` | post, create a ticket, book, submit | require a `policy.write_roles` role, then confirm |
 | `Destructive` | delete, cancel | require a `policy.write_roles` role, then confirm |
 | `Forbidden` | another user's session, bypassing policy | deny |
 
 The classes are ordered as listed. `policy.write_roles` gates `ExternalWrite` and above. `policy.confirm_from` names the lowest class held for approval. `Forbidden` is denied regardless of settings. Defaults are `["MANAGE_GUILD"]`, `external_write`, and authenticated reads off. `ReadAuthenticated` is also allowed whenever the exchange is private (a direct message), so a user's own data is read only in their own channel, never in a shared server.
+
+A tool with `private` set in its definition is personal to the user. A public turn is not offered it, and the policy denies a call to it outside a private turn whatever the other settings allow.
 
 ## Canvas
 
@@ -553,7 +562,7 @@ The `web` source is Platform's SearXNG search; it returns titles, links, dates, 
 
 A thread is the conversation. Inside one, only a reply to something Sparky said continues it. The message replied to rides the request as `reply_to` and is quoted into the prompt under `prompt.reply_header`, capped by `agent.reply_budget_tokens`. A reply to a person or another bot is not a turn.
 
-A direct message is private, which is what `agent.recall_in_public` keys on. `bot.direct_messages` turns the direct channel off.
+A direct message is private: only there are memories recalled and the memory tools offered. `bot.direct_messages` turns the direct channel off.
 
 Up to `bot.max_images` image attachments ride the request as image blocks on the user turn. The engine filters them again in `Attachment::accepted`. Only the link travels, the model server fetches it, and history stores none of them. Whether the model reads images depends on the model; see `deploy/inference/README.md`.
 
@@ -563,7 +572,7 @@ A turn is one message, edited in place. It opens with a spinner header and gains
 
 The finished card shows the steps (the oldest fold into a count when space runs out), the answer, the memories the prompt carried (`ChatResponse.memories`), and sources without a URL. Sources with a URL are link buttons. An answer that does not fit spills into further messages. An approval adds buttons to the card, and the resumed answer replaces the prompt on the same card.
 
-A conversation belongs to one tenant, user, channel, and visibility. The bot holds no conversation state. `/reset` ends the caller's open conversations in the channel through `POST /conversation/reset`.
+A conversation belongs to one tenant, user, channel, and visibility. The bot holds no conversation state. `/reset` ends the caller's open conversations in the channel through `POST /conversation/reset`. `/memories` lists what Sparky remembers, numbered; `/forget <n>` removes one, and `/forget all` asks with buttons, then removes every memory.
 
 ## Storage
 
@@ -664,7 +673,7 @@ One service image, `sparkyai-rust` (engine and discord, selected by entrypoint).
 - Whether a reranker earns its place once the eval set exists.
 - Parallel slots per `llama-server` under load.
 - Default `chars_per_token` once the tokenizer is measured.
-- Retention periods for memories and traces.
+- Retention periods for conversations and traces. `store.conversation_idle_days` is 0 (keep) until this is settled; #82 proposes 30.
 - Moderator access to user conversations and traces.
 - App server host.
 

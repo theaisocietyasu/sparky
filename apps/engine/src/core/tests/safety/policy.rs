@@ -6,6 +6,7 @@ use serde_json::json;
 
 use crate::core::traits::safety::policy::Policy;
 use crate::core::types::agent::context::RequestContext;
+use crate::core::types::conversation::Visibility;
 use crate::core::types::safety::policy::{Decision, ProposedAction};
 use crate::core::types::tools::RiskClass;
 use crate::runtime::harness::safety::policy::{RiskPolicy, payload_hash};
@@ -20,6 +21,7 @@ fn action(risk: RiskClass) -> ProposedAction {
         tool: "t".into(),
         risk,
         arguments: json!({"a": 1}),
+        private: false,
     }
 }
 
@@ -153,4 +155,28 @@ async fn authenticated_reads_are_allowed_in_a_direct_message() {
             .await,
         Decision::Deny { .. }
     ));
+}
+
+fn private(risk: RiskClass) -> ProposedAction {
+    ProposedAction {
+        private: true,
+        ..action(risk)
+    }
+}
+
+#[tokio::test]
+async fn a_private_tool_is_denied_in_a_public_turn_even_with_authenticated_reads_on() {
+    let p = RiskPolicy::new(Vec::new(), true, RiskClass::ExternalWrite);
+    let d = p
+        .authorize(&ctx(&[]), &private(RiskClass::PrepareWrite))
+        .await;
+    assert!(matches!(d, Decision::Deny { .. }));
+}
+
+#[tokio::test]
+async fn a_private_tool_runs_in_a_private_turn_without_confirmation() {
+    let p = RiskPolicy::default();
+    let turn = ctx(&[]).with_visibility(Visibility::Private);
+    let d = p.authorize(&turn, &private(RiskClass::PrepareWrite)).await;
+    assert!(matches!(d, Decision::Allow));
 }

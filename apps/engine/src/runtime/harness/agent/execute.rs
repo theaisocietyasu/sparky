@@ -170,10 +170,12 @@ impl Agent {
                 ));
                 continue;
             };
+            let definition = tool.definition();
             let action = ProposedAction {
                 tool: call.name.clone(),
-                risk: tool.definition().risk,
+                risk: definition.risk,
                 arguments: call.arguments.clone(),
+                private: definition.private,
             };
             let decision = deps.policy.authorize(run.ctx, &action).await;
             deps.trace.emit(

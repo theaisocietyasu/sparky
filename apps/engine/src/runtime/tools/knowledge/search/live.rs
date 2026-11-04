@@ -63,6 +63,7 @@ impl LiveSearch {
                 &keys,
             ),
             risk: RiskClass::ReadPublic,
+            private: false,
             sequential: false,
             timeout_secs: Some(timeout_secs),
         };

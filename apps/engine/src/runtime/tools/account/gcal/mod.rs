@@ -62,6 +62,7 @@ impl Tool for GcalTool {
                 .to_owned(),
             parameters: json!({ "type": "object", "properties": {} }),
             risk: RiskClass::ReadAuthenticated,
+            private: false,
             sequential: false,
             timeout_secs: None,
         }

@@ -16,7 +16,7 @@ pub(crate) mod tools;
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::core::config::Config;
+use crate::core::config::{Config, StoreBackend};
 use crate::core::traits::conversation::ConversationStore;
 use crate::core::traits::health::Probe;
 use crate::core::traits::knowledge::query::SourceQueries;
@@ -39,7 +39,7 @@ use crate::runtime::tools::files::HttpFiles;
 
 use self::agent::{agent_config, compactor, guardrail, profile_writer, trace_sink};
 use self::boot::{fits_the_prompt, fits_the_slot};
-use self::http::{chat_state, http_router, oauth_state, profile_state};
+use self::http::{chat_state, http_router, memory_state, oauth_state, profile_state};
 use self::prompt::SYSTEM_PROMPT;
 use self::tools::{build_tools, sandbox};
 
@@ -106,6 +106,7 @@ pub async fn serve(cfg: Config) -> anyhow::Result<()> {
         Arc::clone(&stores.retriever),
         sandbox.clone(),
         Arc::clone(&stores.oauth_store),
+        memory_tools(&cfg, &stores, &trace),
     )
     .await?;
     // Measured at boot with every tool offered, which is the largest the section ever gets.
@@ -143,8 +144,17 @@ pub async fn serve(cfg: Config) -> anyhow::Result<()> {
 
     let state = chat_state(&cfg, agent, stores.conversations, stores.confirmations);
     let profile = profile_state(&cfg, profile_graph, state.rate_limit.clone());
+    let memories = memory_state(&cfg, Arc::clone(&stores.memory), state.rate_limit.clone());
     let oauth = oauth_state(&cfg, stores.oauth_store);
-    let router = http_router(&cfg, state, profile, oauth, stores.probes, sandbox);
+    let router = http_router(
+        &cfg,
+        state,
+        profile,
+        memories,
+        oauth,
+        stores.probes,
+        sandbox,
+    );
 
     let listener = tokio::net::TcpListener::bind(&cfg.app.http_addr).await?;
     tracing::info!(addr = %cfg.app.http_addr, "listening");
@@ -154,6 +164,18 @@ pub async fn serve(cfg: Config) -> anyhow::Result<()> {
         Duration::from_secs(cfg.http.shutdown_grace_secs),
     )
     .await
+}
+
+/// The store and trace the memory tools write to, when memory.tools is on over the SQLite store.
+fn memory_tools(
+    cfg: &Config,
+    stores: &Stores,
+    trace: &Arc<dyn TraceSink>,
+) -> Option<(Arc<dyn MemoryStore>, Arc<dyn TraceSink>)> {
+    if !cfg.memory.tools || cfg.store.backend != StoreBackend::Sqlite {
+        return None;
+    }
+    Some((Arc::clone(&stores.memory), Arc::clone(trace)))
 }
 
 /// Serves until the shutdown signal, then gives in-flight requests grace to finish.

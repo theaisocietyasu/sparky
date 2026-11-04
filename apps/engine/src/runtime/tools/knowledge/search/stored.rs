@@ -67,6 +67,7 @@ impl StoredSearch {
                 &keys,
             ),
             risk: RiskClass::ReadPublic,
+            private: false,
             sequential: false,
             timeout_secs: None,
         };

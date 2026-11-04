@@ -133,7 +133,7 @@ fn a_direct_message_is_private_so_personal_memory_applies_and_a_thread_is_public
         )
     };
 
-    // recall_in_public gates the profile graph on this, so a DM is the only place it applies.
+    // Memory recall and the memory tools key on this, so a DM is the only place they apply.
     assert_eq!(
         make(Place::Private(ChannelId::new(7))).visibility,
         Visibility::Private

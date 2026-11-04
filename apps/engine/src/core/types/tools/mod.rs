@@ -16,6 +16,12 @@ pub const SEARCH_KNOWLEDGE: &str = "search_knowledge";
 /// Name of the tool that fetches a source now.
 pub const SEARCH_LIVE: &str = "search_live";
 
+/// Name of the tool that writes a memory.
+pub const REMEMBER: &str = "remember";
+
+/// Name of the tool that removes a memory.
+pub const FORGET_MEMORY: &str = "forget_memory";
+
 /// Name of the tool that runs a command in the isolated environment.
 pub const SANDBOX: &str = "run_sandbox";
 
@@ -48,6 +54,9 @@ pub struct ToolDefinition {
     pub parameters: Value,
     /// Risk classification.
     pub risk: RiskClass,
+    /// Reads or writes what is personal to the user; offered and allowed only in a private turn.
+    #[serde(default)]
+    pub private: bool,
     /// Holds state between calls; its calls never run in parallel with other calls in the step.
     #[serde(default)]
     pub sequential: bool,

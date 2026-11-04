@@ -35,8 +35,6 @@ pub struct Agent {
     pub history_turns: usize,
     /// Memories recalled per request.
     pub memory_recall_limit: usize,
-    /// Recall memory and the profile graph for a public request.
-    pub recall_in_public: bool,
     /// Whole-prompt token budget.
     pub prompt_budget_tokens: usize,
     /// Cap on prior turns.
@@ -100,7 +98,6 @@ impl Default for Agent {
             temperature: 0.6,
             history_turns: 20,
             memory_recall_limit: 10,
-            recall_in_public: false,
             prompt_budget_tokens: 4_000,
             history_budget_tokens: 1_000,
             memory_budget_tokens: 300,
@@ -220,6 +217,8 @@ pub struct Prompt {
     pub role_line_no_roles: String,
     /// Heading above recalled memories.
     pub memory_header: String,
+    /// What to remember and what never to store. Added to the system prompt in a private turn.
+    pub memory_rules: String,
     /// Heading above what the model may do.
     pub capabilities_header: String,
     /// Heading above the message of ours a reply answers.
@@ -252,6 +251,7 @@ impl Default for Prompt {
             role_line: assemble::ROLE_LINE.into(),
             role_line_no_roles: assemble::ROLE_LINE_NO_ROLES.into(),
             memory_header: assemble::MEMORY_HEADER.into(),
+            memory_rules: assemble::MEMORY_RULES.into(),
             capabilities_header: assemble::CAPABILITIES_HEADER.into(),
             reply_header: assemble::REPLY_HEADER.into(),
             result_cut_line: assemble::RESULT_CUT_LINE.into(),

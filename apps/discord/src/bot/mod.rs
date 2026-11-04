@@ -5,7 +5,7 @@ mod commands;
 mod confirm;
 mod destination;
 mod login;
-mod memory;
+pub(crate) mod memory;
 mod respond;
 mod turn;
 
@@ -269,7 +269,7 @@ impl EventHandler for Handler {
             },
             Interaction::Command(cmd) => match cmd.data.name.as_str() {
                 commands::RESET => self.reset(&ctx, &cmd).await,
-                commands::MEMORY => self.memory(&ctx, &cmd).await,
+                commands::MEMORIES => self.memories(&ctx, &cmd).await,
                 commands::FORGET => self.forget(&ctx, &cmd).await,
                 commands::LOGIN => self.login(&ctx, &cmd).await,
                 commands::LOGOUT => self.logout(&ctx, &cmd).await,

@@ -3,5 +3,6 @@
 mod gcal;
 mod integrations;
 mod mcp;
+mod memory;
 mod outlook;
 mod sandbox;

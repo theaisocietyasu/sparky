@@ -1,81 +1,148 @@
-//! Memories in the file: scoped to the caller, unexpired, sealed when sensitive.
+//! Memories in the file: scoped to the caller, capped, ordered, expiring, sealed when sensitive.
 
 use chrono::{Duration, Utc};
 use sqlx::Row;
-use uuid::Uuid;
 
-use super::{caller, other, seal, store};
+use super::{caller, limits, other, seal, store};
 use crate::core::traits::memory::MemoryStore;
-use crate::core::types::memory::{MemoryKind, MemoryQuery};
-use crate::stores::sqlite::{NewMemory, Seal};
+use crate::core::types::memory::{MemoryKind, NewMemory};
+use crate::stores::sqlite::{MemoryLimits, Seal};
 
-fn memory(content: &str, kind: MemoryKind) -> NewMemory {
+fn fact(text: &str) -> NewMemory {
     NewMemory {
-        id: Uuid::new_v4(),
-        kind,
-        content: content.into(),
+        kind: MemoryKind::Fact,
+        text: text.into(),
+        due: None,
         sensitive: false,
-        confidence: 0.9,
-        source_conversation: None,
-        source_seq: None,
-        created_at: Utc::now(),
-        expires_at: None,
     }
 }
 
-fn all() -> MemoryQuery {
-    MemoryQuery {
-        kinds: Vec::new(),
-        limit: 10,
+fn task(text: &str, in_days: i64) -> NewMemory {
+    NewMemory {
+        kind: MemoryKind::Task,
+        text: text.into(),
+        due: Some((Utc::now() + Duration::days(in_days)).date_naive()),
+        sensitive: false,
     }
+}
+
+fn wide() -> MemoryLimits {
+    MemoryLimits {
+        max_per_user: 50,
+        ..limits()
+    }
+}
+
+async fn texts(
+    memories: &impl MemoryStore,
+    ctx: &crate::core::types::agent::context::RequestContext,
+) -> Vec<String> {
+    let Ok(found) = memories.recall(ctx).await else {
+        unreachable!("recall runs")
+    };
+    found.into_iter().map(|m| m.content).collect()
 }
 
 #[tokio::test]
-async fn recall_leaves_out_expired_rows_other_kinds_and_other_users() {
+async fn recall_leaves_out_past_tasks_and_other_users() {
     let store = store().await;
-    let memories = store.memory(seal());
+    let memories = store.memory(seal(), wide());
     let ctx = caller();
-    let mut expired = memory("old", MemoryKind::Semantic);
-    expired.expires_at = Some(Utc::now() - Duration::hours(1));
-    for m in [
-        memory("likes rust", MemoryKind::Semantic),
-        memory("asked about parking", MemoryKind::Episodic),
-        expired,
-    ] {
-        assert!(memories.write(&ctx, &m).await.is_ok());
+    for m in [fact("likes rust"), task("old essay", -2), fact("cs junior")] {
+        assert!(memories.remember(&ctx, &m).await.is_ok());
     }
     assert!(
         memories
-            .write(&other(), &memory("not yours", MemoryKind::Semantic))
+            .remember(&other(), &fact("not yours"))
             .await
             .is_ok()
     );
+    let mut found = texts(&memories, &ctx).await;
+    found.sort_unstable();
+    assert_eq!(found, ["cs junior", "likes rust"]);
+}
 
-    let Ok(found) = memories.recall(&ctx, &all()).await else {
-        unreachable!("recall runs")
-    };
-    let mut texts: Vec<&str> = found.iter().map(|m| m.content.as_str()).collect();
-    texts.sort_unstable();
-    assert_eq!(texts, ["asked about parking", "likes rust"]);
+#[tokio::test]
+async fn a_task_needs_a_due_date() {
+    let store = store().await;
+    let memories = store.memory(seal(), wide());
+    let mut undated = task("project", 3);
+    undated.due = None;
+    assert!(memories.remember(&caller(), &undated).await.is_err());
+}
 
-    let semantic = MemoryQuery {
-        kinds: vec![MemoryKind::Semantic],
-        limit: 10,
+#[tokio::test]
+async fn a_task_due_soon_comes_first_then_newest_first() {
+    let store = store().await;
+    let memories = store.memory(seal(), wide());
+    let ctx = caller();
+    for m in [
+        fact("first"),
+        task("far task", 30),
+        task("later task", 5),
+        task("next task", 1),
+        fact("newest"),
+    ] {
+        assert!(memories.remember(&ctx, &m).await.is_ok());
+    }
+    assert_eq!(
+        texts(&memories, &ctx).await,
+        ["next task", "later task", "newest", "far task", "first"]
+    );
+}
+
+#[tokio::test]
+async fn at_the_cap_the_oldest_fact_goes_first() {
+    let store = store().await;
+    let memories = store.memory(seal(), limits());
+    let ctx = caller();
+    for m in [
+        fact("oldest fact"),
+        task("task", 3),
+        fact("newer fact"),
+        fact("newest fact"),
+    ] {
+        assert!(memories.remember(&ctx, &m).await.is_ok());
+    }
+    let mut found = texts(&memories, &ctx).await;
+    found.sort_unstable();
+    assert_eq!(found, ["newer fact", "newest fact", "task"]);
+}
+
+#[tokio::test]
+async fn forget_touches_only_the_callers_rows() {
+    let store = store().await;
+    let memories = store.memory(seal(), wide());
+    let Ok(mine) = memories.remember(&caller(), &fact("mine")).await else {
+        unreachable!("remember runs")
     };
-    let Ok(found) = memories.recall(&ctx, &semantic).await else {
-        unreachable!("recall runs")
+    let Ok(theirs) = memories.remember(&other(), &fact("theirs")).await else {
+        unreachable!("remember runs")
     };
-    assert_eq!(found.len(), 1);
-    assert_eq!(found[0].content, "likes rust");
+    assert!(matches!(
+        memories.forget(&caller(), theirs.id).await,
+        Ok(false)
+    ));
+    assert!(matches!(
+        memories.forget(&caller(), mine.id).await,
+        Ok(true)
+    ));
+    assert!(matches!(
+        memories.forget(&caller(), mine.id).await,
+        Ok(false)
+    ));
+    assert!(memories.remember(&caller(), &fact("again")).await.is_ok());
+    assert!(matches!(memories.forget_all(&caller()).await, Ok(1)));
+    assert_eq!(texts(&memories, &other()).await, ["theirs"]);
 }
 
 #[tokio::test]
 async fn a_sensitive_memory_is_stored_sealed_and_recalled_in_clear() {
     let store = store().await;
-    let memories = store.memory(seal());
-    let mut secret = memory("my phone is 555-0100", MemoryKind::Profile);
+    let memories = store.memory(seal(), wide());
+    let mut secret = fact("my phone is 555-0100");
     secret.sensitive = true;
-    assert!(memories.write(&caller(), &secret).await.is_ok());
+    assert!(memories.remember(&caller(), &secret).await.is_ok());
 
     let Ok(row) = sqlx::query("SELECT content, nonce FROM memories")
         .fetch_one(store.pool())
@@ -87,35 +154,45 @@ async fn a_sensitive_memory_is_stored_sealed_and_recalled_in_clear() {
     let nonce: Option<Vec<u8>> = row.try_get("nonce").unwrap_or_default();
     assert!(nonce.is_some());
     assert_ne!(raw, b"my phone is 555-0100".to_vec());
-
-    let Ok(found) = memories.recall(&caller(), &all()).await else {
-        unreachable!("recall runs")
-    };
-    assert_eq!(found[0].content, "my phone is 555-0100");
+    assert_eq!(texts(&memories, &caller()).await, ["my phone is 555-0100"]);
 }
 
 #[tokio::test]
 async fn a_row_that_does_not_open_is_left_out_of_recall() {
     let store = store().await;
-    let mut secret = memory("sealed under another key", MemoryKind::Profile);
+    let mut secret = fact("sealed under another key");
     secret.sensitive = true;
-    assert!(
-        store
-            .memory(Seal::new(&[9; 32]))
-            .write(&caller(), &secret)
+    let other_key = store.memory(Seal::new(&[9; 32]), wide());
+    assert!(other_key.remember(&caller(), &secret).await.is_ok());
+    let memories = store.memory(seal(), wide());
+    assert!(memories.remember(&caller(), &fact("plain")).await.is_ok());
+    assert_eq!(texts(&memories, &caller()).await, ["plain"]);
+}
+
+#[tokio::test]
+async fn migration_two_maps_the_old_kinds() {
+    let store = store().await;
+    let Ok(row) =
+        sqlx::query("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'memories'")
+            .fetch_one(store.pool())
             .await
-            .is_ok()
-    );
-    assert!(
-        store
-            .memory(seal())
-            .write(&caller(), &memory("plain", MemoryKind::Semantic))
-            .await
-            .is_ok()
-    );
-    let Ok(found) = store.memory(seal()).recall(&caller(), &all()).await else {
-        unreachable!("recall runs")
+    else {
+        unreachable!("the table exists")
     };
-    let texts: Vec<&str> = found.iter().map(|m| m.content.as_str()).collect();
-    assert_eq!(texts, ["plain"]);
+    let sql: String = row.try_get("sql").unwrap_or_default();
+    assert!(sql.contains("'fact'") && sql.contains("'preference'") && sql.contains("'task'"));
+    assert!(!sql.contains("confidence"));
+    assert_eq!(
+        MemoryKind::from_platform("episodic"),
+        Some(MemoryKind::Fact)
+    );
+    assert_eq!(
+        MemoryKind::from_platform("semantic"),
+        Some(MemoryKind::Fact)
+    );
+    assert_eq!(
+        MemoryKind::from_platform("profile"),
+        Some(MemoryKind::Preference)
+    );
+    assert_eq!(MemoryKind::from_platform("task"), Some(MemoryKind::Task));
 }

@@ -124,6 +124,8 @@ impl TraceEvent {
                 "\u{1f9e0} remembering {count} {} about you",
                 plural(*count, "thing", "things")
             )),
+            Self::MemoryWritten { .. } => Some("\u{1f4dd} remembering that".to_owned()),
+            Self::MemoryForgotten => Some("\u{1f5d1} forgetting that".to_owned()),
             Self::GuardrailBlocked { stage, .. } => {
                 Some(format!("\u{1f6d1} the {} was not allowed", stage.as_str()))
             }

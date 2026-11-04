@@ -2,7 +2,7 @@
 
 use std::fmt::Write;
 
-use crate::core::types::{EngineError, ProfileList};
+use crate::core::types::{EngineError, MemoryList};
 
 /// The Discord hard limit on message content. bot.max_message_chars may go below it, never above.
 pub const MAX_MESSAGE: usize = 2_000;
@@ -78,63 +78,48 @@ pub fn confirm_refused(e: &EngineError) -> bool {
     )
 }
 
-/// What remembered things and relations look like, split into sendable messages.
-pub fn render_profile(profile: &ProfileList, limit: usize) -> Vec<String> {
-    if profile.nodes.is_empty() && profile.relations.is_empty() {
+/// The numbered memories, split into sendable messages.
+pub fn render_memories(list: &MemoryList, limit: usize) -> Vec<String> {
+    if list.memories.is_empty() {
         return vec![NOTHING_REMEMBERED.to_owned()];
     }
-    let mut body = String::new();
-    if !profile.nodes.is_empty() {
-        body.push_str("**What I remember**\n");
-        for n in &profile.nodes {
-            let _ = writeln!(
-                body,
-                "- {} ({}, {})",
-                n.label,
-                n.kind,
-                percent(n.confidence)
-            );
-        }
+    let mut body = String::from("**What I remember**\n");
+    for m in &list.memories {
+        let when = m
+            .due
+            .as_ref()
+            .map_or_else(|| m.created_at.clone(), |due| format!("due {due}"));
+        let _ = writeln!(body, "{}. {}: {} ({when})", m.number, m.kind, m.text);
     }
-    if !profile.relations.is_empty() {
-        if !body.is_empty() {
-            body.push('\n');
-        }
-        body.push_str("**How it connects**\n");
-        for r in &profile.relations {
-            let _ = writeln!(
-                body,
-                "- {} {} {} ({})",
-                r.subject,
-                r.relation.replace('_', " "),
-                r.object,
-                percent(r.confidence)
-            );
-        }
-    }
-    body.push_str("\n/forget with a label drops one thing. /forget alone clears everything.");
+    body.push_str("\n/forget with a number drops one. /forget all clears everything.");
     chunk(&body, limit.clamp(1, MAX_MESSAGE))
 }
 
-/// A confidence from 0 to 1 as a whole percentage.
-fn percent(confidence: f64) -> String {
-    format!("{:.0}%", confidence.clamp(0.0, 1.0) * 100.0)
-}
-
-/// What /forget says after the engine removed some items. named is true for a single label.
-pub fn forgot(removed: u64, named: bool) -> String {
-    match (removed, named) {
-        (0, true) => "I had nothing under that name.".into(),
-        (0, false) => "I did not remember anything about you.".into(),
-        (1, _) => "Forgot 1 thing.".into(),
-        (n, _) => format!("Forgot {n} things."),
+/// What /forget says after the engine removed some memories. number is set for a single one.
+pub fn forgot(removed: u64, number: Option<usize>) -> String {
+    match (removed, number) {
+        (0, Some(n)) => format!("I have no memory {n}. /memories shows the numbers."),
+        (0, None) => "I did not remember anything about you.".into(),
+        (_, Some(n)) => format!("Forgot memory {n}."),
+        (1, None) => "Forgot 1 thing.".into(),
+        (n, None) => format!("Forgot {n} things."),
     }
 }
 
-/// What to say when a profile call failed. 503 means the profile graph is off.
+/// What to say when forgetting memory number failed. 404 means there is no such number.
+pub fn forget_failure(e: &EngineError, number: usize) -> String {
+    match e {
+        EngineError::Status { status: 404, .. } => forgot(0, Some(number)),
+        other => memory_failure(other),
+    }
+}
+
+/// What to say when a memory call failed. 503 means the store is unreachable.
 pub fn memory_failure(e: &EngineError) -> String {
     match e {
-        EngineError::Status { status: 503, .. } => "Memory is turned off here.".into(),
+        EngineError::Status { status: 503, .. } => {
+            "I cannot reach my memory right now. Try again soon.".into()
+        }
         EngineError::Status { status: 404, .. } => UNAVAILABLE.into(),
         other => failure(other),
     }

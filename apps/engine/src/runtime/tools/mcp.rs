@@ -328,6 +328,7 @@ pub async fn connect(
             description: model_description(&t, limits),
             parameters: model_schema((*t.input_schema).clone(), limits),
             name: name.clone(),
+            private: false,
             sequential: true,
             timeout_secs: limits.tool_timeout_secs,
         };
@@ -387,6 +388,7 @@ pub async fn connect_platform(
             description,
             parameters: model_schema(schema, limits),
             name: platform_name(&name),
+            private: false,
             sequential: true,
             timeout_secs: limits.tool_timeout_secs,
         };

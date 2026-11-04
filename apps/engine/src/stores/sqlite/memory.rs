@@ -1,7 +1,7 @@
 //! Memories in the SQLite file. Sensitive text is sealed at rest.
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, FixedOffset, NaiveDate, NaiveTime, TimeZone, Utc};
 use sqlx::sqlite::SqliteRow;
 use sqlx::{Row, SqliteConnection, SqlitePool};
 use uuid::Uuid;
@@ -9,25 +9,34 @@ use uuid::Uuid;
 use super::{Seal, database, parse_stamp, stamp};
 use crate::core::traits::memory::MemoryStore;
 use crate::core::types::agent::context::RequestContext;
-use crate::core::types::memory::{Memory, MemoryKind, MemoryQuery};
+use crate::core::types::memory::{Memory, MemoryKind, NewMemory};
 use crate::core::types::store::StoreError;
 
-/// One memory to write.
+/// How many memories a student keeps, and what counts as due soon.
+#[derive(Debug, Clone, Copy)]
+pub struct MemoryLimits {
+    /// Memories per student; at the cap the oldest fact goes first.
+    pub max_per_user: usize,
+    /// A task due within this many days is recalled first.
+    pub task_soon_days: i64,
+    /// Hours from UTC of the day a task is due on.
+    pub utc_offset_hours: i32,
+}
+
+/// One row to insert, as the import and remember write it.
 #[derive(Debug, Clone)]
-pub struct NewMemory {
+pub(super) struct MemoryRow {
     /// Row id.
     pub id: Uuid,
     /// Kind.
     pub kind: MemoryKind,
-    /// The remembered text.
+    /// The text in clear.
     pub content: String,
-    /// Sealed at rest when true.
+    /// Sealed at rest.
     pub sensitive: bool,
-    /// Confidence, 0 to 1.
-    pub confidence: f32,
-    /// The conversation it came from, when known.
+    /// The conversation it came from.
     pub source_conversation: Option<Uuid>,
-    /// The message it came from, when known.
+    /// The newest message of that conversation when it was written.
     pub source_seq: Option<i64>,
     /// When it was written.
     pub created_at: DateTime<Utc>,
@@ -39,20 +48,23 @@ pub struct NewMemory {
 pub struct SqliteMemory {
     pool: SqlitePool,
     seal: Seal,
+    limits: MemoryLimits,
+}
+
+/// The end of day due at offset hours from UTC.
+fn end_of(due: NaiveDate, offset_hours: i32) -> Option<DateTime<Utc>> {
+    let offset = FixedOffset::east_opt(offset_hours * 3600)?;
+    let end = due.and_time(NaiveTime::from_hms_opt(23, 59, 59)?);
+    offset
+        .from_local_datetime(&end)
+        .single()
+        .map(|t| t.with_timezone(&Utc))
 }
 
 impl SqliteMemory {
-    /// Wraps a pool and the seal for sensitive rows.
-    pub fn new(pool: SqlitePool, seal: Seal) -> Self {
-        Self { pool, seal }
-    }
-
-    /// Writes one memory of the caller.
-    #[cfg(test)]
-    pub async fn write(&self, ctx: &RequestContext, memory: &NewMemory) -> Result<(), StoreError> {
-        let mut conn = self.pool.acquire().await.map_err(database)?;
-        insert(&mut conn, &self.seal, &ctx.tenant_id, &ctx.user_id, memory).await?;
-        Ok(())
+    /// Wraps a pool, the seal for sensitive rows, and the per-student limits.
+    pub fn new(pool: SqlitePool, seal: Seal, limits: MemoryLimits) -> Self {
+        Self { pool, seal, limits }
     }
 
     /// The memory from one row, or None when a sealed row does not open.
@@ -72,20 +84,51 @@ impl SqliteMemory {
         } else {
             String::from_utf8(bytes).map_err(|e| StoreError::Database(e.to_string()))?
         };
-        let confidence: f64 = row.try_get("confidence").map_err(database)?;
         let created: String = row.try_get("created_at").map_err(database)?;
         let expires: Option<String> = row.try_get("expires_at").map_err(database)?;
-        // Confidence is a fraction from 0 to 1.
-        #[allow(clippy::cast_possible_truncation)]
         Ok(Some(Memory {
             id: Uuid::parse_str(&id).map_err(|e| StoreError::Database(e.to_string()))?,
             kind: MemoryKind::parse(&kind)
                 .ok_or_else(|| StoreError::Database(format!("memory kind {kind} is unknown")))?,
             content,
-            confidence: confidence as f32,
+            sensitive,
             created_at: parse_stamp(&created)?,
             expires_at: expires.as_deref().map(parse_stamp).transpose()?,
         }))
+    }
+
+    /// Deletes the oldest memories of the caller until one more fits under the cap.
+    async fn make_room(
+        &self,
+        conn: &mut SqliteConnection,
+        ctx: &RequestContext,
+    ) -> Result<(), StoreError> {
+        let (count,): (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM memories WHERE tenant_id = ? AND user_id = ?")
+                .bind(&ctx.tenant_id)
+                .bind(&ctx.user_id)
+                .fetch_one(&mut *conn)
+                .await
+                .map_err(database)?;
+        let cap = i64::try_from(self.limits.max_per_user).unwrap_or(i64::MAX);
+        let over = count + 1 - cap;
+        if over <= 0 {
+            return Ok(());
+        }
+        // Facts go first, then preferences, then tasks; oldest first within each.
+        sqlx::query(
+            "DELETE FROM memories WHERE id IN (SELECT id FROM memories \
+             WHERE tenant_id = ? AND user_id = ? ORDER BY \
+             CASE kind WHEN 'fact' THEN 0 WHEN 'preference' THEN 1 ELSE 2 END, created_at \
+             LIMIT ?)",
+        )
+        .bind(&ctx.tenant_id)
+        .bind(&ctx.user_id)
+        .bind(over)
+        .execute(&mut *conn)
+        .await
+        .map_err(database)?;
+        Ok(())
     }
 }
 
@@ -95,7 +138,7 @@ pub(super) async fn insert(
     seal: &Seal,
     tenant_id: &str,
     user_id: &str,
-    memory: &NewMemory,
+    memory: &MemoryRow,
 ) -> Result<bool, StoreError> {
     let (content, nonce) = if memory.sensitive {
         let Some((nonce, sealed)) = seal.seal(&memory.content) else {
@@ -108,9 +151,9 @@ pub(super) async fn insert(
         (memory.content.as_bytes().to_vec(), None)
     };
     let done = sqlx::query(
-        "INSERT INTO memories (id, tenant_id, user_id, kind, content, sensitive, nonce, confidence, \
+        "INSERT INTO memories (id, tenant_id, user_id, kind, content, sensitive, nonce, \
          source_conversation, source_seq, created_at, expires_at) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (id) DO NOTHING",
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (id) DO NOTHING",
     )
     .bind(memory.id.to_string())
     .bind(tenant_id)
@@ -119,7 +162,6 @@ pub(super) async fn insert(
     .bind(content)
     .bind(memory.sensitive)
     .bind(nonce)
-    .bind(f64::from(memory.confidence))
     .bind(memory.source_conversation.map(|c| c.to_string()))
     .bind(memory.source_seq)
     .bind(stamp(memory.created_at))
@@ -132,37 +174,25 @@ pub(super) async fn insert(
 
 #[async_trait]
 impl MemoryStore for SqliteMemory {
-    async fn recall(
-        &self,
-        ctx: &RequestContext,
-        q: &MemoryQuery,
-    ) -> Result<Vec<Memory>, StoreError> {
-        let kinds: Vec<&str> = q.kinds.iter().map(|k| k.as_str()).collect();
-        let placeholders = vec!["?"; kinds.len()].join(", ");
-        let filter = if kinds.is_empty() {
-            String::new()
-        } else {
-            format!(" AND kind IN ({placeholders})")
-        };
-        let sql = format!(
-            "SELECT id, kind, content, sensitive, nonce, confidence, created_at, expires_at \
+    async fn recall(&self, ctx: &RequestContext) -> Result<Vec<Memory>, StoreError> {
+        let now = Utc::now();
+        let soon = now + Duration::days(self.limits.task_soon_days);
+        let rows = sqlx::query(
+            "SELECT id, kind, content, sensitive, nonce, created_at, expires_at \
              FROM memories WHERE tenant_id = ? AND user_id = ? \
-             AND (expires_at IS NULL OR expires_at > ?){filter} \
-             ORDER BY confidence DESC, created_at DESC LIMIT ?"
-        );
-        let mut query = sqlx::query(&sql)
-            .bind(&ctx.tenant_id)
-            .bind(&ctx.user_id)
-            .bind(stamp(Utc::now()));
-        for kind in &kinds {
-            query = query.bind(*kind);
-        }
-        let limit = i64::try_from(q.limit.max(1)).unwrap_or(i64::MAX);
-        let rows = query
-            .bind(limit)
-            .fetch_all(&self.pool)
-            .await
-            .map_err(database)?;
+             AND (expires_at IS NULL OR expires_at > ?) \
+             ORDER BY CASE WHEN kind = 'task' AND expires_at <= ? THEN 0 ELSE 1 END, \
+             CASE WHEN kind = 'task' AND expires_at <= ? THEN expires_at END, \
+             created_at DESC",
+        )
+        .bind(&ctx.tenant_id)
+        .bind(&ctx.user_id)
+        .bind(stamp(now))
+        .bind(stamp(soon))
+        .bind(stamp(soon))
+        .fetch_all(&self.pool)
+        .await
+        .map_err(database)?;
         let mut out = Vec::with_capacity(rows.len());
         for row in &rows {
             if let Some(memory) = self.row(row)? {
@@ -170,5 +200,73 @@ impl MemoryStore for SqliteMemory {
             }
         }
         Ok(out)
+    }
+
+    async fn remember(
+        &self,
+        ctx: &RequestContext,
+        memory: &NewMemory,
+    ) -> Result<Memory, StoreError> {
+        let expires_at = match (memory.kind, memory.due) {
+            (MemoryKind::Task, Some(due)) => Some(
+                end_of(due, self.limits.utc_offset_hours)
+                    .ok_or_else(|| StoreError::Database(format!("due date {due}")))?,
+            ),
+            (MemoryKind::Task, None) => {
+                return Err(StoreError::Database("a task needs a due date".into()));
+            }
+            _ => None,
+        };
+        let mut tx = self.pool.begin().await.map_err(database)?;
+        let source: Option<(i64,)> = sqlx::query_as(
+            "SELECT MAX(seq) FROM messages WHERE conversation_id = ? HAVING MAX(seq) IS NOT NULL",
+        )
+        .bind(ctx.conversation_id.to_string())
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(database)?;
+        self.make_room(&mut tx, ctx).await?;
+        let row = MemoryRow {
+            id: Uuid::new_v4(),
+            kind: memory.kind,
+            content: memory.text.clone(),
+            sensitive: memory.sensitive,
+            source_conversation: Some(ctx.conversation_id),
+            source_seq: source.map(|(seq,)| seq),
+            created_at: Utc::now(),
+            expires_at,
+        };
+        insert(&mut tx, &self.seal, &ctx.tenant_id, &ctx.user_id, &row).await?;
+        tx.commit().await.map_err(database)?;
+        Ok(Memory {
+            id: row.id,
+            kind: row.kind,
+            content: row.content,
+            sensitive: row.sensitive,
+            created_at: row.created_at,
+            expires_at: row.expires_at,
+        })
+    }
+
+    async fn forget(&self, ctx: &RequestContext, id: Uuid) -> Result<bool, StoreError> {
+        let done =
+            sqlx::query("DELETE FROM memories WHERE id = ? AND tenant_id = ? AND user_id = ?")
+                .bind(id.to_string())
+                .bind(&ctx.tenant_id)
+                .bind(&ctx.user_id)
+                .execute(&self.pool)
+                .await
+                .map_err(database)?;
+        Ok(done.rows_affected() == 1)
+    }
+
+    async fn forget_all(&self, ctx: &RequestContext) -> Result<u64, StoreError> {
+        let done = sqlx::query("DELETE FROM memories WHERE tenant_id = ? AND user_id = ?")
+            .bind(&ctx.tenant_id)
+            .bind(&ctx.user_id)
+            .execute(&self.pool)
+            .await
+            .map_err(database)?;
+        Ok(done.rows_affected())
     }
 }

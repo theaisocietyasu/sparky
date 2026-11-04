@@ -1,4 +1,4 @@
-//! Router assembly: /chat, /conversation, /profile, /sandbox, /oauth, and /health.
+//! Router assembly: /chat, /conversation, /memories, /profile, /sandbox, /oauth, and /health.
 
 use axum::Router;
 use axum::extract::DefaultBodyLimit;
@@ -12,6 +12,7 @@ pub mod chat;
 pub mod conversation;
 pub mod failure;
 pub mod health;
+pub mod memories;
 pub mod oauth;
 pub mod profile;
 pub mod rate_limit;
@@ -56,16 +57,32 @@ pub fn cors(origins: &[String]) -> Option<CorsLayer> {
     )
 }
 
+/// The state each group of routes reads.
+pub struct States {
+    /// Chat, confirm and conversation routes.
+    pub chat: chat::ChatState,
+    /// Health routes.
+    pub health: health::HealthState,
+    /// Profile graph routes.
+    pub profile: profile::ProfileState,
+    /// Memory routes.
+    pub memories: memories::MemoryState,
+    /// Sandbox routes.
+    pub sandbox: sandbox::SandboxState,
+    /// Account link routes.
+    pub oauth: oauth::OAuthState,
+}
+
 /// Full application router.
-pub fn router(
-    chat_state: chat::ChatState,
-    health_state: health::HealthState,
-    profile_state: profile::ProfileState,
-    sandbox_state: sandbox::SandboxState,
-    oauth_state: oauth::OAuthState,
-    limits: Limits,
-    cors_origins: &[String],
-) -> Router {
+pub fn router(states: States, limits: Limits, cors_origins: &[String]) -> Router {
+    let States {
+        chat: chat_state,
+        health: health_state,
+        profile: profile_state,
+        memories: memory_state,
+        sandbox: sandbox_state,
+        oauth: oauth_state,
+    } = states;
     let health = Router::new()
         .route("/health/live", get(health::live))
         .route("/health/ready", get(health::ready))
@@ -80,6 +97,10 @@ pub fn router(
         .route("/profile/forget", post(profile::forget))
         .route("/profile/list", post(profile::list))
         .with_state(profile_state);
+    let memories = Router::new()
+        .route("/memories/list", post(memories::list))
+        .route("/memories/forget", post(memories::forget))
+        .with_state(memory_state);
     let sandbox = Router::new()
         .route("/sandbox", get(sandbox::report))
         .route("/sandbox/enabled", post(sandbox::switch))
@@ -93,6 +114,7 @@ pub fn router(
         .merge(health)
         .merge(chat)
         .merge(profile)
+        .merge(memories)
         .merge(sandbox)
         .merge(oauth)
         .layer(DefaultBodyLimit::max(limits.max_body_bytes))

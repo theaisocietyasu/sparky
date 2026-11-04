@@ -15,6 +15,9 @@ pub struct ProposedAction {
     pub risk: RiskClass,
     /// Exact arguments. A confirmation binds to these bytes.
     pub arguments: Value,
+    /// The tool is personal to the user and runs only in a private turn.
+    #[serde(default)]
+    pub private: bool,
 }
 
 /// What the user must approve.

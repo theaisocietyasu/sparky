@@ -4,11 +4,10 @@ use chrono::{Duration, Utc};
 use serde_json::json;
 use sqlx::Row;
 
-use super::{caller, seal, store};
+use super::{caller, limits, seal, store};
 use crate::core::traits::conversation::ConversationStore;
 use crate::core::traits::memory::MemoryStore;
 use crate::core::types::export::{ConversationPage, MemoryPage};
-use crate::core::types::memory::MemoryQuery;
 use crate::stores::sqlite::{ImportError, Importer};
 
 const CONVERSATION: &str = "6f1c1d2e-0000-4000-8000-000000000001";
@@ -106,11 +105,7 @@ async fn an_export_imports_with_rewritten_covers_and_sealed_memories_and_only_on
     };
     let raw: Vec<u8> = row.try_get("content").unwrap_or_default();
     assert_ne!(raw, b"lives in Tempe".to_vec());
-    let query = MemoryQuery {
-        kinds: Vec::new(),
-        limit: 10,
-    };
-    let Ok(found) = store.memory(seal()).recall(&caller(), &query).await else {
+    let Ok(found) = store.memory(seal(), limits()).recall(&caller()).await else {
         unreachable!("recall runs")
     };
     let mut texts: Vec<&str> = found.iter().map(|m| m.content.as_str()).collect();
