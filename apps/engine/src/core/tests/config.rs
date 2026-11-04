@@ -517,3 +517,34 @@ fn memory_limits_and_the_prune_interval_must_be_positive() {
     assert!(cfg.memory.tools);
     assert_eq!(cfg.memory.max_per_user, 50);
 }
+
+#[test]
+fn the_web_sign_in_needs_its_app_key_urls_and_a_listed_site() {
+    let on = |extra: &str| {
+        format!(
+            "[web]\nenabled = true\ndiscord_client_id = \"1\"\ndiscord_client_secret = \"s\"\n\
+             session_key = \"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\"\n\
+             public_url = \"https://engine.example.org\"\nsite_url = \"https://sparky.example.org\"\n{extra}"
+        )
+    };
+    let listed = "[http]\ncors_origins = [\"https://sparky.example.org\"]\n";
+    let cfg = ok(&on(listed));
+    assert!(cfg.web.enabled);
+    assert_eq!(cfg.web.session_hours, 12);
+    let e = err(&on(""));
+    assert!(e.contains("cors_origins must list"), "{e}");
+    let e = err(&on(
+        "[http]\ncors_origins = [\"https://sparky.example.org\", \"*\"]\n",
+    ));
+    assert!(e.contains("must not be *"), "{e}");
+    let e = err(&on(listed).replace(
+        "discord_client_secret = \"s\"",
+        "discord_client_secret = \"\"",
+    ));
+    assert!(e.contains("SPARKY_WEB__DISCORD_CLIENT_SECRET"), "{e}");
+    let e = err(&on(listed).replace("https://engine", "http://engine"));
+    assert!(e.contains("SPARKY_WEB__PUBLIC_URL"), "{e}");
+    let e = err(&on(listed).replace("BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=", "AAAA"));
+    assert!(e.contains("32 bytes") || e.contains("SESSION_KEY"), "{e}");
+    assert!(!ok("").web.enabled);
+}

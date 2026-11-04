@@ -5,6 +5,7 @@ pub mod http;
 pub mod integrations;
 pub mod services;
 pub mod store;
+pub mod web;
 
 use figment::Figment;
 use figment::providers::{Env, Format, Toml};
@@ -19,6 +20,7 @@ pub use self::http::*;
 pub use self::integrations::*;
 pub use self::services::*;
 pub use self::store::*;
+pub use self::web::*;
 
 /// TOML layer read when SPARKY_CONFIG_FILE is unset. Missing is not an error.
 pub const DEFAULT_CONFIG_FILE: &str = "sparky.toml";
@@ -102,6 +104,9 @@ pub struct Config {
     /// What Sparky remembers and the key that seals sensitive memories.
     #[serde(default)]
     pub memory: MemorySettings,
+    /// Discord sign-in for the web page.
+    #[serde(default)]
+    pub web: Web,
 }
 
 /// Default budgets. Every field comes from the agent section.
@@ -212,6 +217,7 @@ impl Config {
         validate_integrations(self)?;
         validate_platform(self)?;
         validate_store(&self.store, &self.memory)?;
+        validate_web(self)?;
         if self.retrieval.window < 0 {
             return invalid(format!(
                 "retrieval.window must not be negative, got {}",
@@ -423,6 +429,48 @@ fn validate_integrations(cfg: &Config) -> Result<(), ConfigError> {
                 "outlook: timeout_secs and max_items must be at least 1".into(),
             ));
         }
+    }
+    Ok(())
+}
+
+fn validate_web(cfg: &Config) -> Result<(), ConfigError> {
+    let web = &cfg.web;
+    if !web.enabled {
+        return Ok(());
+    }
+    let invalid = |m: &str| Err(ConfigError::Invalid(format!("web: {m}")));
+    if web
+        .discord_client_id
+        .as_deref()
+        .is_none_or(|id| id.trim().is_empty())
+        || web
+            .discord_client_secret
+            .as_ref()
+            .is_none_or(|s| s.expose_secret().trim().is_empty())
+    {
+        return invalid("set SPARKY_WEB__DISCORD_CLIENT_ID and SPARKY_WEB__DISCORD_CLIENT_SECRET");
+    }
+    web.key()?;
+    let https = |u: &str| url::Url::parse(u).is_ok() && u.starts_with("https://");
+    if !https(web.public()) {
+        return invalid("set SPARKY_WEB__PUBLIC_URL, the https URL of this engine");
+    }
+    if !https(web.site()) {
+        return invalid("set SPARKY_WEB__SITE_URL, the https origin of the page");
+    }
+    if !cfg
+        .http
+        .cors_origins
+        .iter()
+        .any(|o| o.trim_end_matches('/') == web.site())
+    {
+        return invalid("http.cors_origins must list SPARKY_WEB__SITE_URL");
+    }
+    if cfg.http.cors_origins.iter().any(|o| o == "*") {
+        return invalid("http.cors_origins must not be * while the web sign-in is on");
+    }
+    if web.session_hours == 0 || web.timeout_secs == 0 || web.cookie_name.trim().is_empty() {
+        return invalid("session_hours, timeout_secs and cookie_name must be set");
     }
     Ok(())
 }

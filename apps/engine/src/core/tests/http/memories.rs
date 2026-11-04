@@ -63,6 +63,7 @@ fn router(store: Arc<dyn MemoryStore>, per_min: u32) -> axum::Router {
             rate_limit: RateLimiter::new(per_min),
             default_tenant: "guild".into(),
             service_token: SecretString::from(TOKEN),
+            web: None,
         })
 }
 

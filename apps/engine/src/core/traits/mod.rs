@@ -2,6 +2,7 @@
 
 pub mod conversation;
 pub mod health;
+pub mod identity;
 pub mod knowledge;
 pub mod memory;
 pub mod model;

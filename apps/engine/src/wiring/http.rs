@@ -3,9 +3,10 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use super::Stores;
 use crate::core::config::Config;
 use crate::core::traits::conversation::ConversationStore;
-use crate::core::traits::health::Probe;
+use crate::core::traits::identity::DiscordIdentity;
 use crate::core::traits::memory::MemoryStore;
 use crate::core::traits::oauth::OAuthStore;
 use crate::core::traits::safety::confirmation::ConfirmationStore;
@@ -18,8 +19,11 @@ use crate::routes::health::HealthState;
 use crate::routes::memories::MemoryState;
 use crate::routes::oauth::OAuthState;
 use crate::routes::rate_limit::RateLimiter;
+use crate::routes::session::WebAuth;
+use crate::routes::web::WebState;
 use crate::runtime::harness::agent::Agent;
 use crate::runtime::tools::sandbox::ContainerSandbox;
+use crate::stores::discord::DiscordOAuth;
 
 /// What the chat routes need, gathered from the settings that describe it.
 pub(super) fn chat_state(
@@ -27,6 +31,7 @@ pub(super) fn chat_state(
     agent: Agent,
     conversations: Arc<dyn ConversationStore>,
     confirmations: Arc<dyn ConfirmationStore>,
+    web: Option<WebAuth>,
 ) -> ChatState {
     ChatState {
         confirmations: Some(confirmations),
@@ -42,7 +47,57 @@ pub(super) fn chat_state(
         attachments_only_input: cfg.prompt.attachments_only_input.clone(),
         service_token: cfg.engine.service_token.clone(),
         rate_limit: RateLimiter::new(cfg.http.rate_limit_per_min),
+        web,
     }
+}
+
+/// The session reader, when the web sign-in is on.
+pub(super) fn web_auth(cfg: &Config) -> anyhow::Result<Option<WebAuth>> {
+    if !cfg.web.enabled {
+        return Ok(None);
+    }
+    let key = cfg.web.key()?;
+    Ok(Some(WebAuth::new(
+        &key,
+        &cfg.web.cookie_name,
+        cfg.web.site(),
+    )))
+}
+
+/// The sign-in routes and the Discord client behind them, when the web sign-in is on.
+pub(super) fn web_state(cfg: &Config, auth: Option<WebAuth>) -> anyhow::Result<Option<WebState>> {
+    let Some(auth) = auth else {
+        return Ok(None);
+    };
+    let client_id = cfg.web.discord_client_id.clone().unwrap_or_default();
+    let secret = cfg
+        .web
+        .discord_client_secret
+        .clone()
+        .ok_or_else(|| anyhow::anyhow!("SPARKY_WEB__DISCORD_CLIENT_SECRET is not set"))?;
+    let identity = DiscordOAuth::new(
+        &cfg.web.discord_api,
+        &client_id,
+        secret,
+        Duration::from_secs(cfg.web.timeout_secs),
+    )
+    .map_err(|e| anyhow::anyhow!("web sign-in: {e}"))?;
+    tracing::info!(site = %cfg.web.site(), "web sign-in on");
+    Ok(Some(WebState {
+        identity: Arc::new(identity) as Arc<dyn DiscordIdentity>,
+        auth,
+        client_id,
+        authorize_url: cfg.web.discord_authorize_url.clone(),
+        public_url: cfg.web.public().to_owned(),
+        guild_id: cfg.discord.guild_id.to_string(),
+        capability: cfg
+            .policy
+            .write_roles
+            .first()
+            .cloned()
+            .unwrap_or_else(|| "MANAGE_GUILD".to_owned()),
+        session_secs: i64::try_from(cfg.web.session_hours.saturating_mul(3600)).unwrap_or(i64::MAX),
+    }))
 }
 
 /// What the memory routes need: the store, the clock offset, and the chat rate limit.
@@ -50,6 +105,7 @@ pub(super) fn memory_state(
     cfg: &Config,
     store: Arc<dyn MemoryStore>,
     rate_limit: RateLimiter,
+    web: Option<WebAuth>,
 ) -> MemoryState {
     MemoryState {
         store,
@@ -58,6 +114,7 @@ pub(super) fn memory_state(
         rate_limit,
         default_tenant: cfg.discord.guild_id.to_string(),
         service_token: cfg.engine.service_token.clone(),
+        web,
     }
 }
 
@@ -92,15 +149,26 @@ pub(super) fn canvas_state(cfg: &Config, feeds: Option<Arc<dyn CanvasFeeds>>) ->
 /// The whole HTTP surface, with the state each group of routes reads.
 pub(super) fn http_router(
     cfg: &Config,
-    state: ChatState,
-    memories: MemoryState,
-    oauth: OAuthState,
-    canvas: CanvasState,
-    probes: Vec<Arc<dyn Probe>>,
+    agent: Agent,
+    stores: Stores,
     sandbox: Option<Arc<ContainerSandbox>>,
-) -> axum::Router {
+) -> anyhow::Result<axum::Router> {
+    let web = web_auth(cfg)?;
+    let state = chat_state(
+        cfg,
+        agent,
+        stores.conversations,
+        stores.confirmations,
+        web.clone(),
+    );
+    let memories = memory_state(
+        cfg,
+        Arc::clone(&stores.memory),
+        state.rate_limit.clone(),
+        web.clone(),
+    );
     let health = HealthState {
-        probes,
+        probes: stores.probes,
         model_base_url: cfg.model.base_url.clone(),
     };
     let limits = Limits {
@@ -112,8 +180,13 @@ pub(super) fn http_router(
         health,
         memories,
         sandbox: sandbox_state(cfg, sandbox),
-        oauth,
-        canvas,
+        oauth: oauth_state(cfg, stores.oauth_store),
+        canvas: canvas_state(cfg, stores.canvas),
+        web: web_state(cfg, web)?,
     };
-    crate::routes::router(states, limits, &cfg.http.cors_origins)
+    Ok(crate::routes::router(
+        states,
+        limits,
+        &cfg.http.cors_origins,
+    ))
 }

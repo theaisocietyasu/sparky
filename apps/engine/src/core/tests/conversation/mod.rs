@@ -24,6 +24,14 @@ use crate::routes::rate_limit::RateLimiter;
 use crate::runtime::harness::tools::ToolSet;
 
 fn state(rooms: Arc<Rooms>) -> ChatState {
+    state_with_web(rooms, None)
+}
+
+/// The chat state with the web sign-in on when web is set.
+pub(crate) fn state_with_web(
+    rooms: Arc<Rooms>,
+    web: Option<crate::routes::session::WebAuth>,
+) -> ChatState {
     let replies = (0..16).map(|_| Ok(text("ok"))).collect();
     ChatState {
         agent: agent_with_store(
@@ -44,6 +52,7 @@ fn state(rooms: Arc<Rooms>) -> ChatState {
         attachments_only_input: "what is this".into(),
         service_token: SecretString::from("t"),
         rate_limit: RateLimiter::new(0),
+        web,
     }
 }
 
@@ -418,4 +427,59 @@ async fn a_message_that_is_only_an_attachment_is_answered() {
         StatusCode::BAD_REQUEST,
         "nothing at all is still refused"
     );
+}
+
+#[tokio::test]
+async fn a_signed_in_browser_turn_runs_as_the_cookie_user_in_the_web_channel() {
+    use crate::core::tests::http::web::{SITE, auth, browser, session};
+
+    let web = auth();
+    let Some(sealed) = web.seal(&session("111", &[], 3600)) else {
+        unreachable!("the session seals")
+    };
+    let state = state_with_web(Arc::new(Rooms::default()), Some(web));
+    let request = || {
+        let Ok(req) = serde_json::from_value::<ChatRequest>(json!({
+            "user_id": "someone-else", "channel_id": "c1", "tenant_id": "other", "message": "hi"
+        })) else {
+            unreachable!("a chat request")
+        };
+        req
+    };
+    let (status, _) = body(
+        chat(
+            State(state.clone()),
+            browser(SITE, &sealed),
+            Json(request()),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    let forged = chat(
+        State(state.clone()),
+        browser("https://evil.example.com", &sealed),
+        Json(request()),
+    )
+    .await;
+    assert_eq!(forged.status(), StatusCode::UNAUTHORIZED);
+
+    let ended = |user: &str, channel: &str| ResetRequest {
+        user: user.into(),
+        tenant: None,
+        channel: channel.into(),
+    };
+    let (_, theirs) = body(
+        reset(
+            State(state.clone()),
+            headers(),
+            Json(ended("someone-else", "c1")),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(theirs, json!({"ended": 0}));
+    let (_, mine) = body(reset(State(state), headers(), Json(ended("111", "web"))).await).await;
+    assert_eq!(mine, json!({"ended": 1}));
 }
