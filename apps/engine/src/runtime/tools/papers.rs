@@ -85,6 +85,7 @@ impl Tool for PapersTool {
                 .to_owned(),
             parameters: query_schema("What to search for, in keywords."),
             risk: RiskClass::ReadPublic,
+            private: false,
             sequential: false,
             timeout_secs: None,
         }

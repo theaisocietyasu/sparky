@@ -79,6 +79,7 @@ impl Tool for SandboxTool {
             }),
             risk: self.risk,
             // Sandbox calls within one step run one at a time.
+            private: false,
             sequential: true,
             timeout_secs: None,
         }

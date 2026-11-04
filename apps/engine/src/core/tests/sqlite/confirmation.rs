@@ -17,6 +17,7 @@ fn pending() -> PendingAction {
             tool: "canvas.submit".into(),
             risk: RiskClass::ExternalWrite,
             arguments: json!({"id": 1}),
+            private: false,
         },
     }
 }

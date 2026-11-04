@@ -1,10 +1,10 @@
 //! Reply text: chunking, failure wording, and the memory listing.
 
-use crate::core::types::profile::{ProfileNode, ProfileRelation};
-use crate::core::types::{EngineError, ProfileList};
+use crate::core::types::memory::ListedMemory;
+use crate::core::types::{EngineError, MemoryList};
 use crate::render::reply::{
     MAX_MESSAGE, NOT_YOURS, NOTHING_REMEMBERED, UNAVAILABLE, chunk, confirm_failure,
-    confirm_refused, failure, forgot, memory_failure, render_profile,
+    confirm_refused, failure, forget_failure, forgot, memory_failure, render_memories,
 };
 
 #[test]
@@ -74,48 +74,62 @@ fn a_refused_press_is_told_privately_and_other_failures_read_as_outages() {
 }
 
 #[test]
-fn memory_renders_things_and_relations_or_says_it_is_empty() {
+fn memories_render_numbered_or_say_none_is_kept() {
     assert_eq!(
-        render_profile(&ProfileList::default(), 2_000),
+        render_memories(&MemoryList::default(), 2_000),
         vec![NOTHING_REMEMBERED.to_owned()]
     );
-
-    let profile = ProfileList {
-        nodes: vec![ProfileNode {
-            kind: "course".into(),
-            label: "CSE 310".into(),
-            confidence: 0.87,
-        }],
-        relations: vec![ProfileRelation {
-            subject: "me".into(),
-            relation: "enrolled_in".into(),
-            object: "CSE 310".into(),
-            confidence: 0.5,
-        }],
+    let memory = |number: usize, kind: &str, text: &str, due: Option<&str>| ListedMemory {
+        number,
+        kind: kind.into(),
+        text: text.into(),
+        created_at: "2026-10-30".into(),
+        due: due.map(str::to_owned),
     };
-    let out = render_profile(&profile, 2_000).join("\n");
-    assert!(out.contains("- CSE 310 (course, 87%)"), "{out}");
-    assert!(out.contains("- me enrolled in CSE 310 (50%)"), "{out}");
+    let list = MemoryList {
+        memories: vec![
+            memory(1, "task", "CSE 310 project", Some("2026-11-12")),
+            memory(2, "fact", "CS junior at Poly", None),
+        ],
+    };
+    let out = render_memories(&list, 2_000).join("\n");
+    assert!(
+        out.contains("1. task: CSE 310 project (due 2026-11-12)"),
+        "{out}"
+    );
+    assert!(
+        out.contains("2. fact: CS junior at Poly (2026-10-30)"),
+        "{out}"
+    );
 
-    let many = ProfileList {
-        nodes: (0..200)
-            .map(|i| ProfileNode {
-                kind: "club".into(),
-                label: format!("club number {i}"),
-                confidence: 1.0,
-            })
+    let many = MemoryList {
+        memories: (1..=200)
+            .map(|i| memory(i, "fact", &format!("fact number {i}"), None))
             .collect(),
-        relations: vec![],
     };
-    let parts = render_profile(&many, 500);
+    let parts = render_memories(&many, 500);
     assert!(parts.len() > 1);
     assert!(parts.iter().all(|p| p.len() <= 500));
 
-    assert_eq!(forgot(0, true), "I had nothing under that name.");
-    assert_eq!(forgot(3, false), "Forgot 3 things.");
+    assert_eq!(forgot(1, Some(2)), "Forgot memory 2.");
+    assert_eq!(
+        forgot(0, Some(9)),
+        "I have no memory 9. /memories shows the numbers."
+    );
+    assert_eq!(forgot(3, None), "Forgot 3 things.");
+    assert_eq!(
+        forget_failure(
+            &EngineError::Status {
+                status: 404,
+                body: String::new()
+            },
+            9
+        ),
+        forgot(0, Some(9))
+    );
     let off = memory_failure(&EngineError::Status {
         status: 503,
         body: String::new(),
     });
-    assert_eq!(off, "Memory is turned off here.");
+    assert_eq!(off, "I cannot reach my memory right now. Try again soon.");
 }

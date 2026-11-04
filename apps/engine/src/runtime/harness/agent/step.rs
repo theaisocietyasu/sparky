@@ -7,6 +7,7 @@ use crate::core::types::conversation::message::Message;
 use crate::core::types::model::{FinishReason, ModelError, ModelResponse};
 use crate::core::types::safety::guardrail::{Stage, Verdict};
 use crate::core::types::safety::redact::truncate;
+use crate::core::types::tools::REMEMBER;
 use crate::core::types::trace::{RunStatus, TraceEvent};
 use crate::runtime::harness::agent::execute::HeldError;
 use crate::runtime::harness::agent::prompt::assemble;
@@ -127,6 +128,11 @@ impl Agent {
         let tool_tokens = self.deps.tools.estimated_tokens(cpt);
         let mut budget = self.cfg.budget;
         budget.total = budget.total.saturating_sub(tool_tokens);
+        // The memory rules go only where the memory tools are offered.
+        let mut templates = self.prompt.templates();
+        if self.deps.tools.get(REMEMBER).is_none() {
+            templates.memory_rules = "";
+        }
         let assembled = assemble::assemble(
             ctx,
             &Sections {
@@ -135,10 +141,10 @@ impl Agent {
                 uploads: &inputs.uploads,
                 history: &inputs.history,
                 turn,
-                capabilities: &self.capabilities(),
+                capabilities: &self.capabilities(ctx.visibility),
                 input: run.input,
                 date: &self.prompt.today(),
-                templates: self.prompt.templates(),
+                templates,
             },
             budget,
         );

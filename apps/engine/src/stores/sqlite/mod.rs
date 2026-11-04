@@ -8,6 +8,7 @@ mod conversation;
 mod health;
 mod import;
 mod memory;
+mod prune;
 mod seal;
 
 use std::path::Path;
@@ -29,9 +30,10 @@ pub use health::SqliteProbe;
 #[cfg(test)]
 pub use import::ImportError;
 pub use import::{ImportCounts, Importer};
+pub use memory::{MemoryLimits, SqliteMemory};
+pub use prune::{PrunePlan, run_prunes};
 #[cfg(test)]
-pub use memory::NewMemory;
-pub use memory::SqliteMemory;
+pub use prune::{Pruned, prune_once};
 pub use seal::Seal;
 
 /// How to open the file.
@@ -97,9 +99,9 @@ impl SqliteStore {
         SqliteConversations::new(self.pool.clone())
     }
 
-    /// Memories in this file, sealed and opened with seal.
-    pub fn memory(&self, seal: Seal) -> SqliteMemory {
-        SqliteMemory::new(self.pool.clone(), seal)
+    /// Memories in this file, sealed and opened with seal, kept within limits.
+    pub fn memory(&self, seal: Seal, limits: MemoryLimits) -> SqliteMemory {
+        SqliteMemory::new(self.pool.clone(), seal, limits)
     }
 
     /// Pending actions in this file.

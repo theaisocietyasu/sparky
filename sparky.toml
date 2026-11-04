@@ -18,8 +18,6 @@ turn_queue_wait_secs = 20      # longest a turn waits for a slot before it is re
 temperature = 0.6
 history_turns = 20
 memory_recall_limit = 10
-# Recall memory and the profile graph in channels others can read.
-recall_in_public = false
 
 # Prompt budgets in estimated tokens. A section budget over the total is rejected at boot.
 # Tool schemas count against prompt_budget_tokens and must fit in half of it.
@@ -79,6 +77,8 @@ retry_without = true
 role_line = "The user is `{user}`. Roles: {roles}."
 role_line_no_roles = "The user is `{user}`. They hold no special roles."
 memory_header = "What you remember about this user:"
+# Added to the system prompt in a direct message when the memory tools are registered.
+memory_rules = "Memory. Call remember when the student states something about themselves that helps later: their major, year, campus, clubs, how they want answers, or a task with its due date. Only what they said, never a guess. Never store grades, GPA, health, disability, immigration status, finances, passwords or codes, or anything about another person. Call forget_memory with the id in brackets when they ask you to forget something."
 capabilities_header = "What you can do. Each line is a name, how it runs, and what it does."
 # {date} is filled in at assembly.
 date_line = "Today is {date}. Search results are labelled by day or date; read the label the question asks for, never the first value in a row."
@@ -350,6 +350,19 @@ backup_every_hours = 24
 backups_kept = 7
 import_days = 30               # engine import-platform leaves out older conversations
 import_page_size = 100         # rows per page of the platform export, 1 to 500
+prune_every_hours = 24         # deletes expired tasks, settled confirmations and idle conversations
+conversation_idle_days = 0     # a conversation idle this many days is deleted; 0 keeps every one
+
+# ---------------------------------------------------------------- memories
+# What Sparky remembers about a student, written by the remember tool in direct messages.
+# SPARKY_MEMORY__KEY in .env seals sensitive memories.
+[memory]
+tools = true                   # remember and forget_memory; need store.backend = "sqlite"
+max_per_user = 50              # at the cap the oldest fact goes first
+max_chars = 200
+task_soon_days = 7             # a task due this soon is recalled first
+refuse_terms = ["password", "passcode", "ssn", "gpa", "grade", "diagnos"]
+sensitive_terms = ["address", "phone", "birthday"]
 
 # ---------------------------------------------------------------- the developer console
 [cli]

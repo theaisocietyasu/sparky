@@ -19,7 +19,7 @@ Use [GitHub private vulnerability reporting](https://github.com/theaisocietyasu/
 ## Model
 
 - The tenant is the guild. One engine serves one guild, and its Platform machine token belongs to that guild's organization; conversations, memory and the profile graph are scoped by it and by the member.
-- A direct message is `Visibility::Private`; a guild thread is `Visibility::Public`. `agent.recall_in_public` keeps personal memory and the profile graph out of a public answer.
+- A direct message is `Visibility::Private`; a guild thread is `Visibility::Public`. Personal memory, the profile graph and the private memory tools reach only a private turn; the policy denies a private tool anywhere else.
 - Secrets are `SecretString`, come from the environment only, and are never logged.
 - Write-side tools go through `Policy`. `policy.confirm_from` decides what needs a confirmation, which expires; the model never decides whether one is required.
 - The engine never writes the retrieval index; Platform crawls and indexes. Model output is never written back as evidence. Linked account tokens come from Platform per call and are never stored by the engine.

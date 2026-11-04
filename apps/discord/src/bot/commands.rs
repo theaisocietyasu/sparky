@@ -1,15 +1,15 @@
-//! Slash command names and their registration: reset, memory, forget, login, logout.
+//! Slash command names and their registration: reset, memories, forget, login, logout.
 
 use serenity::all::{CommandOptionType, CreateCommand, CreateCommandOption};
 
 /// The /reset command, which ends the conversation in this channel.
 pub const RESET: &str = "reset";
-/// The /memory command, which lists what the engine remembers about the user.
-pub const MEMORY: &str = "memory";
-/// The /forget command, which removes one remembered thing or everything.
+/// The /memories command, which lists what the engine remembers about the user.
+pub const MEMORIES: &str = "memories";
+/// The /forget command, which removes one memory or every memory.
 pub const FORGET: &str = "forget";
-/// Name of the label option on /forget.
-pub const LABEL: &str = "label";
+/// Name of the option on /forget: a number from /memories, or all.
+pub const WHICH: &str = "which";
 /// The /login command, which connects one of the user's accounts.
 pub const LOGIN: &str = "login";
 /// The /logout command, which disconnects one of the user's accounts.
@@ -28,14 +28,17 @@ pub fn all() -> Vec<CreateCommand> {
     vec![
         CreateCommand::new(RESET)
             .description("End the conversation in this channel and start over"),
-        CreateCommand::new(MEMORY).description("See what Sparky remembers about you"),
+        CreateCommand::new(MEMORIES).description("See what Sparky remembers about you"),
         CreateCommand::new(FORGET)
-            .description("Make Sparky forget one thing, or everything, about you")
-            .add_option(CreateCommandOption::new(
-                CommandOptionType::String,
-                LABEL,
-                "The thing to forget, as /memory shows it. Leave empty to forget everything",
-            )),
+            .description("Make Sparky forget one memory, or every memory, about you")
+            .add_option(
+                CreateCommandOption::new(
+                    CommandOptionType::String,
+                    WHICH,
+                    "A number from /memories, or all",
+                )
+                .required(true),
+            ),
         CreateCommand::new(LOGIN)
             .description("Connect an account (Canvas, Outlook) so Sparky can check it in DMs")
             .add_option(service_option()),

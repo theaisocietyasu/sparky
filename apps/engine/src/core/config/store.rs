@@ -1,4 +1,4 @@
-//! Where the engine keeps conversations, memories and pending actions.
+//! Where the engine keeps conversations, memories and pending actions, and what it remembers.
 
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
@@ -40,6 +40,10 @@ pub struct Store {
     pub import_days: u32,
     /// Rows asked for in one page of the platform export.
     pub import_page_size: usize,
+    /// Hours between prunes of expired tasks, settled confirmations and idle conversations.
+    pub prune_every_hours: u64,
+    /// A conversation idle this many days is deleted with its messages. 0 keeps every one.
+    pub conversation_idle_days: u32,
 }
 
 impl Default for Store {
@@ -54,22 +58,51 @@ impl Default for Store {
             backups_kept: 7,
             import_days: 30,
             import_page_size: 100,
+            prune_every_hours: 24,
+            conversation_idle_days: 0,
         }
     }
 }
 
-/// The key that seals sensitive memories at rest.
-#[derive(Debug, Default, Deserialize)]
+/// What Sparky remembers about a student, and the key that seals sensitive memories at rest.
+#[derive(Debug, Deserialize)]
 #[serde(default)]
-pub struct MemorySeal {
+pub struct MemorySettings {
     /// Base64 of 32 random bytes, from SPARKY_MEMORY__KEY.
     pub key: Option<SecretString>,
+    /// Register the remember and forget_memory tools. They need store.backend sqlite.
+    pub tools: bool,
+    /// Memories kept per student; at the cap the oldest fact goes first.
+    pub max_per_user: usize,
+    /// Longest memory, in characters.
+    pub max_chars: usize,
+    /// A task due within this many days is recalled first.
+    pub task_soon_days: i64,
+    /// Lowercase fragments that make remember refuse the text.
+    pub refuse_terms: Vec<String>,
+    /// Lowercase fragments that make remember seal the text.
+    pub sensitive_terms: Vec<String>,
+}
+
+impl Default for MemorySettings {
+    fn default() -> Self {
+        let terms = |t: &[&str]| t.iter().map(|s| (*s).to_owned()).collect();
+        Self {
+            key: None,
+            tools: true,
+            max_per_user: 50,
+            max_chars: 200,
+            task_soon_days: 7,
+            refuse_terms: terms(&["password", "passcode", "ssn", "gpa", "grade", "diagnos"]),
+            sensitive_terms: terms(&["address", "phone", "birthday"]),
+        }
+    }
 }
 
 /// Length of the memory key in bytes.
 pub const MEMORY_KEY_BYTES: usize = 32;
 
-impl MemorySeal {
+impl MemorySettings {
     /// The decoded key, or why it is unusable.
     pub fn bytes(&self) -> Result<[u8; MEMORY_KEY_BYTES], ConfigError> {
         let invalid = |m: &str| ConfigError::Invalid(m.to_owned());
@@ -88,8 +121,17 @@ impl MemorySeal {
 }
 
 /// Rejects a store that cannot open or back up, and a missing or malformed key.
-pub fn validate_store(store: &Store, seal: &MemorySeal) -> Result<(), ConfigError> {
+pub fn validate_store(store: &Store, memory: &MemorySettings) -> Result<(), ConfigError> {
     let invalid = |m: &str| Err(ConfigError::Invalid(m.to_owned()));
+    if memory.max_per_user == 0 {
+        return invalid("memory.max_per_user must be at least 1");
+    }
+    if memory.max_chars == 0 {
+        return invalid("memory.max_chars must be at least 1");
+    }
+    if memory.task_soon_days < 0 {
+        return invalid("memory.task_soon_days must not be negative");
+    }
     if store.backend != StoreBackend::Sqlite {
         return Ok(());
     }
@@ -102,6 +144,9 @@ pub fn validate_store(store: &Store, seal: &MemorySeal) -> Result<(), ConfigErro
     if !(1..=500).contains(&store.import_page_size) {
         return invalid("store.import_page_size must be from 1 to 500");
     }
+    if store.prune_every_hours == 0 {
+        return invalid("store.prune_every_hours must be at least 1");
+    }
     if !store.backup_dir.trim().is_empty() {
         if store.backups_kept == 0 {
             return invalid("store.backups_kept must be at least 1 when store.backup_dir is set");
@@ -112,5 +157,5 @@ pub fn validate_store(store: &Store, seal: &MemorySeal) -> Result<(), ConfigErro
             );
         }
     }
-    seal.bytes().map(|_| ())
+    memory.bytes().map(|_| ())
 }

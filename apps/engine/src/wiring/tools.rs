@@ -8,8 +8,10 @@ use secrecy::ExposeSecret;
 use crate::core::config::Config;
 use crate::core::traits::knowledge::query::SourceQueries;
 use crate::core::traits::knowledge::retrieval::Retriever;
+use crate::core::traits::memory::MemoryStore;
 use crate::core::traits::oauth::OAuthStore;
 use crate::core::traits::tools::Tool;
+use crate::core::traits::trace::TraceSink;
 use crate::core::types::tools::sandbox::Limits as SandboxLimits;
 use crate::runtime::harness::tools::ToolSet;
 use crate::runtime::tools::account::{gcal, outlook};
@@ -17,6 +19,7 @@ use crate::runtime::tools::knowledge::search;
 use crate::runtime::tools::knowledge::search::live::{LiveSearch, Wording as LiveWording};
 use crate::runtime::tools::knowledge::search::stored::{StoredSearch, Wording as StoredWording};
 use crate::runtime::tools::mcp::{self, McpLimits};
+use crate::runtime::tools::memory::{self, MemoryRules};
 use crate::runtime::tools::sandbox::{
     ContainerSandbox, SandboxTool, Wording as SandboxWording, reap_sessions,
 };
@@ -35,6 +38,7 @@ pub(crate) async fn build_tools(
     retriever: Arc<dyn Retriever>,
     sandbox: Option<Arc<ContainerSandbox>>,
     oauth_store: Arc<dyn OAuthStore>,
+    memory: Option<(Arc<dyn MemoryStore>, Arc<dyn TraceSink>)>,
 ) -> anyhow::Result<(ToolSet, Vec<String>)> {
     let disabled = |name: &str| cfg.tools.disabled.iter().any(|d| d == name);
     let mut tools = ToolSet::new();
@@ -108,6 +112,15 @@ pub(crate) async fn build_tools(
             registered += 1;
         }
         tracing::info!(url = %url, count = registered, "platform mcp tools registered");
+    }
+    if let Some((store, trace)) = memory {
+        let rules = MemoryRules::new(&cfg.memory, cfg.prompt.utc_offset_hours);
+        tools = register(
+            tools,
+            memory::tools(&store, &trace, rules),
+            &disabled,
+            "memory",
+        );
     }
     for (integration, enabled, build) in integrations(cfg, &oauth_store) {
         if !enabled {

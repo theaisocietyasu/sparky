@@ -96,9 +96,9 @@ pub struct Config {
     /// Where conversations, memories and pending actions live.
     #[serde(default)]
     pub store: Store,
-    /// The key that seals sensitive memories.
+    /// What Sparky remembers and the key that seals sensitive memories.
     #[serde(default)]
-    pub memory: MemorySeal,
+    pub memory: MemorySettings,
 }
 
 /// Default budgets. Every field comes from the agent section.
@@ -127,7 +127,6 @@ impl Default for AgentConfig {
             history_turns: agent.history_turns,
             history_keep: Compaction::default().keep_tokens(agent.history_budget_tokens),
             memory_recall_limit: agent.memory_recall_limit,
-            recall_in_public: agent.recall_in_public,
             retry_base_ms: agent.retry_base_ms,
             retry_cap_ms: agent.retry_cap_ms,
             max_span_value_chars: agent.max_span_value_chars,

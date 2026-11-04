@@ -6,7 +6,7 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use sqlx::{SqliteConnection, SqlitePool};
 use uuid::Uuid;
 
-use super::memory::{NewMemory, insert};
+use super::memory::{MemoryRow, insert};
 use super::{Seal, database, stamp};
 use crate::core::types::export::{ConversationPage, ExportConversation, MemoryPage};
 use crate::core::types::memory::MemoryKind;
@@ -185,15 +185,13 @@ impl Importer {
         let mut tx = self.pool.begin().await.map_err(database)?;
         for m in &page.memories {
             let row = |e: String| ImportError::Row(m.id.clone(), e);
-            let kind = MemoryKind::parse(&m.kind).ok_or_else(|| row(format!("kind {}", m.kind)))?;
-            // Confidence is a fraction from 0 to 1.
-            #[allow(clippy::cast_possible_truncation)]
-            let memory = NewMemory {
+            let kind = MemoryKind::from_platform(&m.kind)
+                .ok_or_else(|| row(format!("kind {}", m.kind)))?;
+            let memory = MemoryRow {
                 id: Uuid::parse_str(&m.id).map_err(|e| row(e.to_string()))?,
                 kind,
                 content: m.content.clone(),
                 sensitive: m.sensitivity == "sensitive",
-                confidence: m.confidence as f32,
                 source_conversation: None,
                 source_seq: None,
                 created_at: time(&m.id, "created_at", &m.created_at)?,

@@ -31,6 +31,7 @@ impl Tool for Finder {
             description: "finds".into(),
             parameters: json!({"type": "object"}),
             risk: RiskClass::ReadPublic,
+            private: false,
             sequential: false,
             timeout_secs: None,
         }

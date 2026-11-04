@@ -2,6 +2,7 @@
 
 mod health;
 mod login;
+mod memories;
 mod rate_limit;
 mod sandbox;
 

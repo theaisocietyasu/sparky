@@ -29,6 +29,7 @@ use crate::core::traits::tools::sandbox::Sandbox;
 use crate::core::traits::trace::TraceSink;
 use crate::core::types::agent::context::RequestContext;
 use crate::core::types::agent::{AgentConfig, AgentError, Answer};
+use crate::core::types::conversation::Visibility;
 use crate::core::types::conversation::message::{Message, ToolCall};
 use crate::core::types::model::{ModelError, Usage};
 use crate::core::types::safety::policy::{ConfirmationRequest, PendingAction};
@@ -135,10 +136,10 @@ impl Agent {
         self
     }
 
-    /// The capabilities section for this step. A tool switched off is not in it.
-    fn capabilities(&self) -> String {
+    /// The capabilities section for a turn of visibility. A tool switched off is not in it.
+    fn capabilities(&self, visibility: Visibility) -> String {
         capability::render(&capability::from_definitions(
-            &self.deps.tools.definitions(),
+            &self.deps.tools.definitions_for(visibility),
             &self.mcp_names,
         ))
     }

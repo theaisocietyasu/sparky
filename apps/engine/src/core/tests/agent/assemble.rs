@@ -115,9 +115,9 @@ fn a_resumed_run_appends_no_input_of_its_own() {
 fn the_wording_around_every_section_comes_from_configuration() {
     let memories = vec![Memory {
         id: Uuid::new_v4(),
-        kind: MemoryKind::Profile,
+        kind: MemoryKind::Preference,
         content: "prefers mornings".into(),
-        confidence: 1.0,
+        sensitive: false,
         created_at: Utc::now(),
         expires_at: None,
     }];
@@ -512,4 +512,69 @@ fn a_leading_summary_is_kept_before_older_turns_when_history_is_over_budget() {
             .iter()
             .any(|m| m.content.starts_with("turn 0 "))
     );
+}
+
+fn remembered(kind: MemoryKind, content: &str) -> Memory {
+    Memory {
+        id: Uuid::new_v4(),
+        kind,
+        content: content.into(),
+        sensitive: false,
+        created_at: Utc::now(),
+        expires_at: None,
+    }
+}
+
+#[test]
+fn a_memory_line_carries_its_short_id_and_lines_stop_at_the_budget() {
+    let memories: Vec<Memory> = (0..40)
+        .map(|n| {
+            remembered(
+                MemoryKind::Fact,
+                &format!("fact number {n} about the student"),
+            )
+        })
+        .collect();
+    let budget = Budget {
+        memory: 60,
+        ..Budget::default()
+    };
+    let out = assemble(
+        &ctx(),
+        &Sections {
+            system: "s",
+            memory: &memories,
+            input: "q",
+            ..Sections::default()
+        },
+        budget,
+    );
+    let text: String = out.messages.iter().map(|m| m.content.clone()).collect();
+    let first = format!("- [{}] fact: fact number 0", memories[0].short_id());
+    assert!(text.contains(&first), "{text}");
+    assert!(out.memory_used > 0 && out.memory_used < memories.len());
+}
+
+#[test]
+fn the_memory_rules_are_only_in_a_private_turn() {
+    let sections = Sections {
+        system: "s",
+        input: "q",
+        templates: Templates {
+            memory_rules: "MEMORY RULES",
+            ..Templates::default()
+        },
+        ..Sections::default()
+    };
+    let public = assemble(&ctx(), &sections, Budget::default());
+    let private = assemble(
+        &ctx().with_visibility(crate::core::types::conversation::Visibility::Private),
+        &sections,
+        Budget::default(),
+    );
+    let text = |out: &crate::core::types::agent::assemble::Assembled| -> String {
+        out.messages.iter().map(|m| m.content.clone()).collect()
+    };
+    assert!(!text(&public).contains("MEMORY RULES"));
+    assert!(text(&private).contains("MEMORY RULES"));
 }

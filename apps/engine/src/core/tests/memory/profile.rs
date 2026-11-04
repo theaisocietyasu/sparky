@@ -108,9 +108,8 @@ fn a_relation_reads_as_a_sentence_in_the_prompt() {
 
     // A node says what a user is connected to. Only the relation says how.
     let memory = Memory::from(&relation);
-    assert_eq!(memory.kind, MemoryKind::Semantic);
+    assert_eq!(memory.kind, MemoryKind::Fact);
     assert_eq!(memory.content, "the student studies computer science");
-    assert!((memory.confidence - 0.9).abs() < f32::EPSILON);
 }
 
 #[test]
@@ -127,7 +126,7 @@ fn a_recalled_node_reads_as_its_kind_and_label() {
         updated_at: chrono::Utc::now(),
     };
     let memory = Memory::from(&node);
-    assert_eq!(memory.kind, MemoryKind::Profile);
+    assert_eq!(memory.kind, MemoryKind::Fact);
     assert_eq!(memory.content, "interest: robotics");
 }
 

@@ -13,8 +13,8 @@ use tokio::sync::mpsc::UnboundedSender;
 
 use crate::core::types::{
     AuthorizeRequest, AuthorizeResponse, ChatRequest, ChatResponse, ConfirmRequest,
-    DisconnectResponse, ERROR_BODY_CHARS, EngineError, ForgetRequest, ForgetResponse, ProfileList,
-    ProfileRequest, ResetRequest, ResetResponse, Update,
+    DisconnectResponse, ERROR_BODY_CHARS, EngineError, ForgetRequest, ForgetResponse, MemoryList,
+    MemoryRequest, ResetRequest, ResetResponse, Update,
 };
 use crate::engine::sse::{decode, drain_frames, take_complete};
 
@@ -56,14 +56,14 @@ impl EngineClient {
         self.post("/conversation/reset", req).await
     }
 
-    /// Lists what the engine remembers about a user. 503 when the profile graph is off.
-    pub async fn profile_list(&self, req: &ProfileRequest) -> Result<ProfileList, EngineError> {
-        self.post("/profile/list", req).await
+    /// Lists what the engine remembers about a user, numbered from 1.
+    pub async fn memories(&self, req: &MemoryRequest) -> Result<MemoryList, EngineError> {
+        self.post("/memories/list", req).await
     }
 
-    /// Forgets one remembered thing, or everything without a label. 503 if profile graph is off.
+    /// Forgets one memory by number, or every memory without one. 404 for an unknown number.
     pub async fn forget(&self, req: &ForgetRequest) -> Result<ForgetResponse, EngineError> {
-        self.post("/profile/forget", req).await
+        self.post("/memories/forget", req).await
     }
 
     /// Mints a consent URL for the caller and a provider. 503 when that login is not enabled.

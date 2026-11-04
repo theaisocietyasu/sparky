@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use crate::core::traits::tools::Tool;
+use crate::core::types::conversation::Visibility;
 use crate::core::types::model::tokens::estimate;
 use crate::core::types::tools::ToolDefinition;
 
@@ -37,6 +38,15 @@ impl ToolSet {
             .filter(|t| t.available())
             .map(|t| t.definition())
             .collect()
+    }
+
+    /// Definitions offered in a turn of visibility: a public turn leaves private tools out.
+    pub fn definitions_for(&self, visibility: Visibility) -> Vec<ToolDefinition> {
+        let mut out = self.definitions();
+        if visibility != Visibility::Private {
+            out.retain(|d| !d.private);
+        }
+        out
     }
 
     /// Estimated tokens the tool schemas add to every model request.

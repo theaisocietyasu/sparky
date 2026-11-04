@@ -2,7 +2,9 @@
 
 use crate::core::types::agent::assemble::{Assembled, Budget, Sections};
 use crate::core::types::agent::context::RequestContext;
+use crate::core::types::conversation::Visibility;
 use crate::core::types::conversation::message::{Message, Role};
+use crate::core::types::memory::MemoryKind;
 use crate::core::types::model::tokens::estimate;
 
 /// Builds the message list within budget.
@@ -22,6 +24,11 @@ pub fn assemble(ctx: &RequestContext, s: &Sections<'_>, budget: Budget) -> Assem
             .replace("{roles}", &ctx.roles.join(", "))
     };
     let mut system = format!("{}\n\n{role_line}", s.system.trim());
+    let rules = s.templates.memory_rules.trim();
+    if ctx.visibility == Visibility::Private && !rules.is_empty() {
+        system.push_str("\n\n");
+        system.push_str(rules);
+    }
     if !s.date.is_empty() {
         let date_line = s.templates.date_line.replace("{date}", s.date);
         system.push('\n');
@@ -175,7 +182,16 @@ fn memory_block(s: &Sections<'_>, budget: usize, cpt: usize) -> Option<(String, 
     let mut spent = estimate(&block, cpt);
     let mut count = 0;
     for m in s.memory {
-        let line = format!("- ({}) {}\n", m.kind.as_str(), m.content.trim());
+        let when = match (m.kind, m.expires_at) {
+            (MemoryKind::Task, Some(due)) => format!("due {}", due.format("%Y-%m-%d")),
+            _ => m.created_at.format("%Y-%m-%d").to_string(),
+        };
+        let line = format!(
+            "- [{}] {}: {} ({when})\n",
+            m.short_id(),
+            m.kind.as_str(),
+            m.content.trim()
+        );
         let cost = estimate(&line, cpt);
         if spent + cost > budget {
             break;

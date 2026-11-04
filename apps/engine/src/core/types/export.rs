@@ -55,8 +55,6 @@ pub struct ExportMemory {
     pub content: String,
     /// normal or sensitive.
     pub sensitivity: String,
-    /// Confidence, 0 to 1.
-    pub confidence: f64,
     /// When it was written.
     pub created_at: String,
     /// When it stops being recalled.

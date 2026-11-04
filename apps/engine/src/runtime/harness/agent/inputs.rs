@@ -5,7 +5,7 @@ use crate::core::types::agent::AgentError;
 use crate::core::types::agent::context::RequestContext;
 use crate::core::types::conversation::message::{Message, Role};
 use crate::core::types::conversation::{Stored, Visibility};
-use crate::core::types::memory::{Memory, MemoryQuery};
+use crate::core::types::memory::Memory;
 use crate::core::types::trace::TraceEvent;
 use crate::runtime::harness::agent::run::Inputs;
 
@@ -101,26 +101,21 @@ impl Agent {
     pub(super) async fn load(&self, ctx: &RequestContext) -> Result<Inputs, AgentError> {
         let deps = &self.deps;
         let history = self.history(ctx).await?;
-        let memory = if ctx.visibility == Visibility::Public && !self.cfg.recall_in_public {
-            Vec::new()
-        } else {
+        // Memories are personal and reach the prompt only in a private turn.
+        let memory = if ctx.visibility == Visibility::Private {
             let recalled = match &deps.memory {
-                Some(store) => {
-                    let query = MemoryQuery {
-                        kinds: Vec::new(),
-                        limit: self.cfg.memory_recall_limit,
-                    };
-                    match store.recall(ctx, &query).await {
-                        Ok(memories) => memories,
-                        Err(error) => {
-                            tracing::error!(error = %error, "memory recall failed; none is recalled");
-                            Vec::new()
-                        }
+                Some(store) => match store.recall(ctx).await {
+                    Ok(memories) => memories,
+                    Err(error) => {
+                        tracing::error!(error = %error, "memory recall failed; none is recalled");
+                        Vec::new()
                     }
-                }
+                },
                 None => Vec::new(),
             };
             self.with_profile(ctx, recalled).await
+        } else {
+            Vec::new()
         };
         deps.trace.emit(
             ctx,

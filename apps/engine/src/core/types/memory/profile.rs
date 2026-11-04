@@ -68,9 +68,9 @@ impl From<&ProfileNode> for crate::core::types::memory::Memory {
     fn from(node: &ProfileNode) -> Self {
         Self {
             id: node.id,
-            kind: crate::core::types::memory::MemoryKind::Profile,
+            kind: crate::core::types::memory::MemoryKind::Fact,
             content: format!("{}: {}", node.kind, node.label),
-            confidence: node.confidence,
+            sensitive: false,
             created_at: node.created_at,
             expires_at: None,
         }
@@ -105,9 +105,9 @@ impl From<&ProfileRelation> for crate::core::types::memory::Memory {
     fn from(relation: &ProfileRelation) -> Self {
         Self {
             id: uuid::Uuid::nil(),
-            kind: crate::core::types::memory::MemoryKind::Semantic,
+            kind: crate::core::types::memory::MemoryKind::Fact,
             content: relation.to_string(),
-            confidence: relation.confidence,
+            sensitive: false,
             created_at: chrono::Utc::now(),
             expires_at: None,
         }

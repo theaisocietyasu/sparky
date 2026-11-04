@@ -49,8 +49,6 @@ pub struct AgentConfig {
     pub history_keep: usize,
     /// Memories recalled per request.
     pub memory_recall_limit: usize,
-    /// Recall memory and the profile graph for a public request.
-    pub recall_in_public: bool,
     /// First retry wait, doubled per attempt.
     pub retry_base_ms: u64,
     /// Longest retry wait.

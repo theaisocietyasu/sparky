@@ -1,8 +1,9 @@
-//! MemoryKind, Memory, MemoryQuery.
+//! MemoryKind, Memory, NewMemory: what Sparky remembers about one student.
 
+pub mod listing;
 pub mod profile;
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -10,13 +11,11 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum MemoryKind {
-    /// A useful event from a prior interaction.
-    Episodic,
-    /// A stable inferred fact.
-    Semantic,
-    /// Approved preferences, interests, goals.
-    Profile,
-    /// State to continue a multi-step job.
+    /// Something the student stated about themselves: major, year, campus, clubs.
+    Fact,
+    /// How the student wants answers.
+    Preference,
+    /// Something due on a date. Expires after it.
     Task,
 }
 
@@ -24,9 +23,8 @@ impl MemoryKind {
     /// Database column value.
     pub fn as_str(self) -> &'static str {
         match self {
-            Self::Episodic => "episodic",
-            Self::Semantic => "semantic",
-            Self::Profile => "profile",
+            Self::Fact => "fact",
+            Self::Preference => "preference",
             Self::Task => "task",
         }
     }
@@ -34,9 +32,18 @@ impl MemoryKind {
     /// Parses a database column value.
     pub fn parse(s: &str) -> Option<Self> {
         match s {
-            "episodic" => Some(Self::Episodic),
-            "semantic" => Some(Self::Semantic),
-            "profile" => Some(Self::Profile),
+            "fact" => Some(Self::Fact),
+            "preference" => Some(Self::Preference),
+            "task" => Some(Self::Task),
+            _ => None,
+        }
+    }
+
+    /// The kind of a platform memory: episodic and semantic are facts, profile is a preference.
+    pub fn from_platform(s: &str) -> Option<Self> {
+        match s {
+            "episodic" | "semantic" | "fact" => Some(Self::Fact),
+            "profile" | "preference" => Some(Self::Preference),
             "task" => Some(Self::Task),
             _ => None,
         }
@@ -44,27 +51,43 @@ impl MemoryKind {
 }
 
 /// A stored memory.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Memory {
-    /// Row id.
+    /// Row id. The first 8 hex digits are the short id the prompt and the tools use.
     pub id: Uuid,
     /// Kind.
     pub kind: MemoryKind,
-    /// The remembered text.
+    /// The remembered line.
     pub content: String,
-    /// Confidence at write time, 0 to 1.
-    pub confidence: f32,
+    /// Sealed at rest.
+    pub sensitive: bool,
     /// When it was written.
     pub created_at: DateTime<Utc>,
-    /// When it stops being recalled.
+    /// When it stops being recalled; for a task, the end of its due date.
     pub expires_at: Option<DateTime<Utc>>,
 }
 
-/// Recall parameters.
-#[derive(Debug, Clone)]
-pub struct MemoryQuery {
-    /// Restrict to these kinds; empty means all.
-    pub kinds: Vec<MemoryKind>,
-    /// Maximum rows.
-    pub limit: usize,
+impl Memory {
+    /// The short id: the first 8 hex digits of the row id.
+    pub fn short_id(&self) -> String {
+        short_id(self.id)
+    }
+}
+
+/// The first 8 hex digits of id.
+pub fn short_id(id: Uuid) -> String {
+    id.simple().to_string().chars().take(8).collect()
+}
+
+/// One memory to write for the caller.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NewMemory {
+    /// Kind.
+    pub kind: MemoryKind,
+    /// The line to remember.
+    pub text: String,
+    /// For a task, the day it is due.
+    pub due: Option<NaiveDate>,
+    /// Seal it at rest.
+    pub sensitive: bool,
 }

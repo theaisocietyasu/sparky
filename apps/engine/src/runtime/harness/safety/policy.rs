@@ -86,6 +86,12 @@ impl Policy for RiskPolicy {
                 reason: format!("`{}` is forbidden", action.tool),
             };
         }
+        // A private tool runs only in a private turn, whatever the other gates allow.
+        if action.private && ctx.visibility != Visibility::Private {
+            return Decision::Deny {
+                reason: format!("`{}` runs only in a direct message", action.tool),
+            };
+        }
         if action.risk == RiskClass::ReadAuthenticated
             && !self.allow_authenticated_reads
             && ctx.visibility != Visibility::Private

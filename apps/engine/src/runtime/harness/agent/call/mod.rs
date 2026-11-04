@@ -140,7 +140,7 @@ impl Agent {
                 tools: if answer_only {
                     Vec::new()
                 } else {
-                    deps.tools.definitions()
+                    deps.tools.definitions_for(ctx.visibility)
                 },
                 max_tokens: if thinking.on {
                     self.cfg.max_tokens

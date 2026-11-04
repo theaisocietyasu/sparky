@@ -37,6 +37,8 @@ pub struct Templates<'a> {
     pub reply_header: &'a str,
     /// Line closing a tool result cut to fit the prompt, with {chars}.
     pub result_cut_line: &'a str,
+    /// What to remember and what never to store. Added to the system prompt in a private turn.
+    pub memory_rules: &'a str,
 }
 
 /// Default line naming the user, with {user} and {roles}.
@@ -45,6 +47,12 @@ pub const ROLE_LINE: &str = "The user is `{user}`. Roles: {roles}.";
 pub const ROLE_LINE_NO_ROLES: &str = "The user is `{user}`. They hold no special roles.";
 /// Default heading above recalled memories.
 pub const MEMORY_HEADER: &str = "What you remember about this user:";
+/// Default rules for the memory tools, added to the system prompt in a private turn.
+pub const MEMORY_RULES: &str = "Memory. Call remember when the student states something about themselves that helps \
+later: their major, year, campus, clubs, how they want answers, or a task with its due date. \
+Only what they said, never a guess. Never store grades, GPA, health, disability, immigration \
+status, finances, passwords or codes, or anything about another person. Call forget_memory \
+with the id in brackets when they ask you to forget something.";
 /// Default line naming the current date, with {date}.
 pub const DATE_LINE: &str = "Today is {date}. Search results are labelled by day or date; read \
                              the label the question asks for, never the first value in a row.";
@@ -88,6 +96,7 @@ impl Default for Templates<'_> {
             date_line: DATE_LINE,
             reply_header: REPLY_HEADER,
             result_cut_line: RESULT_CUT_LINE,
+            memory_rules: MEMORY_RULES,
         }
     }
 }

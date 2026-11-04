@@ -58,6 +58,7 @@ impl Tool for WikiTool {
                 .to_owned(),
             parameters: query_schema("The subject to look up."),
             risk: RiskClass::ReadPublic,
+            private: false,
             sequential: false,
             timeout_secs: None,
         }

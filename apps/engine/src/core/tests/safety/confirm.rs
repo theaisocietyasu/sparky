@@ -101,6 +101,7 @@ async fn approving_runs_the_action_and_carries_on_to_an_answer() {
             tool: "echo".into(),
             risk: RiskClass::ExternalWrite,
             arguments: json!({"x": 1}),
+            private: false,
         },
     };
 

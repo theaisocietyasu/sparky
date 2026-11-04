@@ -103,6 +103,7 @@ impl Tool for OutlookTool {
             description: self.query.description().to_owned(),
             parameters: json!({ "type": "object", "properties": {} }),
             risk: RiskClass::ReadAuthenticated,
+            private: false,
             sequential: false,
             timeout_secs: None,
         }

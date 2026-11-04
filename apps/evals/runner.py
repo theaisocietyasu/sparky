@@ -50,9 +50,17 @@ def ask(
     conversation_id: str | None,
     user_id: str,
     engine_url: str | None = None,
+    visibility: str = "public",
+    channel_id: str = "eval",
 ) -> TurnResult:
     cfg = settings().evals
-    body = {"user_id": user_id, "roles": roles, "message": question, "channel_id": "eval"}
+    body = {
+        "user_id": user_id,
+        "roles": roles,
+        "message": question,
+        "channel_id": channel_id,
+        "visibility": visibility,
+    }
     if conversation_id:
         body["conversation_id"] = conversation_id
     url = (engine_url or cfg.engine_url).rstrip("/") + "/chat"
@@ -94,7 +102,7 @@ def ask(
 
 
 def run_case(case: EvalCase, engine_url: str | None = None) -> list[TurnResult]:
-    """One or two turns. The follow-up continues the same conversation."""
+    """One or two turns. The follow-up continues the conversation unless new_conversation is set."""
     user_id = f"eval-{case.id}"
     first = ask(
         case.question,
@@ -102,16 +110,20 @@ def run_case(case: EvalCase, engine_url: str | None = None) -> list[TurnResult]:
         conversation_id=None,
         user_id=user_id,
         engine_url=engine_url,
+        visibility=case.visibility,
     )
     turns = [first]
     if case.follow_up:
+        fresh = case.new_conversation
         turns.append(
             ask(
                 case.follow_up,
                 roles=case.roles,
-                conversation_id=first.conversation_id,
+                conversation_id=None if fresh else first.conversation_id,
                 user_id=user_id,
                 engine_url=engine_url,
+                visibility=case.visibility,
+                channel_id="eval-next" if fresh else "eval",
             )
         )
     return turns

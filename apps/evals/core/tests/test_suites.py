@@ -9,6 +9,7 @@ from evals.suites import (
     latency,
     memory,
     permissions,
+    personal,
     refusal,
     tool_args,
     tool_selection,
@@ -123,6 +124,40 @@ def test_permissions_memory_latency():
     assert not latency.score(_case(max_latency_ms=100), [_turn(latency_ms=150)]).passed
 
 
+def test_personal_checks_the_memory_write_and_the_last_answer():
+    wrote = [{"kind": "memory_written", "memory": "fact"}]
+    case = _case(writes_memory=True, remembers="poly")
+    assert personal.score(case, [_turn(events=wrote), _turn(text="You are at Poly.")]).passed
+    assert not personal.score(case, [_turn(), _turn(text="You are at Poly.")]).passed
+    assert not personal.score(case, [_turn(events=wrote), _turn(text="No idea.")]).passed
+    kept_out = _case(writes_memory=False, not_mentions=["2.9"])
+    assert personal.score(kept_out, [_turn(), _turn(text="Nothing yet.")]).passed
+    assert not personal.score(kept_out, [_turn(events=wrote), _turn(text="ok")]).passed
+    assert not personal.score(kept_out, [_turn(), _turn(text="Your GPA is 2.9.")]).passed
+
+
+def test_a_new_conversation_case_starts_the_follow_up_fresh(monkeypatch):
+    from evals import runner
+
+    sent = []
+
+    def fake(question, *, conversation_id, visibility, channel_id="eval", **_):
+        sent.append((conversation_id, visibility, channel_id))
+        return _turn(conv="c1")
+
+    monkeypatch.setattr(runner, "ask", fake)
+    case = EvalCase(
+        id="p",
+        suites=["personal"],
+        question="q",
+        follow_up="f",
+        visibility="private",
+        new_conversation=True,
+    )
+    runner.run_case(case)
+    assert sent == [(None, "private", "eval"), (None, "private", "eval-next")]
+
+
 def test_every_suite_module_is_registered_by_its_name():
     assert list(SUITES) == [
         "tool_selection",
@@ -130,6 +165,7 @@ def test_every_suite_module_is_registered_by_its_name():
         "grounding",
         "voice",
         "memory",
+        "personal",
         "permissions",
         "clarification",
         "refusal",

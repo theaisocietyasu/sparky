@@ -20,17 +20,23 @@ class Expectation(BaseModel):
     mentions: list[str] = Field(default_factory=list)
     not_mentions: list[str] = Field(default_factory=list)
     remembers: str | None = None
+    writes_memory: bool | None = None
     max_latency_ms: int | None = None
 
 
 class EvalCase(BaseModel):
-    """A hand-written question with expectations. follow_up makes a two-turn case."""
+    """A hand-written question with expectations. follow_up makes a two-turn case.
+
+    new_conversation sends the follow-up as a fresh conversation, so only memory carries over.
+    """
 
     id: str
     suites: list[str]
     question: str
     roles: list[str] = Field(default_factory=list)
     follow_up: str | None = None
+    visibility: Literal["public", "private"] = "public"
+    new_conversation: bool = False
     expect: Expectation = Field(default_factory=Expectation)
 
 
