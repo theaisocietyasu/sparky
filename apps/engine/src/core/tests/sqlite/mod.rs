@@ -1,5 +1,6 @@
 //! The SQLite store through its public adapters, on a private in-memory database.
 
+mod admin;
 mod backup;
 mod canvas;
 mod confirmation;

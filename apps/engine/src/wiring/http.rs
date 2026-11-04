@@ -12,7 +12,9 @@ use crate::core::traits::oauth::OAuthStore;
 use crate::core::traits::safety::confirmation::ConfirmationStore;
 use crate::core::traits::tools::canvas::CanvasFeeds;
 use crate::core::traits::tools::sandbox::Sandbox;
+use crate::core::types::admin::AdminLimits;
 use crate::routes::Limits;
+use crate::routes::admin::AdminState;
 use crate::routes::canvas::CanvasState;
 use crate::routes::chat::ChatState;
 use crate::routes::health::HealthState;
@@ -90,14 +92,44 @@ pub(super) fn web_state(cfg: &Config, auth: Option<WebAuth>) -> anyhow::Result<O
         authorize_url: cfg.web.discord_authorize_url.clone(),
         public_url: cfg.web.public().to_owned(),
         guild_id: cfg.discord.guild_id.to_string(),
-        capability: cfg
-            .policy
-            .write_roles
-            .first()
-            .cloned()
-            .unwrap_or_else(|| "MANAGE_GUILD".to_owned()),
+        capability: capability(cfg),
         session_secs: i64::try_from(cfg.web.session_hours.saturating_mul(3600)).unwrap_or(i64::MAX),
     }))
+}
+
+/// What the admin routes need: the store, the agent they change, and who may call them.
+pub(super) fn admin_state(
+    cfg: &Config,
+    agent: Agent,
+    store: Option<Arc<dyn crate::core::traits::admin::AdminStore>>,
+    web: Option<WebAuth>,
+) -> AdminState {
+    AdminState {
+        store,
+        agent,
+        tenant: cfg.discord.guild_id.to_string(),
+        service_token: cfg.engine.service_token.clone(),
+        web,
+        capability: capability(cfg),
+        limits: AdminLimits {
+            max_turns: cfg.agent.max_turns,
+            model_slots: cfg.agent.model_slots,
+            rate_limit_per_min: cfg.http.rate_limit_per_min,
+            memory_max_per_user: cfg.memory.max_per_user,
+            conversation_idle_days: cfg.store.conversation_idle_days,
+        },
+        max_instructions_chars: cfg.admin.max_instructions_chars,
+        history_limit: cfg.admin.history_limit,
+    }
+}
+
+/// The role a session needs for the write side: the first write role.
+fn capability(cfg: &Config) -> String {
+    cfg.policy
+        .write_roles
+        .first()
+        .cloned()
+        .unwrap_or_else(|| "MANAGE_GUILD".to_owned())
 }
 
 /// What the memory routes need: the store, the clock offset, and the chat rate limit.
@@ -154,6 +186,7 @@ pub(super) fn http_router(
     sandbox: Option<Arc<ContainerSandbox>>,
 ) -> anyhow::Result<axum::Router> {
     let web = web_auth(cfg)?;
+    let admin = admin_state(cfg, agent.clone(), stores.admin, web.clone());
     let state = chat_state(
         cfg,
         agent,
@@ -183,6 +216,7 @@ pub(super) fn http_router(
         oauth: oauth_state(cfg, stores.oauth_store),
         canvas: canvas_state(cfg, stores.canvas),
         web: web_state(cfg, web)?,
+        admin,
     };
     Ok(crate::routes::router(
         states,

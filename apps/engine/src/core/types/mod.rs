@@ -1,5 +1,6 @@
 //! Every data type in the engine: cross-module values, wire shapes, settings, errors, beside impl.
 
+pub mod admin;
 pub mod agent;
 pub mod conversation;
 pub mod export;

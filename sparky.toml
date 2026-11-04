@@ -263,6 +263,12 @@ discord_api = "https://discord.com/api/v10"
 discord_authorize_url = "https://discord.com/oauth2/authorize"
 timeout_secs = 10
 
+# The admin pages at /admin: a session whose roles include policy.write_roles[0] switches tools,
+# edits the system instructions with history and rollback, and denies held actions.
+[admin]
+max_instructions_chars = 20000
+history_limit = 50
+
 # upcoming lists the caller's remembered tasks, Canvas due dates, and Google and Outlook events
 # in one call, soonest first, in a direct message only. It reads the sources that are registered.
 [upcoming]

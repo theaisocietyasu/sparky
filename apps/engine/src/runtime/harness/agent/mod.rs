@@ -98,6 +98,8 @@ pub struct Agent {
     deps: Arc<AgentDeps>,
     cfg: AgentConfig,
     system_prompt: Arc<str>,
+    /// Instructions an operator set in place of system_prompt, shared by every clone.
+    instructions: Arc<std::sync::RwLock<Option<Arc<str>>>>,
     /// Wording written around the prompt sections.
     prompt: Arc<PromptText>,
     /// Names of the MCP tools, so a capability line says how each one runs.
@@ -119,9 +121,36 @@ impl Agent {
             deps: Arc::new(deps),
             cfg,
             system_prompt: system_prompt.into(),
+            instructions: Arc::default(),
             prompt: Arc::new(PromptText::default()),
             mcp_names: Arc::from([]),
         }
+    }
+
+    /// The configured system instructions.
+    pub fn default_instructions(&self) -> Arc<str> {
+        Arc::clone(&self.system_prompt)
+    }
+
+    /// The system instructions in force: the operator's when set, else the configured ones.
+    pub fn instructions(&self) -> Arc<str> {
+        self.instructions
+            .read()
+            .ok()
+            .and_then(|set| set.clone())
+            .unwrap_or_else(|| Arc::clone(&self.system_prompt))
+    }
+
+    /// Sets the instructions for every clone of this agent; None returns to the configured ones.
+    pub fn set_instructions(&self, text: Option<String>) {
+        if let Ok(mut set) = self.instructions.write() {
+            *set = text.map(Arc::from);
+        }
+    }
+
+    /// The tools, sharing which are switched off with this agent.
+    pub fn tools(&self) -> ToolSet {
+        self.deps.tools.clone()
     }
 
     /// Names the MCP tools, which the capabilities section labels differently.

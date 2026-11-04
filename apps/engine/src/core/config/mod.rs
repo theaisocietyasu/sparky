@@ -1,5 +1,6 @@
 //! Configuration. Every external service and harness knob is configured here, nowhere else.
 
+pub mod admin;
 pub mod harness;
 pub mod http;
 pub mod integrations;
@@ -15,6 +16,7 @@ use serde::Deserialize;
 use crate::core::types::agent::AgentConfig;
 use crate::core::types::agent::assemble::Budget;
 
+pub use self::admin::*;
 pub use self::harness::*;
 pub use self::http::*;
 pub use self::integrations::*;
@@ -107,6 +109,9 @@ pub struct Config {
     /// Discord sign-in for the web page.
     #[serde(default)]
     pub web: Web,
+    /// The admin surface.
+    #[serde(default)]
+    pub admin: Admin,
 }
 
 /// Default budgets. Every field comes from the agent section.
@@ -218,6 +223,11 @@ impl Config {
         validate_platform(self)?;
         validate_store(&self.store, &self.memory)?;
         validate_web(self)?;
+        if self.admin.max_instructions_chars == 0 || self.admin.history_limit == 0 {
+            return invalid(
+                "admin.max_instructions_chars and admin.history_limit must be above 0".into(),
+            );
+        }
         if self.retrieval.window < 0 {
             return invalid(format!(
                 "retrieval.window must not be negative, got {}",

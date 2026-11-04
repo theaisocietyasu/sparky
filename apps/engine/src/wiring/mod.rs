@@ -17,6 +17,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::core::config::{Config, StoreBackend};
+use crate::core::traits::admin::AdminStore;
 use crate::core::traits::conversation::ConversationStore;
 use crate::core::traits::health::Probe;
 use crate::core::traits::knowledge::query::SourceQueries;
@@ -61,6 +62,8 @@ struct Stores {
     oauth_store: Arc<dyn OAuthStore>,
     /// Canvas calendar feed links, when the local store holds them.
     canvas: Option<Arc<dyn CanvasFeeds>>,
+    /// Admin changes, when the local store holds them.
+    admin: Option<Arc<dyn AdminStore>>,
     /// What readiness checks besides the model.
     probes: Vec<Arc<dyn Probe>>,
 }
@@ -139,6 +142,13 @@ pub async fn serve(cfg: Config) -> anyhow::Result<()> {
     let agent = Agent::new(deps, agent_cfg, system_prompt)
         .with_prompt_text(PromptText::from(&cfg.prompt))
         .with_mcp_names(mcp_names);
+    if let Some(admin) = &stores.admin {
+        let tenant = cfg.discord.guild_id.to_string();
+        let restored = crate::routes::admin::restore(admin.as_ref(), &tenant, &agent)
+            .await
+            .map_err(|e| anyhow::anyhow!("admin changes: {e}"))?;
+        tracing::info!(restored, "admin changes applied");
+    }
 
     let router = http_router(&cfg, agent, stores, sandbox)?;
 

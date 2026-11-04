@@ -48,6 +48,7 @@ pub(super) async fn localize(cfg: &Config, stores: &mut Stores) -> anyhow::Resul
         stores.canvas = Some(Arc::new(store.canvas_feeds(seal(cfg)?)));
     }
     stores.confirmations = Arc::new(store.confirmations());
+    stores.admin = Some(Arc::new(store.admin()));
     stores.probes.push(Arc::new(store.probe()));
     let prune = PrunePlan {
         every: Duration::from_secs(cfg.store.prune_every_hours * 3600),

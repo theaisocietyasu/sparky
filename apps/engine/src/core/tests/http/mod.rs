@@ -1,5 +1,6 @@
 //! The HTTP surface: health, login, Canvas feed links, rate limiting, and the sandbox routes.
 
+mod admin;
 mod canvas;
 mod health;
 mod login;
