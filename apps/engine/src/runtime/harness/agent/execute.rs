@@ -14,8 +14,8 @@ use crate::core::types::model::ModelError;
 use crate::core::types::safety::policy::{
     ConfirmationRequest, Decision, PendingAction, ProposedAction,
 };
-use crate::core::types::safety::redact::{redact, redact_text, truncate};
-use crate::core::types::tools::{ToolError, ToolRun};
+use crate::core::types::safety::redact::{masked, redact, redact_text, truncate};
+use crate::core::types::tools::{RiskClass, ToolError, ToolRun};
 use crate::core::types::trace::{RunStatus, TraceEvent};
 use crate::runtime::harness::agent::run::Run;
 
@@ -277,8 +277,8 @@ impl Agent {
         };
         let (content, traced, found) = match result {
             Ok(output) => {
-                // Tool output is redacted before it reaches the trace.
-                let traced = Ok(truncate(&redact_text(&output.content), 2_000));
+                // Tool output is redacted before it reaches the trace; an authenticated result is masked.
+                let traced = Ok(traced_result(risk, &output.content, 2_000));
                 (Ok(output.content), traced, output.sources)
             }
             Err(error) => {
@@ -299,7 +299,7 @@ impl Agent {
         );
         match &content {
             Ok(text) => {
-                let shown = truncate(&redact_text(text), 4_000);
+                let shown = traced_result(risk, text, 4_000);
                 span.record("gen_ai.tool.call.result", shown.as_str());
                 span.record("output.value", shown.as_str());
                 span.record("otel.status_code", "OK");
@@ -313,5 +313,14 @@ impl Agent {
             }
         }
         (content, found)
+    }
+}
+
+/// What a trace or span records for a tool result: masked when authenticated, else redacted and cut.
+fn traced_result(risk: RiskClass, content: &str, max: usize) -> String {
+    if risk == RiskClass::ReadAuthenticated {
+        masked(content)
+    } else {
+        truncate(&redact_text(content), max)
     }
 }

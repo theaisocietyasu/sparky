@@ -467,7 +467,7 @@ A tool with `private` set in its definition is personal to the user. A public tu
 
 ## Canvas
 
-Canvas is the six Platform `canvas.*` tools, registered as `platform_canvas_courses`, `platform_canvas_assignments`, `platform_canvas_grades`, `platform_canvas_announcements`, `platform_canvas_calendar`, and `platform_canvas_assignment_grades`. Each is `ReadAuthenticated`, refuses outside a direct message, and sends the caller as the member (see Platform stores), so a user's Canvas data is only ever read in their own channel. A member connects Canvas with `/login canvas`, which returns the Platform accounts link. Authenticated Canvas content answers the caller and is never indexed, memorized, or traced as evidence.
+Canvas is the six Platform `canvas.*` tools, registered as `platform_canvas_courses`, `platform_canvas_assignments`, `platform_canvas_grades`, `platform_canvas_announcements`, `platform_canvas_calendar`, and `platform_canvas_assignment_grades`. Each is `ReadAuthenticated`, refuses outside a direct message, and sends the caller as the member (see Platform stores), so a user's Canvas data is only ever read in their own channel. A member connects Canvas with `/login canvas`, which returns the Platform accounts link. Authenticated Canvas content answers the caller and is never indexed, memorized, or traced as evidence; traces and Phoenix record only its length (see Tracing).
 
 ## Linked accounts and integrations
 
@@ -605,7 +605,7 @@ Traces go to two places:
 
 An empty `phoenix_url` turns export off. `telemetry.phoenix_api_key` is sent as a bearer token when set. The bot records each product event as one span under the interaction (`[analytics]`).
 
-Secrets, credentials, cookies, and sensitive form values are redacted from tool arguments and results before they reach any trace. The developer console mirrors followed stdout into `.sparky/logs/<unit>.log`. Deployments keep stdout with the platform log driver.
+Secrets, credentials, cookies, and sensitive form values are redacted from tool arguments and results before they reach any trace. The result of a `ReadAuthenticated` tool never reaches a trace in clear: the JSONL trace, the `tool` span and the prompt recorded on the `llm` span carry `[authenticated result, <n> chars]` in its place. The answer built from it stays in the trace. The developer console mirrors followed stdout into `.sparky/logs/<unit>.log`. Deployments keep stdout with the platform log driver.
 
 ## Metrics
 
