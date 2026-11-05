@@ -1,6 +1,6 @@
 import { CalendarClock, type LucideIcon, SlidersHorizontal, Trash2, UserRound } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import type { Memory } from "../chat/types";
+import type { Memory } from "../../chat/types";
 
 type Kind = { label: string; Icon: LucideIcon; tone: string };
 

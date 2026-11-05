@@ -1,13 +1,12 @@
 import { lazy, Suspense } from "react";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import Home from "./pages/Home";
 import NotFound from "./pages/NotFound";
 
 // The app pages load on first visit, so the landing page does not carry the chat, markdown or admin code.
 const Signed = lazy(() => import("./app/session"));
 const Chat = lazy(() => import("./pages/Chat"));
-const Memories = lazy(() => import("./pages/Memories"));
-const Connections = lazy(() => import("./pages/Connections"));
+const Settings = lazy(() => import("./pages/settings/Settings"));
 const AdminLayout = lazy(() => import("./pages/admin/Layout"));
 const Overview = lazy(() => import("./pages/admin/Overview"));
 const Tools = lazy(() => import("./pages/admin/Tools"));
@@ -29,8 +28,9 @@ const App = () => (
         <Route path="/" element={<Home />} />
         <Route element={<Signed />}>
           <Route path="/chat/:id?" element={<Chat />} />
-          <Route path="/memories" element={<Memories />} />
-          <Route path="/connections" element={<Connections />} />
+          <Route path="/settings/:section?" element={<Settings />} />
+          <Route path="/memories" element={<Navigate to="/settings/memories" replace />} />
+          <Route path="/connections" element={<Navigate to="/settings/accounts" replace />} />
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<Overview />} />
             <Route path="tools" element={<Tools />} />

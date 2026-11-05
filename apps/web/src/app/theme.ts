@@ -7,11 +7,10 @@ const KEY = "sparky-theme";
 
 const current = (): Theme => (document.documentElement.dataset.theme === "dark" ? "dark" : "light");
 
-/** The app theme and a toggle that keeps the choice in this browser. */
+/** The app theme, a setter and a toggle; the choice stays in this browser. */
 export const useTheme = () => {
   const [theme, setTheme] = useState<Theme>(current);
-  const toggle = useCallback(() => {
-    const next: Theme = current() === "dark" ? "light" : "dark";
+  const set = useCallback((next: Theme) => {
     document.documentElement.dataset.theme = next;
     try {
       localStorage.setItem(KEY, next);
@@ -20,5 +19,6 @@ export const useTheme = () => {
     }
     setTheme(next);
   }, []);
-  return { theme, toggle };
+  const toggle = useCallback(() => set(current() === "dark" ? "light" : "dark"), [set]);
+  return { theme, set, toggle };
 };
