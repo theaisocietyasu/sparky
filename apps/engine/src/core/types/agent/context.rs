@@ -36,6 +36,8 @@ pub struct RequestContext {
     pub deadline: Instant,
     /// Cancelled by the caller or by the deadline.
     pub cancel: CancellationToken,
+    /// Whether the client renders tap-to-answer choices.
+    pub widgets: bool,
     /// Where to send live progress, when the caller is watching.
     pub progress: Option<UnboundedSender<Progress>>,
 }
@@ -55,6 +57,7 @@ impl RequestContext {
             files: Vec::new(),
             deadline: Instant::now() + budget,
             cancel: CancellationToken::new(),
+            widgets: false,
             progress: None,
         }
     }
@@ -62,6 +65,12 @@ impl RequestContext {
     /// Sends live progress to tx for the length of this request.
     pub fn listening_to(mut self, tx: UnboundedSender<Progress>) -> Self {
         self.progress = Some(tx);
+        self
+    }
+
+    /// Says whether the client renders tap-to-answer choices.
+    pub fn with_widgets(mut self, widgets: bool) -> Self {
+        self.widgets = widgets;
         self
     }
 

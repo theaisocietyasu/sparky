@@ -45,6 +45,8 @@ pub struct Templates<'a> {
     pub proactive_rules: &'a str,
     /// How to meet a student Sparky knows nothing about. Added to the first private turn with no memories.
     pub onboarding_rules: &'a str,
+    /// How to offer tap-to-answer choices. Added to a private turn from a client that renders them.
+    pub widget_rules: &'a str,
 }
 
 /// Default line naming the user, with {user} and {roles}.
@@ -65,6 +67,8 @@ pub const DISCOVERY_RULES: &str = "Discovery. When the student asks for somethin
 pub const PROACTIVE_RULES: &str = "Initiative. End an answer with one short, concrete next step when one helps: a related deadline, event, club, office or resource, or an offer to set a reminder. When one missing detail would change the answer, such as their campus or course section, ask for it in one short question. Never ask more than one question at a time, and never pad an answer with offers.";
 /// Default rule for the first private turn with a student Sparky knows nothing about.
 pub const ONBOARDING_RULES: &str = "First meeting. You know nothing about this student yet. Answer what they asked first, if anything. Then greet them by first name in one line and ask one friendly question to get to know them, starting with their major and year, then campus, then what they most want help with. Call remember with each answer they give. Mention once that linking Canvas lets you track their due dates.";
+/// Default rule for tap-to-answer choices.
+pub const WIDGET_RULES: &str = "Choices. When you ask the student a question that has a few short answers, put them right after the question in a fenced code block with the language choices, one answer per line, two to four lines, each under 40 characters. The page shows them as buttons the student can tap. Use it only for a question you just asked, never for a list of facts.";
 /// Default line naming the current date, with {date}.
 pub const DATE_LINE: &str = "Today is {date}. Search results are labelled by day or date; read \
                              the label the question asks for, never the first value in a row.";
@@ -114,6 +118,7 @@ impl Default for Templates<'_> {
             discovery_rules: DISCOVERY_RULES,
             proactive_rules: PROACTIVE_RULES,
             onboarding_rules: ONBOARDING_RULES,
+            widget_rules: WIDGET_RULES,
         }
     }
 }

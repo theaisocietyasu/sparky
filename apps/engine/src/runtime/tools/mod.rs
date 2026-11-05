@@ -6,6 +6,7 @@ pub mod http;
 pub mod knowledge;
 pub mod mcp;
 pub mod memory;
+pub mod page;
 pub mod papers;
 pub mod remind;
 pub mod sandbox;

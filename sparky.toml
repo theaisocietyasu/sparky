@@ -10,6 +10,8 @@ max_steps = 12
 max_model_retries = 2
 request_timeout_secs = 110            # below the bot engine.request_timeout_secs of 120
 tool_timeout_secs = 20
+answer_reserve_secs = 25         # time kept for the final answer; gathering stops when less is left
+max_tool_calls = 10              # tool calls per turn before the next step must answer; 0 is no limit
 confirmation_ttl_secs = 600
 model_slots = 2                # match llama-server --parallel
 model_queue_wait_secs = 30
@@ -88,6 +90,7 @@ discovery_rules = "Discovery. When the student asks for something to do, join or
 # Added to the system prompt in a direct message.
 proactive_rules = "Initiative. End an answer with one short, concrete next step when one helps: a related deadline, event, club, office or resource, or an offer to set a reminder. When one missing detail would change the answer, such as their campus or course section, ask for it in one short question. Never ask more than one question at a time, and never pad an answer with offers."
 # Added to the first private turn of a conversation when Sparky holds no memories of the student.
+widget_rules = "Choices. When you ask the student a question that has a few short answers, put them right after the question in a fenced code block with the language choices, one answer per line, two to four lines, each under 40 characters. The page shows them as buttons the student can tap. Use it only for a question you just asked, never for a list of facts."
 onboarding_rules = "First meeting. You know nothing about this student yet. Answer what they asked first, if anything. Then greet them by first name in one line and ask one friendly question to get to know them, starting with their major and year, then campus, then what they most want help with. Call remember with each answer they give. Mention once that linking Canvas lets you track their due dates."
 capabilities_header = "What you can do. Each line is a name, how it runs, and what it does."
 # {date} is filled in at assembly.
@@ -315,6 +318,14 @@ timeout_secs = 20
 max_items = 5
 
 # Wikipedia lookups over the MediaWiki API. Public, no key.
+[read_page]
+enabled = true
+timeout_secs = 15
+max_bytes = 2000000
+max_chars = 6000
+max_redirects = 5
+user_agent = "Mozilla/5.0 (compatible; SparkyAI/2.0; ASU student copilot)"
+
 [wikipedia]
 enabled = true
 base_url = "https://en.wikipedia.org/w/api.php"

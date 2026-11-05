@@ -12,7 +12,7 @@ pub mod task;
 pub mod uploads;
 
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use opentelemetry::trace::{TraceContextExt, TraceId};
 use tracing::Instrument;
@@ -32,7 +32,7 @@ use crate::core::traits::trace::TraceSink;
 use crate::core::types::agent::context::RequestContext;
 use crate::core::types::agent::{AgentConfig, AgentError, Answer};
 use crate::core::types::conversation::Visibility;
-use crate::core::types::conversation::message::{Message, ToolCall};
+use crate::core::types::conversation::message::{Message, Role, ToolCall};
 use crate::core::types::model::{ModelError, Usage};
 use crate::core::types::safety::policy::{ConfirmationRequest, PendingAction};
 use crate::core::types::tools::SANDBOX;
@@ -245,8 +245,9 @@ impl Agent {
             name: pending.action.tool,
             arguments: pending.action.arguments,
         };
-        let (result, found) = self.run_tool(ctx, 0, &call).await;
-        run.tool_sources.extend(found);
+        run.reserve = self.reserve_for(ctx);
+        let (result, found) = self.run_tool(ctx, 0, &call, run.gather_room()).await;
+        run.cite(found);
         run.tool_runs.push(ToolRun {
             tool: call.name.clone(),
             ok: result.is_ok(),
@@ -265,6 +266,7 @@ impl Agent {
 
     async fn run_inner(&self, ctx: &RequestContext, input: &str) -> Result<Answer, AgentError> {
         let mut run = Run::new(ctx, input, vec![Message::user(input)], 1);
+        run.reserve = self.reserve_for(ctx);
         self.deps.trace.emit(
             ctx,
             TraceEvent::RequestStarted {
@@ -290,12 +292,22 @@ impl Agent {
             if let Some(stop) = self.check_limits(run) {
                 return self.conclude(run, stop, String::new(), None).await;
             }
+            self.wrap_up(run);
             run.steps += 1;
 
             let (status, text, confirmation) = match self.step(run, inputs).await {
                 Ok(StepOutcome::Continue) => continue,
                 Ok(StepOutcome::Stop(status, text, confirmation)) => (status, text, confirmation),
                 Err(ModelError::Cancelled) => (RunStatus::Cancelled, String::new(), None),
+                // Gathering ran into the answer reserve: the next step answers from what is in.
+                Err(ModelError::Timeout) if !run.force_answer && !run.ctx.remaining().is_zero() => {
+                    tracing::info!(
+                        steps = run.steps,
+                        "gathering ran out of time; answering now"
+                    );
+                    run.force_answer = true;
+                    continue;
+                }
                 Err(ModelError::Timeout) => (RunStatus::Deadline, String::new(), None),
                 Err(error) => {
                     // The turns of a failed request are still kept.
@@ -324,6 +336,7 @@ impl Agent {
     ) -> bool {
         let line = self.prompt.sandbox_retry_line.trim();
         if line.is_empty()
+            || run.force_answer
             || run.sent_to_sandbox
             || *status != RunStatus::Answered
             || confirmation.is_some()
@@ -343,6 +356,33 @@ impl Agent {
             "a tool failed and the sandbox was not tried; the run goes back for one more step"
         );
         true
+    }
+
+    /// The time a request keeps for its final answer: the configured reserve, at most a quarter of what is left.
+    fn reserve_for(&self, ctx: &RequestContext) -> Duration {
+        self.cfg.answer_reserve.min(ctx.remaining() / 4)
+    }
+
+    /// Makes the next step answer once tools have run and the last step, the reserve or the call cap is reached.
+    fn wrap_up(&self, run: &mut Run<'_>) {
+        let gathered = run.new_turns.iter().any(|m| m.role == Role::Tool);
+        if run.force_answer || !gathered {
+            return;
+        }
+        let last_step = run.steps + 1 >= self.cfg.max_steps;
+        let late = run.ctx.remaining() <= run.reserve;
+        let spent = self.cfg.max_tool_calls > 0 && run.tool_runs.len() >= self.cfg.max_tool_calls;
+        if last_step || late || spent {
+            tracing::info!(
+                steps = run.steps,
+                tool_calls = run.tool_runs.len(),
+                last_step,
+                late,
+                spent,
+                "enough gathered; the next step answers"
+            );
+            run.force_answer = true;
+        }
     }
 
     /// The status the loop stops with before the next step, if any.

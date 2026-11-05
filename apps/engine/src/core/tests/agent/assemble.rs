@@ -611,3 +611,26 @@ fn the_onboarding_rule_meets_only_a_student_with_no_memories_or_turns() {
     let shown = text(assemble(&private, &returning, Budget::default()));
     assert!(!shown.contains("ONBOARDING RULES") && shown.contains("PROACTIVE RULES"));
 }
+
+#[test]
+fn the_choices_rule_goes_only_to_a_private_turn_from_a_client_that_renders_it() {
+    let templates = Templates {
+        widget_rules: "WIDGET RULES",
+        ..Templates::default()
+    };
+    let private = ctx().with_visibility(crate::core::types::conversation::Visibility::Private);
+    let text = |out: crate::core::types::agent::assemble::Assembled| -> String {
+        out.messages.iter().map(|m| m.content.clone()).collect()
+    };
+    let sections = Sections {
+        system: "s",
+        input: "hi",
+        templates,
+        ..Sections::default()
+    };
+    let web = private.clone().with_widgets(true);
+    assert!(text(assemble(&web, &sections, Budget::default())).contains("WIDGET RULES"));
+    assert!(!text(assemble(&private, &sections, Budget::default())).contains("WIDGET RULES"));
+    let public_web = ctx().with_widgets(true);
+    assert!(!text(assemble(&public_web, &sections, Budget::default())).contains("WIDGET RULES"));
+}

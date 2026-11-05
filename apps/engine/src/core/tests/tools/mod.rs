@@ -6,6 +6,7 @@ mod integrations;
 mod mcp;
 mod memory;
 mod outlook;
+mod page;
 mod remind;
 mod sandbox;
 mod upcoming;

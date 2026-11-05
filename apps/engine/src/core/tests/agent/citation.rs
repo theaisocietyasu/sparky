@@ -159,3 +159,60 @@ fn citations_list_each_source_once_best_first() {
     assert_eq!(lines[2].title, "note");
     assert_eq!(lines[2].url, None, "a source with no page of its own");
 }
+
+/// A tool that reads every page it is given in one call.
+struct Many(Vec<Citation>);
+
+#[async_trait]
+impl Tool for Many {
+    fn definition(&self) -> ToolDefinition {
+        ToolDefinition {
+            name: "many".into(),
+            description: "finds several".into(),
+            parameters: json!({"type": "object"}),
+            risk: RiskClass::ReadPublic,
+            private: false,
+            sequential: false,
+            timeout_secs: None,
+        }
+    }
+    async fn call(&self, _ctx: &RequestContext, _args: Value) -> Result<ToolOutput, ToolError> {
+        Ok(ToolOutput {
+            content: "found several".into(),
+            data: None,
+            sources: self.0.clone(),
+        })
+    }
+}
+
+#[tokio::test]
+async fn a_source_that_would_show_as_the_same_chip_is_cited_once() {
+    let cite = |title: &str, url: &str| Citation {
+        key: "web".into(),
+        title: title.into(),
+        url: Some(url.into()),
+    };
+    let found = vec![
+        cite("Web Search", "https://www.google.com/search?q=mat+434"),
+        cite("Web Search", "https://www.google.com/search?q=mat+434+tips"),
+        cite("MAT 434", "https://catalog.asu.edu/mat434"),
+        cite("MAT 434", "https://catalog.asu.edu/mat434"),
+        cite("Admission", "https://admission.asu.edu"),
+    ];
+    let (a, _sink) = agent(
+        crate::core::tests::support::Scripted::new(vec![
+            Ok(calls(vec![
+                ("1", "many", json!({"a": 1})),
+                ("2", "many", json!({"a": 2})),
+            ])),
+            Ok(text("answered")),
+        ]),
+        crate::runtime::harness::tools::ToolSet::new().with(Arc::new(Many(found))),
+        AgentConfig::default(),
+    );
+    let Ok(answer) = a.run(&ctx(), "q").await else {
+        unreachable!("the run answered")
+    };
+    let titles: Vec<String> = answer.sources.iter().map(|c| c.title.clone()).collect();
+    assert_eq!(titles, vec!["Web Search", "MAT 434", "Admission"]);
+}

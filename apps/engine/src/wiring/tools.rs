@@ -30,7 +30,7 @@ use crate::runtime::tools::sandbox::{
     ContainerSandbox, SandboxTool, Wording as SandboxWording, reap_sessions,
 };
 use crate::runtime::tools::upcoming::{UpcomingTool, Window as UpcomingWindow};
-use crate::runtime::tools::{Built, papers, wiki};
+use crate::runtime::tools::{Built, page, papers, wiki};
 
 /// Builds the tools and upcoming sources of one integration, or says why it could not.
 type Build<'a> = Box<dyn FnOnce() -> Result<Built, String> + 'a>;
@@ -181,7 +181,7 @@ fn integrations<'a>(
         memory,
     } = personal;
     let mut all: Vec<Integration<'a>> = Vec::new();
-    all.extend::<[Integration<'a>; 7]>([
+    all.extend::<[Integration<'a>; 8]>([
         (
             "memory",
             memory.is_some(),
@@ -240,6 +240,11 @@ fn integrations<'a>(
             "papers",
             cfg.papers.enabled,
             Box::new(move || papers::tools(&cfg.papers).map(Built::from)),
+        ),
+        (
+            "read_page",
+            cfg.read_page.enabled,
+            Box::new(move || Ok(Built::from(page::tools(&cfg.read_page)))),
         ),
         (
             "wikipedia",

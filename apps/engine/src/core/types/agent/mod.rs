@@ -29,6 +29,10 @@ pub struct AgentConfig {
     pub max_model_retries: u32,
     /// Per-tool-call timeout.
     pub tool_timeout: Duration,
+    /// Time of the request kept for the final answer.
+    pub answer_reserve: Duration,
+    /// Tool calls per request before the next step must answer. 0 removes the limit.
+    pub max_tool_calls: usize,
     /// How long a held action waits for caller approval.
     pub confirmation_ttl: Duration,
     /// Completion budget of a model call that thinks.

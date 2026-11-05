@@ -1,6 +1,7 @@
 import { ShieldCheck } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import type { ReactNode } from "react";
+import { splitChoices } from "../../chat/choices";
 import type { Answer } from "../../chat/types";
 import { useSmoothText } from "../../chat/useSmoothText";
 import { host, isWeb } from "../../chat/links";
@@ -23,27 +24,54 @@ export const AssistantRow = ({ mood, children }: { mood?: Mood; children: ReactN
 );
 
 /**
- * One answer: its text, its sources, and approval buttons when it asks.
- * With revealFrom set, the text types out from that character and the rest fades in after it.
+ * One answer: its text, its sources, approval buttons when it asks, and choices to tap when it
+ * asked a question and onChoose is set. With revealFrom set, the text types out from that character
+ * and the rest fades in after it.
  */
 const Reply = ({
   answer,
   onConfirm,
+  onChoose,
   busy,
   revealFrom,
 }: {
   answer: Answer;
   onConfirm: (approve: boolean) => void;
+  onChoose?: (choice: string) => void;
   busy: boolean;
   revealFrom?: number;
 }) => {
   const still = useReducedMotion() ?? false;
   const { text, done } = useSmoothText(answer.text, { from: revealFrom ?? 0, off: revealFrom === undefined || still });
+  const shown = splitChoices(text).text;
+  const { choices } = splitChoices(answer.text);
   const sources = answer.citations ?? [];
+  const animate = revealFrom !== undefined && !still;
   return (
     <AssistantRow>
-      <Markdown text={text} streaming={!done} />
-      {done && <Extras answer={answer} onConfirm={onConfirm} busy={busy} sources={sources} animate={revealFrom !== undefined && !still} />}
+      <Markdown text={shown} streaming={!done} />
+      {done && onChoose && choices.length > 0 && (
+        <ul aria-label="Choices" className="mt-3 flex flex-wrap gap-2">
+          {choices.map((c, i) => (
+            <motion.li
+              key={c}
+              initial={animate ? { opacity: 0, y: 6 } : false}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25, ease: "easeOut", delay: i * 0.05 }}
+            >
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => onChoose(c)}
+                className="glass h-9 rounded-full px-3.5 text-sm font-medium transition hover:-translate-y-px hover:text-accent disabled:opacity-50"
+              >
+                {c}
+              </button>
+            </motion.li>
+          ))}
+        </ul>
+      )}
+      {done && <Extras answer={answer} onConfirm={onConfirm} busy={busy} sources={sources} animate={animate} />}
     </AssistantRow>
   );
 };
@@ -115,7 +143,7 @@ const Extras = ({
         </ol>
       )}
       <div className="mt-2 flex flex-wrap items-center gap-1">
-        <CopyButton text={answer.text} label="Copy answer" />
+        <CopyButton text={splitChoices(answer.text).text} label="Copy answer" />
       </div>
     </motion.div>
   );

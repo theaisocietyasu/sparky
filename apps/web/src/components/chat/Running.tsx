@@ -1,6 +1,7 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect } from "react";
 import type { Line } from "../../chat/lines";
+import { splitChoices } from "../../chat/choices";
 import { parseStep } from "../../chat/step";
 import { useSmoothText } from "../../chat/useSmoothText";
 import Markdown from "./Markdown";
@@ -42,7 +43,7 @@ const Running = ({ lines, draft, onShown }: { lines: Line[]; draft: string; onSh
             </AnimatePresence>
           </div>
         )}
-        {draft && <Markdown text={text} streaming />}
+        {draft && <Markdown text={splitChoices(text).text} streaming />}
       </div>
     </AssistantRow>
   );

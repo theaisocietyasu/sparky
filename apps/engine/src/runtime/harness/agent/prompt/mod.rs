@@ -42,6 +42,8 @@ pub struct PromptText {
     pub proactive_rules: String,
     /// How to meet a student Sparky knows nothing about, for the first private turn with no memories.
     pub onboarding_rules: String,
+    /// How to offer tap-to-answer choices, for a private turn from a client that renders them.
+    pub widget_rules: String,
     /// Hours from UTC the date is rendered in.
     pub utc_offset_hours: i32,
 }
@@ -72,6 +74,7 @@ impl From<&crate::core::config::Prompt> for PromptText {
             discovery_rules: cfg.discovery_rules.clone(),
             proactive_rules: cfg.proactive_rules.clone(),
             onboarding_rules: cfg.onboarding_rules.clone(),
+            widget_rules: cfg.widget_rules.clone(),
             utc_offset_hours: cfg.utc_offset_hours,
         }
     }
@@ -110,6 +113,7 @@ impl PromptText {
             discovery_rules: &self.discovery_rules,
             proactive_rules: &self.proactive_rules,
             onboarding_rules: &self.onboarding_rules,
+            widget_rules: &self.widget_rules,
         }
     }
 }

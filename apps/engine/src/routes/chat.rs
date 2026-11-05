@@ -288,6 +288,7 @@ async fn run_turn(
         .tenant_id
         .unwrap_or_else(|| state.default_tenant.clone());
     let ctx = RequestContext::new(tenant, req.user_id, state.request_budget)
+        .with_widgets(req.channel_id == WEB_CHANNEL)
         .with_roles(req.roles)
         .with_visibility(req.visibility)
         .replying_to(req.reply_to)

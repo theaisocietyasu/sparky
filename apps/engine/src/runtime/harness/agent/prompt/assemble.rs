@@ -31,11 +31,17 @@ pub fn assemble(ctx: &RequestContext, s: &Sections<'_>, budget: Budget) -> Assem
     } else {
         ""
     };
+    let widgets = if ctx.widgets {
+        s.templates.widget_rules
+    } else {
+        ""
+    };
     let private = [
         s.templates.memory_rules,
         s.templates.discovery_rules,
         s.templates.proactive_rules,
         onboarding,
+        widgets,
     ];
     for rules in private {
         let rules = rules.trim();

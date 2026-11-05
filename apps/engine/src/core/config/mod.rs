@@ -97,6 +97,9 @@ pub struct Config {
     /// Academic paper search.
     #[serde(default)]
     pub papers: Papers,
+    /// Reading one public web page.
+    #[serde(default)]
+    pub read_page: ReadPage,
     /// Wikipedia lookups.
     #[serde(default)]
     pub wikipedia: Wikipedia,
@@ -134,6 +137,8 @@ impl Default for AgentConfig {
             max_steps: agent.max_steps,
             max_model_retries: agent.max_model_retries,
             tool_timeout: std::time::Duration::from_secs(agent.tool_timeout_secs),
+            answer_reserve: std::time::Duration::from_secs(agent.answer_reserve_secs),
+            max_tool_calls: agent.max_tool_calls,
             tool_result_to_file_chars: agent.tool_result_to_file_chars,
             confirmation_ttl: std::time::Duration::from_secs(agent.confirmation_ttl_secs),
             temperature: agent.temperature,
