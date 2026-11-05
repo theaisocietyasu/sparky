@@ -434,6 +434,13 @@ impl Tool for McpTool {
                 text.push_str(&t.text);
             }
         }
+        if is_html(&text) {
+            return Err(ToolError::Failed(
+                "the server behind this tool answered with a web page instead of a result; it may \
+                 be starting or down. Tell the user it is unavailable right now."
+                    .into(),
+            ));
+        }
         if result.is_error.unwrap_or(false) {
             return Err(ToolError::Failed(if text.is_empty() {
                 "mcp tool reported an error".into()
@@ -451,4 +458,11 @@ impl Tool for McpTool {
             sources: Vec::new(),
         })
     }
+}
+
+/// True when text is an HTML page, such as a proxy error page, rather than a tool result.
+pub(crate) fn is_html(text: &str) -> bool {
+    let head: String = text.trim_start().chars().take(15).collect();
+    let head = head.to_ascii_lowercase();
+    head.starts_with("<!doctype html") || head.starts_with("<html")
 }

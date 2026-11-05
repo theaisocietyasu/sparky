@@ -31,6 +31,8 @@ const failure = async (res: Response) => {
   } catch {
     // The body is plain text.
   }
+  // A proxy in front of the engine can answer with its own HTML page.
+  if (/^\s*<(!doctype|html)/i.test(message)) message = `Sparky is not reachable right now (${res.status}).`;
   return new EngineError(res.status, message || res.statusText);
 };
 

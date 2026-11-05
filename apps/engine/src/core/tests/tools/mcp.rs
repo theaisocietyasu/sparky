@@ -245,3 +245,14 @@ fn a_public_platform_tool_sends_the_arguments_as_given() {
     };
     assert_eq!(args.get("confirm"), Some(&json!(true)));
 }
+
+#[test]
+fn a_proxy_error_page_reads_as_html_and_a_result_does_not() {
+    use crate::runtime::tools::mcp::is_html;
+    assert!(is_html(
+        "  <!DOCTYPE html> <html lang=\"en\"><title>Waiting</title>"
+    ));
+    assert!(is_html("<HTML><body>502</body></HTML>"));
+    assert!(!is_html("{\"items\": []}"));
+    assert!(!is_html("Hayden Library is open until midnight. <b>"));
+}

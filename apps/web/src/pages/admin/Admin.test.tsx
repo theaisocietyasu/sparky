@@ -224,4 +224,14 @@ describe("admin pages", () => {
     expect(screen.getByText("date")).toBeInTheDocument();
     expect(screen.getByText("indexed")).toBeInTheDocument();
   });
+
+  it("shows a short error instead of a proxy page", async () => {
+    engine({
+      "GET /web/me": () => Response.json(MOD),
+      "GET /admin/sources": () => new Response("<!DOCTYPE html><html><title>Waiting for service</title></html>", { status: 502 }),
+    });
+    open("/admin/sources");
+    expect(await screen.findByText(/not reachable right now \(502\)/i)).toBeInTheDocument();
+    expect(screen.queryByText(/doctype/i)).toBeNull();
+  });
 });
