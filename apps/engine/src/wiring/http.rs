@@ -30,7 +30,6 @@ use crate::routes::session::WebAuth;
 use crate::routes::web::WebState;
 use crate::runtime::harness::agent::Agent;
 use crate::runtime::harness::trace::JsonlTraces;
-use crate::runtime::tools::sandbox::ContainerSandbox;
 use crate::stores::discord::DiscordOAuth;
 
 /// What the chat routes need, gathered from the settings that describe it.
@@ -200,10 +199,10 @@ pub(super) fn memory_state(
 /// What the sandbox routes read and drive.
 pub(super) fn sandbox_state(
     cfg: &Config,
-    sandbox: Option<Arc<ContainerSandbox>>,
+    sandbox: Option<Arc<dyn Sandbox>>,
 ) -> crate::routes::sandbox::SandboxState {
     crate::routes::sandbox::SandboxState {
-        sandbox: sandbox.map(|s| s as Arc<dyn Sandbox>),
+        sandbox,
         service_token: cfg.engine.service_token.clone(),
     }
 }
@@ -267,7 +266,7 @@ pub(super) fn http_router(
     cfg: &Config,
     agent: Agent,
     stores: Stores,
-    sandbox: Option<Arc<ContainerSandbox>>,
+    sandbox: Option<Arc<dyn Sandbox>>,
     home: HomeRules,
 ) -> anyhow::Result<axum::Router> {
     let web = web_auth(cfg)?;

@@ -23,6 +23,11 @@ pub trait Sandbox: Send + Sync {
     /// Offers the tool, or stops offering it. Containers already up are left alone.
     fn set_enabled(&self, on: bool);
 
+    /// Whether it holds the PDF and scan converters an attached file is opened with.
+    fn converts(&self) -> bool {
+        true
+    }
+
     /// The session containers running now, newest use first.
     fn sessions(&self) -> Vec<SandboxSession>;
 

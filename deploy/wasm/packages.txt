@@ -1,0 +1,8 @@
+# WebAssembly packages run_sandbox runs with sandbox.runtime = "wasm", from cdn.wasmer.io.
+# name version sha256 of the webc file
+wasmer/bash 1.0.25 059606d132e2e6bc1afe3b432ee64dcb1b1b059815c8bb213cf3b24798ef21e1
+wasmer/coreutils 1.0.27 35028c4e6b9fa8cccdffdcab2007d1df3af31b3f2b22fb890d022d7ae723bbd3
+wasmer/python 3.13.15 a9fa8202f1bf6a4eca8d31ee5f2b1970c8f45af5c5520cc954d28a133333d8e7
+wasmer/grep 3.12.0 42a2dd5452990c94a51036cfb5eb9574899beccb5ce8f83f75995f7ac5e0e1ca
+wasmer/sed 4.9.0 3fc12256be87f6b8b7810d68d642359a6220f63b39a2ea6ef7a2bb6d79ec1393
+wasmer/ripgrep 15.2.1 18fcf24a6af0dceaa72601d3c286d179b1338575a9c56bb6a48caa8d6487aea0

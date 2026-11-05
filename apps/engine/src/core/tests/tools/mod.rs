@@ -11,3 +11,4 @@ mod page;
 mod remind;
 mod sandbox;
 mod upcoming;
+mod wasm_sandbox;

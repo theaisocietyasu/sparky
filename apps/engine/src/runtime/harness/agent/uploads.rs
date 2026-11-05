@@ -257,6 +257,34 @@ impl Agent {
             return Ok((size, Opened::Inline(text)));
         };
         let name = format!("upload-{}", file.safe_name());
+        if !sandbox.converts() {
+            let path = sandbox
+                .put(ctx, session, &name, &bytes)
+                .await
+                .map_err(|e| e.to_string())?;
+            let owned = file.clone();
+            let text = tokio::task::spawn_blocking(move || read::text(&owned, &bytes))
+                .await
+                .ok()
+                .and_then(Result::ok);
+            // The prompt points at a text copy beside the file, as the converters leave one.
+            if let Some(text) = &text
+                && let Err(error) = sandbox
+                    .put(ctx, session, &format!("{name}.txt"), text.as_bytes())
+                    .await
+            {
+                tracing::warn!(file = %file.name, %error, "text copy not written");
+            }
+            let text = text.map(|text| {
+                (
+                    false,
+                    text.chars().count(),
+                    read::preview(&text, self.cfg.upload_preview_chars),
+                    read::passages(&text, &terms(input), self.cfg.upload_match_chars),
+                )
+            });
+            return Ok((size, Opened::Sandbox(path, text)));
+        }
         let path = sandbox
             .put(ctx, session, &name, &bytes)
             .await

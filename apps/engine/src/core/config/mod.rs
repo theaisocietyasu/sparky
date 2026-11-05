@@ -373,6 +373,24 @@ fn validate_sandbox(sandbox: &SandboxSettings) -> Result<(), ConfigError> {
     if sandbox.runtime.trim().is_empty() {
         return Err(ConfigError::Invalid("sandbox.runtime is empty".into()));
     }
+    if sandbox.runtime == WASM_RUNTIME {
+        for (key, value) in [
+            ("sandbox.wasm_packages", &sandbox.wasm_packages),
+            ("sandbox.wasm_cache", &sandbox.wasm_cache),
+            ("sandbox.wasm_work", &sandbox.wasm_work),
+        ] {
+            if value.trim().is_empty() {
+                return Err(ConfigError::Invalid(format!(
+                    "{key} is empty and sandbox.runtime is wasm"
+                )));
+            }
+        }
+        if sandbox.egress {
+            return Err(ConfigError::Invalid(
+                "sandbox.egress is on and sandbox.runtime is wasm, which has no network".into(),
+            ));
+        }
+    }
     if sandbox.recent_commands == 0 {
         return Err(ConfigError::Invalid(
             "sandbox.recent_commands is 0, which keeps no record of what the agent ran".into(),

@@ -1,9 +1,9 @@
 //! ContainerSandbox: runs commands in a sealed container through the container runtime.
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::process::Stdio;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
@@ -19,17 +19,13 @@ use crate::core::types::tools::sandbox::{
     Limits, SandboxCommand, SandboxError, SandboxOutput, SandboxRequest, SandboxSession,
     session_name, workspace_path,
 };
+use crate::runtime::tools::sandbox::log::CommandLog;
+pub(super) use crate::runtime::tools::sandbox::log::held;
 use crate::runtime::tools::sandbox::output::{bounded_output, clip};
 use crate::runtime::tools::sandbox::session::Live;
 
 /// Directory the workspace is mounted at inside the container.
 pub const WORKSPACE: &str = "/tmp";
-
-/// The guard of a lock, taken back after a panic.
-pub(super) fn held<T>(lock: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
-    lock.lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-}
 
 /// Label every container the engine starts carries, so an operator can find them all.
 pub const LABEL: &str = "sparky.sandbox";
@@ -46,12 +42,8 @@ pub struct ContainerSandbox {
     pub(super) limits: Limits,
     /// Container name to what is known about it, for the idle sweep and the per-caller cap.
     pub(super) sessions: Arc<Mutex<HashMap<String, Live>>>,
-    /// The commands that ran, newest last, capped at limits.recent_commands.
-    pub(super) recent: Arc<Mutex<VecDeque<SandboxCommand>>>,
-    /// Commands running right now, by the ticket they took.
-    pub(super) running: Arc<Mutex<Vec<(u64, SandboxCommand)>>>,
-    /// Hands out a ticket per command, so one can be found again when it ends.
-    pub(super) ticket: Arc<AtomicU64>,
+    /// The commands running and the ones that ran.
+    pub(super) log: CommandLog,
     /// Whether the tool is offered. An operator turns it off without restarting the engine.
     pub(super) enabled: Arc<AtomicBool>,
     /// One permit per command allowed to run at once, across every caller.
@@ -69,11 +61,9 @@ impl ContainerSandbox {
     pub fn new(limits: Limits) -> Self {
         Self {
             slots: Arc::new(tokio::sync::Semaphore::new(limits.max_running.max(1))),
+            log: CommandLog::new(limits.recent_commands),
             limits,
             sessions: Arc::default(),
-            recent: Arc::default(),
-            running: Arc::default(),
-            ticket: Arc::default(),
             enabled: Arc::new(AtomicBool::new(true)),
         }
     }
@@ -289,8 +279,8 @@ impl Sandbox for ContainerSandbox {
             .map_err(|_| SandboxError::Timeout)?
             .map_err(|_| SandboxError::Runtime("the sandbox is shutting down".into()))?;
         let started = Instant::now();
-        let running = self.command_started(SandboxCommand {
-            // command_started stamps the ticket over this.
+        let running = self.log.started(SandboxCommand {
+            // started stamps the ticket over this.
             id: 0,
             at: Utc::now(),
             container: session.clone(),
@@ -352,11 +342,7 @@ impl Sandbox for ContainerSandbox {
     }
 
     fn commands(&self) -> Vec<SandboxCommand> {
-        let mut out: Vec<SandboxCommand> =
-            held(&self.running).iter().map(|(_, c)| c.clone()).collect();
-        out.extend(held(&self.recent).iter().rev().cloned());
-        out.sort_by_key(|c| std::cmp::Reverse(c.id));
-        out
+        self.log.commands()
     }
 
     async fn kill(&self, name: &str) -> Result<(), SandboxError> {

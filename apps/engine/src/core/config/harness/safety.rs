@@ -65,7 +65,7 @@ pub struct SandboxSettings {
     pub enabled: bool,
     /// Refuse to start when the runtime is unreachable. Off leaves the tool unregistered instead.
     pub required: bool,
-    /// Container runtime binary.
+    /// Container runtime binary, or wasm to run commands in WebAssembly inside the engine.
     pub runtime: String,
     /// Image the command runs in.
     pub image: String,
@@ -109,6 +109,14 @@ pub struct SandboxSettings {
     pub command_description: String,
     /// What the tool tells the model the session argument is.
     pub session_description: String,
+    /// Folder of the WebAssembly packages, each file named namespace__name@version.webc.
+    pub wasm_packages: String,
+    /// Folder the compiled packages are kept in, so a restart does not compile them again.
+    pub wasm_cache: String,
+    /// Folder that holds one workspace folder per student.
+    pub wasm_work: String,
+    /// What the tool tells the model it is for when runtime is wasm.
+    pub wasm_description: String,
 }
 
 impl Default for SandboxSettings {
@@ -138,6 +146,10 @@ impl Default for SandboxSettings {
             description: DESCRIPTION.into(),
             command_description: COMMAND_DESCRIPTION.into(),
             session_description: SESSION_DESCRIPTION.into(),
+            wasm_packages: "/opt/sparky/wasm".into(),
+            wasm_cache: "data/sandbox/cache".into(),
+            wasm_work: "data/sandbox/work".into(),
+            wasm_description: WASM_DESCRIPTION.into(),
         }
     }
 }
@@ -148,6 +160,15 @@ pub const DESCRIPTION: &str = "Run a shell command in an isolated environment. U
     reading a file the user attached or an earlier tool left in the workspace. python3 with \
     pandas, pypdf, docx and openpyxl, pdftotext, tesseract, jq, rg and the usual text tools are \
     installed. There is no network, so it cannot fetch anything or reach ASU.";
+
+/// The sandbox.runtime that runs commands in WebAssembly inside the engine.
+pub const WASM_RUNTIME: &str = "wasm";
+
+/// What the sandbox tells the model it is for when runtime is wasm.
+pub const WASM_DESCRIPTION: &str = "Run a bash command in the student's own workspace, kept \
+    between calls. Use it to work something out rather than doing it in your head, and to read \
+    or change a file the user attached. It has python3 with the standard library, grep, sed, rg \
+    and the coreutils. There is no network.";
 
 /// What the sandbox tells the model the command argument is.
 pub const COMMAND_DESCRIPTION: &str = "The shell command to run.";

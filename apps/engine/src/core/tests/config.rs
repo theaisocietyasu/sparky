@@ -525,3 +525,12 @@ fn the_web_sign_in_needs_its_app_key_urls_and_a_listed_site() {
     );
     assert!(!ok("").web.enabled);
 }
+
+#[test]
+fn a_wasm_sandbox_has_no_egress_and_names_its_folders() {
+    let e = err("[sandbox]\nenabled = true\nruntime = \"wasm\"\negress = true\n");
+    assert!(e.contains("no network"), "{e}");
+    let e = err("[sandbox]\nenabled = true\nruntime = \"wasm\"\nwasm_work = \"\"\n");
+    assert!(e.contains("sandbox.wasm_work"), "{e}");
+    assert!(load("[sandbox]\nenabled = true\nruntime = \"wasm\"\n").is_ok());
+}
