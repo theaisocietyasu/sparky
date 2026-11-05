@@ -10,9 +10,19 @@ use crate::core::tests::support::Fixed;
 use crate::core::traits::health::Probe;
 use crate::routes::health::{HealthState, ready};
 
-/// A model endpoint that lists its models.
+/// A model endpoint that lists its models to a caller with the key k.
 async fn model() -> String {
-    let app = axum::Router::new().route("/v1/models", get(|| async { "{}" }));
+    let app = axum::Router::new().route(
+        "/v1/models",
+        get(|headers: axum::http::HeaderMap| async move {
+            let key = headers.get(axum::http::header::AUTHORIZATION);
+            if key.and_then(|v| v.to_str().ok()) == Some("Bearer k") {
+                (StatusCode::OK, "{}")
+            } else {
+                (StatusCode::UNAUTHORIZED, "no key")
+            }
+        }),
+    );
     let Ok(listener) = tokio::net::TcpListener::bind("127.0.0.1:0").await else {
         unreachable!("a local port is free")
     };
@@ -26,9 +36,14 @@ async fn model() -> String {
 }
 
 async fn report(probes: Vec<Arc<dyn Probe>>) -> (StatusCode, serde_json::Value) {
+    report_with(probes, "k").await
+}
+
+async fn report_with(probes: Vec<Arc<dyn Probe>>, key: &str) -> (StatusCode, serde_json::Value) {
     let state = HealthState {
         probes,
         model_base_url: model().await,
+        model_api_key: secrecy::SecretString::from(key),
     };
     let response = ready(axum::extract::State(state)).await.into_response();
     let status = response.status();
@@ -58,4 +73,11 @@ async fn one_probe_down_makes_the_engine_unready() {
     .await;
     assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
     assert_eq!(body["platform"], false);
+}
+
+#[tokio::test]
+async fn the_model_probe_sends_the_model_key() {
+    let (status, body) = report_with(vec![], "wrong").await;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(body["model"], false);
 }

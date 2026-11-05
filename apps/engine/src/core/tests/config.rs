@@ -546,5 +546,14 @@ fn the_web_sign_in_needs_its_app_key_urls_and_a_listed_site() {
     assert!(e.contains("SPARKY_WEB__PUBLIC_URL"), "{e}");
     let e = err(&on(listed).replace("BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=", "AAAA"));
     assert!(e.contains("32 bytes") || e.contains("SESSION_KEY"), "{e}");
+    let numeric = ok(&on(listed).replace(
+        "discord_client_id = \"1\"",
+        "discord_client_id = 1302499768966185012",
+    ));
+    assert_eq!(
+        numeric.web.discord_client_id.as_deref(),
+        Some("1302499768966185012"),
+        "an unquoted id, as an env var parses it, is read as text"
+    );
     assert!(!ok("").web.enabled);
 }

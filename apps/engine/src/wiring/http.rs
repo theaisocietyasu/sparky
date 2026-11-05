@@ -218,6 +218,7 @@ pub(super) fn http_router(
     let health = HealthState {
         probes: stores.probes,
         model_base_url: cfg.model.base_url.clone(),
+        model_api_key: cfg.model.api_key.clone(),
     };
     let limits = Limits {
         max_body_bytes: cfg.http.max_body_bytes,

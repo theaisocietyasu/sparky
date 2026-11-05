@@ -27,6 +27,7 @@ pub struct Web {
     /// Budget for one Discord request.
     pub timeout_secs: u64,
     /// Discord application id. SPARKY_WEB__DISCORD_CLIENT_ID.
+    #[serde(deserialize_with = "id_text")]
     pub discord_client_id: Option<String>,
     /// Discord application secret. SPARKY_WEB__DISCORD_CLIENT_SECRET.
     pub discord_client_secret: Option<SecretString>,
@@ -90,4 +91,20 @@ impl Web {
             .trim()
             .trim_end_matches('/')
     }
+}
+
+/// An application id as text, read from a string or from the number an env var parses to.
+fn id_text<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Option<String>, D::Error> {
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum Id {
+        /// Quoted, or from the TOML file.
+        Text(String),
+        /// An unquoted env value of digits.
+        Number(u64),
+    }
+    Ok(Option::<Id>::deserialize(deserializer)?.map(|id| match id {
+        Id::Text(text) => text,
+        Id::Number(number) => number.to_string(),
+    }))
 }
