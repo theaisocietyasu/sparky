@@ -1,9 +1,11 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect } from "react";
 import type { Line } from "../../chat/lines";
+import { parseStep } from "../../chat/step";
 import { useSmoothText } from "../../chat/useSmoothText";
 import Markdown from "./Markdown";
 import { AssistantRow } from "./Reply";
+import StepLine from "./StepLine";
 
 /** What the running turn shows: each progress line the engine sends, then the draft as it streams in. */
 const Running = ({ lines, draft, onShown }: { lines: Line[]; draft: string; onShown: (text: string) => void }) => {
@@ -24,14 +26,12 @@ const Running = ({ lines, draft, onShown }: { lines: Line[]; draft: string; onSh
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.2 }}
-                  className="flex items-center gap-2"
                 >
-                  <span className="size-1.5 shrink-0 rounded-full bg-dim/50" />
-                  {l.text}
+                  <StepLine {...parseStep(l.text)} />
                 </motion.li>
               ))}
             </AnimatePresence>
-            <li className="shimmer w-fit">{lines.length === 0 ? "Thinking" : "Working"}</li>
+            <li className="shimmer w-fit pl-6">{lines.length === 0 ? "Thinking" : "Working"}</li>
           </ul>
         )}
         {draft && <Markdown text={text} streaming />}
