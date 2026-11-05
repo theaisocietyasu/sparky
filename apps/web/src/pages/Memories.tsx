@@ -1,10 +1,13 @@
+import { Brain, Trash2 } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useCallback, useEffect, useState } from "react";
+import ChatFrame from "../app/ChatFrame";
 import { forget, memories as fetchMemories } from "../chat/client";
 import type { Memory } from "../chat/types";
-import Gated from "../components/chat/Gated";
 
-/** The list of what Sparky remembers, with forget per item and for all. */
-const List = () => {
+/** /memories: what Sparky remembers about the signed-in student, with forget per item and for all. */
+const Memories = () => {
+  const still = useReducedMotion() ?? false;
   const [items, setItems] = useState<Memory[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmAll, setConfirmAll] = useState(false);
@@ -31,62 +34,89 @@ const List = () => {
   };
 
   return (
-    <>
-      <h1 className="font-serif text-2xl font-bold">Memories</h1>
-      <p className="mt-1 text-sm text-ink-soft">What Sparky remembers about you, the same as /memories in Discord.</p>
-      {error && (
-        <p role="alert" className="mt-4 text-sm text-shu">
-          {error}
-        </p>
-      )}
-      {items && items.length === 0 && <p className="mt-6 text-sm text-ink-soft">Sparky remembers nothing about you.</p>}
-      {items && items.length > 0 && (
-        <>
-          <ol aria-label="Memories" className="mt-6 divide-y divide-ink/10 rounded-md border border-ink/10">
-            {items.map((m) => (
-              <li key={m.id} className="flex items-start gap-3 px-4 py-3">
-                <span className="w-6 shrink-0 text-sm text-ink-soft">{m.number}.</span>
-                <div className="flex-1">
-                  <p className="text-sm">{m.text}</p>
-                  <p className="mt-0.5 text-xs text-ink-soft">
-                    {m.kind}, {m.created_at}
-                    {m.due ? `, due ${m.due}` : ""}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => drop(m.number)}
-                  aria-label={`Forget memory ${m.number}`}
-                  className="text-sm text-shu hover:text-shu-deep"
-                >
-                  Forget
-                </button>
-              </li>
-            ))}
-          </ol>
-          <div className="mt-4 flex gap-2">
-            {confirmAll ? (
-              <>
-                <button type="button" onClick={() => drop(null)} className="h-9 rounded-full bg-shu px-4 text-sm font-semibold text-paper">
-                  Forget all {items.length}
-                </button>
-                <button type="button" onClick={() => setConfirmAll(false)} className="h-9 rounded-full border border-ink/20 px-4 text-sm">
-                  Keep them
-                </button>
-              </>
-            ) : (
-              <button type="button" onClick={() => setConfirmAll(true)} className="h-9 rounded-full border border-ink/20 px-4 text-sm">
-                Forget all
-              </button>
+    <ChatFrame>
+      <main className="flex-1 overflow-y-auto">
+        <div className="mx-auto w-full max-w-3xl px-4 py-10">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight">Memories</h1>
+              <p className="mt-1 text-sm text-dim">What Sparky remembers about you. The same list as /memories in Discord.</p>
+            </div>
+            {items && items.length > 0 && (
+              <div className="flex gap-2">
+                {confirmAll ? (
+                  <>
+                    <button type="button" onClick={() => setConfirmAll(false)} className="h-9 rounded-lg border border-edge px-3 text-sm hover:bg-sunk">
+                      Keep them
+                    </button>
+                    <button type="button" onClick={() => drop(null)} className="h-9 rounded-lg bg-bad px-3 text-sm font-medium text-white hover:opacity-90">
+                      Forget all {items.length}
+                    </button>
+                  </>
+                ) : (
+                  <button type="button" onClick={() => setConfirmAll(true)} className="h-9 rounded-lg border border-edge px-3 text-sm hover:bg-sunk">
+                    Forget all
+                  </button>
+                )}
+              </div>
             )}
           </div>
-        </>
-      )}
-    </>
+          {error && (
+            <p role="alert" className="mt-6 rounded-lg border border-bad/30 bg-bad/10 px-3 py-2 text-sm text-bad">
+              {error}
+            </p>
+          )}
+          {!items && !error && (
+            <div className="mt-8 space-y-3" aria-hidden>
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="h-16 animate-pulse rounded-xl bg-sunk" />
+              ))}
+            </div>
+          )}
+          {items && items.length === 0 && (
+            <div className="mt-10 flex flex-col items-center rounded-2xl border border-dashed border-edge px-6 py-14 text-center">
+              <Brain className="size-6 text-dim" />
+              <p className="mt-3 text-sm font-medium">Sparky remembers nothing about you</p>
+              <p className="mt-1 text-sm text-dim">Tell it in a chat, for example: remember that I study at Tempe.</p>
+            </div>
+          )}
+          {items && items.length > 0 && (
+            <ol aria-label="Memories" className="mt-8 divide-y divide-edge overflow-hidden rounded-2xl border border-edge bg-raised">
+              <AnimatePresence initial={false}>
+                {items.map((m) => (
+                  <motion.li
+                    key={m.id}
+                    layout={!still}
+                    exit={still ? undefined : { opacity: 0, height: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="group flex items-start gap-4 px-4 py-3.5"
+                  >
+                    <span className="mt-0.5 w-5 shrink-0 text-sm tabular-nums text-dim">{m.number}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[15px]">{m.text}</p>
+                      <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-dim">
+                        <span className="rounded-md bg-sunk px-1.5 py-0.5 font-medium">{m.kind}</span>
+                        <span>{m.created_at}</span>
+                        {m.due && <span className="text-warn">due {m.due}</span>}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => drop(m.number)}
+                      aria-label={`Forget memory ${m.number}`}
+                      className="grid size-8 shrink-0 place-items-center rounded-lg text-dim opacity-60 transition hover:bg-sunk hover:text-bad group-hover:opacity-100 focus-visible:opacity-100"
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  </motion.li>
+                ))}
+              </AnimatePresence>
+            </ol>
+          )}
+        </div>
+      </main>
+    </ChatFrame>
   );
 };
-
-/** /memories: what Sparky remembers about the signed-in student. */
-const Memories = () => <Gated>{() => <List />}</Gated>;
 
 export default Memories;

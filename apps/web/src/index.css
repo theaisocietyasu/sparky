@@ -14,6 +14,20 @@
   --color-shu-deep: #5e1428;
   --color-kin: #f2b705;
 
+  /* App surfaces: chat, memories and admin. Values switch with data-theme. */
+  --color-canvas: var(--app-canvas);
+  --color-side: var(--app-side);
+  --color-raised: var(--app-raised);
+  --color-sunk: var(--app-sunk);
+  --color-edge: var(--app-edge);
+  --color-fg: var(--app-fg);
+  --color-dim: var(--app-dim);
+  --color-accent: var(--app-accent);
+  --color-accent-fg: var(--app-accent-fg);
+  --color-good: var(--app-good);
+  --color-warn: var(--app-warn);
+  --color-bad: var(--app-bad);
+
   --animate-rise: rise 0.6s ease-out both;
   --animate-lift: lift 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
   --animate-draw: draw 0.9s ease-out both;
@@ -81,6 +95,37 @@
 }
 
 @layer base {
+  :root {
+    --app-canvas: #ffffff;
+    --app-side: #f7f7f8;
+    --app-raised: #ffffff;
+    --app-sunk: #f0f0f2;
+    --app-edge: #e4e4e7;
+    --app-fg: #18181b;
+    --app-dim: #6b6b74;
+    --app-accent: #781c35;
+    --app-accent-fg: #ffffff;
+    --app-good: #15803d;
+    --app-warn: #b45309;
+    --app-bad: #b91c1c;
+  }
+
+  :root[data-theme="dark"] {
+    --app-canvas: #121214;
+    --app-side: #0c0c0d;
+    --app-raised: #1a1a1d;
+    --app-sunk: #222226;
+    --app-edge: #2c2c31;
+    --app-fg: #ededf0;
+    --app-dim: #9d9da6;
+    --app-accent: #d4567a;
+    --app-accent-fg: #ffffff;
+    --app-good: #4ade80;
+    --app-warn: #fbbf24;
+    --app-bad: #f87171;
+    color-scheme: dark;
+  }
+
   body {
     @apply bg-paper font-sans text-ink antialiased;
   }
@@ -93,6 +138,51 @@
 @utility tategaki {
   writing-mode: vertical-rl;
   text-orientation: upright;
+}
+
+/* A caret after the last line of text that is still streaming. */
+@utility streaming {
+  & > :last-child:not(ul, ol, div, pre)::after,
+  & > :is(ul, ol):last-child > li:last-child::after {
+    content: "";
+    display: inline-block;
+    width: 0.5em;
+    height: 1em;
+    margin-left: 2px;
+    vertical-align: -0.15em;
+    border-radius: 2px;
+    background: var(--color-accent);
+    animation: blink 1.1s step-end infinite;
+  }
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* A light band that runs across text while work is in progress. */
+@utility shimmer {
+  background: linear-gradient(90deg, var(--color-dim) 0%, var(--color-dim) 40%, var(--color-fg) 50%, var(--color-dim) 60%, var(--color-dim) 100%);
+  background-size: 250% 100%;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 2s linear infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    color: var(--color-dim);
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -150% 0;
+  }
 }
 
 /* Seigaiha wave pattern, drawn as hairlines on paper. */

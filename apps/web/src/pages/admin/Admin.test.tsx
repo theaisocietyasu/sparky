@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "../../App";
 
@@ -45,10 +45,10 @@ describe("admin pages", () => {
       },
     });
     open("/admin/tools");
-    const toggle = await screen.findByRole("checkbox", { name: "Offer run_sandbox" });
+    const toggle = await screen.findByRole("switch", { name: "Offer run_sandbox" });
     expect(toggle).toBeChecked();
     fireEvent.click(toggle);
-    await waitFor(() => expect(screen.getByRole("checkbox", { name: "Offer run_sandbox" })).not.toBeChecked());
+    await waitFor(() => expect(screen.getByRole("switch", { name: "Offer run_sandbox" })).not.toBeChecked());
     expect(calls.find((c) => c.method === "POST")?.body).toEqual({ on: false });
   });
 
@@ -98,13 +98,48 @@ describe("admin pages", () => {
     expect(await screen.findByText("Nothing is waiting.")).toBeInTheDocument();
   });
 
-  it("tells a member without the role why the page is empty", async () => {
-    engine({
-      "GET /web/me": () => Response.json({ ...MOD, roles: [] }),
-      "GET /admin/tools": () => new Response("this needs the server manager role", { status: 403 }),
-    });
+  it("tells a member without the role why the page is empty and calls no admin route", async () => {
+    const calls = engine({ "GET /web/me": () => Response.json({ ...MOD, roles: [] }) });
     open("/admin");
     expect(await screen.findByRole("alert")).toHaveTextContent(/manage server role/i);
+    expect(calls.some((c) => c.url.includes("/admin/"))).toBe(false);
+  });
+
+  it("shows the refusal when the engine denies a moderator", async () => {
+    engine({
+      "GET /web/me": () => Response.json(MOD),
+      "GET /admin/tools": () => new Response("this needs the server manager role", { status: 403 }),
+    });
+    open("/admin/tools");
+    expect(await screen.findByRole("alert")).toHaveTextContent(/manage server role/i);
+  });
+
+  it("sums the newest traces on the overview", async () => {
+    const row = (id: string, status: string | null, duration_ms: number, user_id = "222") => ({
+      request_id: id,
+      conversation_id: "c",
+      at: "2026-11-04T00:00:00Z",
+      user_id,
+      input: `question ${id}`,
+      status,
+      steps: 1,
+      tokens: 100,
+      duration_ms,
+    });
+    engine({
+      "GET /web/me": () => Response.json(MOD),
+      "GET /admin/traces": () => Response.json([row("a", "answered", 1000), row("b", "error", 3000, "333"), row("c", "answered", 2000)]),
+      "GET /admin/tools": () => Response.json([{ name: "x", description: "", on: true, private: false }, { name: "y", description: "", on: false, private: false }]),
+      "GET /admin/approvals": () => Response.json([]),
+      "GET /admin/history": () => Response.json([]),
+    });
+    open("/admin");
+    const overview = within(await screen.findByRole("region", { name: "Overview" }));
+    expect(await overview.findByText("67%")).toBeInTheDocument();
+    expect(overview.getAllByText("2.0 s")).toHaveLength(2);
+    expect(overview.getByText("1 / 2")).toBeInTheDocument();
+    expect(overview.getByText("from 2 people")).toBeInTheDocument();
+    expect(overview.getByText("question a")).toBeInTheDocument();
   });
 
   it("lists traces and opens one to its events", async () => {
@@ -131,8 +166,11 @@ describe("admin pages", () => {
         ]),
     });
     open("/admin/traces");
-    fireEvent.click(await screen.findByRole("button", { name: "Open trace r1" }));
-    expect(await screen.findByText("t1 completed")).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("link", { name: "Open trace r1" }));
+    expect(window.location.pathname).toBe("/admin/traces/r1");
+    const events = within(await screen.findByRole("list", { name: "Trace events" }));
+    expect(events.getByText("Request started")).toBeInTheDocument();
+    expect(events.getByText("Completed")).toBeInTheDocument();
   });
 
   it("lists the live sources", async () => {
@@ -143,6 +181,7 @@ describe("admin pages", () => {
     });
     open("/admin/sources");
     expect(await screen.findByText("library_hours")).toBeInTheDocument();
-    expect(screen.getByText(/date, results indexed/)).toBeInTheDocument();
+    expect(screen.getByText("date")).toBeInTheDocument();
+    expect(screen.getByText("indexed")).toBeInTheDocument();
   });
 });
