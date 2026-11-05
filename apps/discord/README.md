@@ -13,6 +13,7 @@ cargo test -p discord
 - Sends one `POST /chat/stream` per turn with the asker, the channel, their roles, the message they replied to, images, and files.
 - Renders the stream into one card edited as the turn runs: the thinking line, the steps, then the answer and its sources. `bot.edit_every_ms` paces the edits; a message longer than `bot.max_message_chars` is split on line boundaries.
 - Shows a held action as buttons and calls `POST /confirm` with the token when someone presses one.
+- Polls `GET /notifications/outgoing` and DMs each reminder and nudge, then marks it with `POST /notifications/sent`.
 - Exports one span per interaction and one span per product event.
 
 Entry points, visibility, and the card are described under Discord surface in [docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md).
