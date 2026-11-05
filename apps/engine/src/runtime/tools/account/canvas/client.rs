@@ -18,10 +18,11 @@ pub struct FeedClient {
 }
 
 impl FeedClient {
-    /// Builds the client with a request budget and a body cap.
-    pub fn new(timeout: Duration, max_bytes: usize) -> Result<Self, CanvasError> {
+    /// Builds the client with a request budget, a body cap and the User-Agent it sends.
+    pub fn new(timeout: Duration, max_bytes: usize, user_agent: &str) -> Result<Self, CanvasError> {
         let http = Client::builder()
             .timeout(timeout)
+            .user_agent(user_agent)
             .redirect(Policy::none())
             .build()
             .map_err(|e| CanvasError::Unreachable(http::failure(&e).to_owned()))?;
