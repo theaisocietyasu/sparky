@@ -3,6 +3,8 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { notices, rateNotice, readNotices } from "../chat/client";
 import type { Notice } from "../chat/types";
+import Sparky from "../components/sparky/Sparky";
+import { cue } from "../components/sparky/cue";
 import { nudgeLabel } from "./nudges";
 
 const EVERY_MS = 60_000;
@@ -21,6 +23,7 @@ const ago = (iso: string, now = Date.now()) => {
 const Rate = ({ notice, onRated }: { notice: Notice; onRated: (n: Notice, note: string | null) => void }) => {
   if (notice.kind === "reminder") return null;
   const rate = (helpful: boolean) => {
+    if (helpful) cue();
     onRated({ ...notice, helpful }, null);
     rateNotice(notice.id, helpful)
       .then((r) => onRated({ ...notice, helpful }, r.turned_off ? `No more ${nudgeLabel(r.turned_off).toLowerCase()}. Turn it back on in Settings.` : null))
@@ -55,12 +58,15 @@ const Bell = () => {
   const [notes, setNotes] = useState<Record<string, string>>({});
   const still = useReducedMotion() ?? false;
   const box = useRef<HTMLDivElement>(null);
+  const seen = useRef<number | null>(null);
 
   const load = useCallback(() => {
     notices()
       .then((n) => {
         setItems(n.notifications);
         setUnread(n.unread);
+        if (seen.current !== null && n.unread > seen.current) cue();
+        seen.current = n.unread;
       })
       .catch(() => undefined);
   }, []);
@@ -90,6 +96,7 @@ const Bell = () => {
     setOpen(next);
     if (next && unread > 0) {
       setUnread(0);
+      seen.current = 0;
       readNotices().catch(() => undefined);
     }
   };
@@ -118,7 +125,10 @@ const Bell = () => {
             className="glass absolute left-0 top-full z-50 mt-2 w-72 origin-top-left rounded-xl p-1.5"
           >
             {items.length === 0 ? (
-              <p className="px-3 py-6 text-center text-sm text-dim">Nothing yet. Sparky checks in here when something comes up.</p>
+              <div className="flex flex-col items-center px-3 py-6 text-center">
+                <Sparky mood="sleepy" still className="h-10 w-auto" />
+                <p className="mt-3 text-sm text-dim">Nothing yet. Sparky checks in here when something comes up.</p>
+              </div>
             ) : (
               <ul className="max-h-80 overflow-y-auto">
                 {items.map((n) => (

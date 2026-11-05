@@ -223,6 +223,7 @@ const Chat = () => {
         <main className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-4 pb-16">
           <motion.div initial={enter} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: "easeOut" }} className="w-full max-w-2xl">
             <motion.div
+              layoutId="sparky-hero"
               initial={still ? false : { opacity: 0, scale: 0.9, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               transition={{ type: "spring", stiffness: 160, damping: 18, delay: 0.05 }}
@@ -284,7 +285,7 @@ const Chat = () => {
                     />
                   )}
                   {t.error && (
-                    <AssistantRow>
+                    <AssistantRow mood="sad">
                       <div className="flex flex-wrap items-center gap-3">
                         <p role="alert" className="text-sm text-bad">
                           {t.error}
@@ -302,7 +303,7 @@ const Chat = () => {
                       </div>
                     </AssistantRow>
                   )}
-                  {!t.answer && !t.error && busy && t.id === liveId && <Running lines={live.lines} draft={live.draft} onShown={onShown} />}
+                  {!t.answer && !t.error && busy && t.id === liveId && <Running lines={live.lines} draft={live.draft} onShown={onShown} fly={turns.length === 1} />}
                 </motion.li>
               ))}
             </ol>

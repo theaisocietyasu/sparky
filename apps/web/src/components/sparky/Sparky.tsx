@@ -1,8 +1,8 @@
 import { useEffect, useRef } from "react";
 import { INNER, LINE, OUTER } from "./body";
 
-/** What Sparky is doing: resting, or working on a turn. */
-export type Mood = "idle" | "thinking";
+/** What Sparky is doing: resting, working, pleased for a moment, dozing on an empty page, or sorry. */
+export type Mood = "idle" | "thinking" | "done" | "sleepy" | "sad";
 
 const REACH = 7;
 

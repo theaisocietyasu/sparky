@@ -3,6 +3,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { type MouseEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { Link, NavLink } from "react-router-dom";
 import Sparky from "../components/sparky/Sparky";
+import { useCue } from "../components/sparky/cue";
 import { isModerator, useMe } from "./useMe";
 import { useTheme } from "./theme";
 
@@ -88,6 +89,12 @@ const Account = () => {
   );
 };
 
+/** The sidebar dragon: hops when something good happens elsewhere on the page. */
+const Brand = () => {
+  const mood = useCue();
+  return <Sparky mood={mood} className="h-6 w-auto" />;
+};
+
 const Links = ({ groups, label, children }: { groups: NavGroup[]; label: string; children?: ReactNode }) => (
   <nav aria-label={label} className="flex-1 overflow-y-auto px-3 py-2">
     {groups.map((g, i) => (
@@ -142,7 +149,7 @@ const Frame = ({
 
   const brand = (
     <Link to="/" className="flex items-center gap-2 text-[15px] font-semibold tracking-tight">
-      <Sparky className="h-6 w-auto" />
+      <Brand />
       Sparky
       {badge && <span className="rounded-md bg-sunk px-1.5 py-0.5 text-xs font-medium text-dim">{badge}</span>}
     </Link>

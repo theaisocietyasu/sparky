@@ -1,6 +1,7 @@
-import { Brain, List, Network, Trash2 } from "lucide-react";
+import { List, Network, Trash2 } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useCallback, useEffect, useState } from "react";
+import Sparky from "../../components/sparky/Sparky";
 import { forget, memories as fetchMemories } from "../../chat/client";
 import type { Memory } from "../../chat/types";
 import MemoryMap from "./MemoryMap";
@@ -113,7 +114,7 @@ const Memories = () => {
           )}
           {items && items.length === 0 && (
             <div className="mt-10 flex flex-col items-center rounded-2xl border border-dashed border-edge px-6 py-14 text-center">
-              <Brain className="size-6 text-dim" />
+              <Sparky mood="sleepy" still className="h-12 w-auto" />
               <p className="mt-3 text-sm font-medium">Sparky remembers nothing about you</p>
               <p className="mt-1 text-sm text-dim">Tell it in a chat, for example: remember that I study at Tempe.</p>
             </div>
