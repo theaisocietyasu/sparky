@@ -6,10 +6,14 @@ use sqlx::sqlite::SqliteRow;
 use sqlx::{Row, SqlitePool};
 use uuid::Uuid;
 
-use super::{Seal, database, parse_stamp, stamp};
+use super::{Seal, database, home, parse_stamp, stamp};
 use crate::core::traits::reminder::ReminderStore;
+use crate::core::types::conversation::message::Notice;
 use crate::core::types::reminder::{NewReminder, Notification, Outgoing, Reminder, Repeat};
 use crate::core::types::store::StoreError;
+
+/// The kind of a notification a reminder makes.
+const REMINDER: &str = "reminder";
 
 /// Most reminders one fire call moves on.
 const FIRE_BATCH: i64 = 500;
@@ -144,21 +148,30 @@ impl ReminderStore for SqliteReminders {
         .map_err(database)?;
         for row in &due {
             let id: String = row.try_get("id").map_err(database)?;
+            let tenant: String = row.try_get("tenant_id").map_err(database)?;
+            let user: String = row.try_get("user_id").map_err(database)?;
+            let notice = Uuid::new_v4().simple().to_string();
+            let text = self.open(row)?;
             let nonce: Vec<u8> = row.try_get("nonce").map_err(database)?;
             let sealed: Vec<u8> = row.try_get("sealed").map_err(database)?;
             sqlx::query(
                 "INSERT INTO notifications (id, tenant_id, user_id, nonce, sealed, created_at) \
                  VALUES (?, ?, ?, ?, ?, ?)",
             )
-            .bind(Uuid::new_v4().simple().to_string())
-            .bind(row.try_get::<String, _>("tenant_id").map_err(database)?)
-            .bind(row.try_get::<String, _>("user_id").map_err(database)?)
+            .bind(&notice)
+            .bind(&tenant)
+            .bind(&user)
             .bind(nonce)
             .bind(sealed)
             .bind(stamp(now))
             .execute(&mut *tx)
             .await
             .map_err(database)?;
+            let notice = Notice {
+                id: notice,
+                kind: REMINDER.to_owned(),
+            };
+            home::deliver(&mut tx, &tenant, &user, notice, &text, now).await?;
             let at = parse_stamp(&row.try_get::<String, _>("due_at").map_err(database)?)?;
             let repeat = Repeat::parse(&row.try_get::<String, _>("repeat").map_err(database)?)
                 .unwrap_or(Repeat::Once);

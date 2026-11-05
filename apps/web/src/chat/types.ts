@@ -16,7 +16,14 @@ export type Answer = {
   citations?: Citation[];
   confirmation?: Confirmation | null;
   memories?: string[];
+  notice?: NoticeRef | null;
 };
+
+/** The notification behind a message Sparky sent on its own. */
+export type NoticeRef = { id: string; kind: "reminder" | NudgeKind };
+
+/** The message a thread starts from. */
+export type Parent = { conversation_id: string; position: number };
 
 /** The signed-in student. */
 export type Me = { user_id: string; name: string; roles: string[]; expires_at: number };
@@ -24,11 +31,11 @@ export type Me = { user_id: string; name: string; roles: string[]; expires_at: n
 /** One remembered fact. */
 export type Memory = { number: number; id: string; kind: string; text: string; created_at: string; due?: string | null };
 
-/** One web chat in the sidebar. */
-export type ChatSummary = { id: string; title: string; updated_at: string };
+/** One thread in the sidebar, with the message it started from when it has one. */
+export type ChatSummary = { id: string; title: string; updated_at: string; parent?: Parent };
 
-/** One stored message of a chat. */
-export type ChatTurn = { role: "user" | "assistant"; text: string };
+/** One stored message of a chat. notice is set on a message Sparky sent on its own. */
+export type ChatTurn = { position?: number; role: "user" | "assistant"; text: string; notice?: NoticeRef };
 
 /** A file sent inline with a message. */
 export type Upload = { name: string; media_type: string; size: number; data: string };

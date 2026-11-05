@@ -131,22 +131,58 @@ describe("web chat", () => {
     expect(screen.queryByRole("link", { name: "Connections" })).toBeNull();
   });
 
-  it("shows a dot for new reminders and marks them read when the bell opens", async () => {
+  it("opens on home, where reminders and check-ins are Sparky's messages, and marks them read", async () => {
     const calls = engine({
       "/web/me": () => Response.json(ME),
-      "/web/notifications": () =>
-        Response.json({
-          notifications: [{ id: "n1", text: "Submit the lab", created_at: new Date().toISOString(), read: false, kind: "reminder", helpful: null }],
-          unread: 1,
-        }),
+      "/web/home": () => Response.json({ id: "h1" }),
+      "/web/conversations/h1": () =>
+        Response.json([
+          { position: 1, role: "assistant", text: "Submit the lab", notice: { id: "n1", kind: "reminder" } },
+          { position: 2, role: "assistant", text: "Essay due tomorrow.", notice: { id: "n2", kind: "due_soon" } },
+        ]),
+      "/web/notifications": () => Response.json({ notifications: [], unread: 2 }),
       "/web/notifications/read": () => new Response(null, { status: 204 }),
+      "/chat/stream": () => sse([["answer", answer({ conversation_id: "h1", text: "On it.", citations: [] })], ["done", {}]]),
     });
     open("/chat");
-    const bell = await screen.findByRole("button", { name: "Notifications, 1 new" });
-    fireEvent.click(bell);
-    expect(within(screen.getByRole("dialog", { name: "Notifications" })).getByText("Submit the lab")).toBeInTheDocument();
+    const convo = within(await screen.findByRole("list", { name: "Conversation" }));
+    expect(await convo.findByText("Submit the lab")).toBeInTheDocument();
+    expect(convo.getByText("Reminder")).toBeInTheDocument();
+    expect(convo.getByText("Due soon")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /notifications/i })).toBeNull();
     await waitFor(() => expect(calls.some((c) => c.url === `${ENGINE}/web/notifications/read` && c.init?.method === "POST")).toBe(true));
-    expect(screen.getByRole("button", { name: "Notifications" })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Message"), { target: { value: "help me start" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(await convo.findByText("On it.")).toBeInTheDocument();
+    const stream = calls.find((c) => c.url === `${ENGINE}/chat/stream`);
+    expect(JSON.parse(String(stream?.init?.body))).toMatchObject({ conversation_id: "h1" });
+    expect(window.location.pathname).toBe("/chat");
+  });
+
+  it("starts a thread off a home message and sends it as the parent", async () => {
+    const calls = engine({
+      "/web/me": () => Response.json(ME),
+      "/web/home": () => Response.json({ id: "h1" }),
+      "/web/conversations": () => Response.json([]),
+      "/web/conversations/h1": () => Response.json([{ position: 4, role: "assistant", text: "Project 3 is due Friday.", notice: { id: "n4", kind: "start_early" } }]),
+      "/chat/stream": () => sse([["answer", answer({ conversation_id: "t1", text: "Start with the outline.", citations: [] })], ["done", {}]]),
+      "/web/conversations/t1": () => Response.json([]),
+    });
+    open("/chat");
+    fireEvent.click(await screen.findByRole("button", { name: "Thread" }));
+    expect(within(await screen.findByRole("blockquote", { name: "Thread of" })).getByText("Project 3 is due Friday.")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Message"), { target: { value: "where do I start" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByText("Start with the outline.")).toBeInTheDocument();
+    const stream = calls.find((c) => c.url === `${ENGINE}/chat/stream`);
+    expect(JSON.parse(String(stream?.init?.body))).toMatchObject({
+      conversation_id: null,
+      parent: { conversation_id: "h1", position: 4 },
+      reply_to: "Project 3 is due Friday.",
+    });
+    await waitFor(() => expect(window.location.pathname).toBe("/chat/t1"));
+    expect(screen.getByRole("link", { name: "Back to home" })).toHaveAttribute("href", "/chat");
   });
 
   it("lists reminders in settings and cancels one", async () => {
@@ -167,22 +203,15 @@ describe("web chat", () => {
     expect(calls.some((c) => c.url === `${ENGINE}/web/reminders/r1` && c.init?.method === "DELETE")).toBe(true);
   });
 
-  it("switches a check-in kind off from the bell and in settings", async () => {
-    const prefs = { quiet_start: 22, quiet_end: 8, off: [] as string[] };
+  it("switches a check-in kind off from its thumbs in home", async () => {
     const calls = engine({
       "/web/me": () => Response.json(ME),
-      "/web/notifications": () =>
-        Response.json({
-          notifications: [{ id: "n2", text: "Hackathon Friday", created_at: new Date().toISOString(), read: true, kind: "event", helpful: null }],
-          unread: 0,
-        }),
+      "/web/home": () => Response.json({ id: "h1" }),
+      "/web/conversations/h1": () => Response.json([{ position: 1, role: "assistant", text: "Hackathon Friday", notice: { id: "n2", kind: "event" } }]),
       "/web/notifications/n2/feedback": () => Response.json({ turned_off: "event" }),
-      "/web/nudges": () => Response.json(prefs),
-      "/web/reminders": () => Response.json({ reminders: [] }),
     });
     open("/chat");
-    fireEvent.click(await screen.findByRole("button", { name: "Notifications" }));
-    fireEvent.click(await within(screen.getByRole("dialog", { name: "Notifications" })).findByRole("button", { name: "Not useful" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Not useful" }));
     expect(await screen.findByText(/No more events for you/)).toBeInTheDocument();
     expect(calls.some((c) => c.url === `${ENGINE}/web/notifications/n2/feedback` && c.init?.method === "POST")).toBe(true);
   });
@@ -354,7 +383,7 @@ describe("web chat", () => {
     fireEvent.click(screen.getByRole("button", { name: "Map" }));
   });
 
-  it("lists chats, reopens one with its turns and deletes it", async () => {
+  it("lists threads, reopens one with its turns and deletes it", async () => {
     let listed = [{ id: "c9", title: "When is my exam", updated_at: "2026-11-05" }];
     const calls = engine({
       "/web/me": () => Response.json(ME),
@@ -368,12 +397,12 @@ describe("web chat", () => {
       },
     });
     open("/chat");
-    const sidebar = within(await screen.findByRole("list", { name: "Chats" }));
+    const sidebar = within(await screen.findByRole("list", { name: "Threads" }));
     fireEvent.click(sidebar.getByRole("link", { name: "When is my exam" }));
     expect(await screen.findByText("Friday at 9.")).toBeInTheDocument();
     expect(window.location.pathname).toBe("/chat/c9");
 
-    fireEvent.click(sidebar.getByRole("button", { name: "Delete chat When is my exam" }));
+    fireEvent.click(sidebar.getByRole("button", { name: "Delete thread When is my exam" }));
     await waitFor(() => expect(window.location.pathname).toBe("/chat"));
     const removed = calls.find((c) => c.url === `${ENGINE}/web/conversations/c9` && c.init?.method === "DELETE");
     expect(removed).toBeDefined();

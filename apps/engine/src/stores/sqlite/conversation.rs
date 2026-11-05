@@ -9,7 +9,7 @@ use super::{database, stamp};
 use crate::core::traits::conversation::ConversationStore;
 use crate::core::types::agent::context::RequestContext;
 use crate::core::types::conversation::message::{Message, Role};
-use crate::core::types::conversation::{ChatHit, ConversationSummary, Stored};
+use crate::core::types::conversation::{ChatHit, ConversationSummary, Parent, Stored, home_id};
 use crate::core::types::store::StoreError;
 
 /// The row role of a summary.
@@ -265,12 +265,13 @@ impl ConversationStore for SqliteConversations {
     async fn end(&self, ctx: &RequestContext, channel_id: &str) -> Result<u64, StoreError> {
         let ended = sqlx::query(
             "UPDATE conversations SET ended_at = ? WHERE tenant_id = ? AND user_id = ? \
-             AND channel_id = ? AND ended_at IS NULL",
+             AND channel_id = ? AND ended_at IS NULL AND id != ?",
         )
         .bind(stamp(Utc::now()))
         .bind(&ctx.tenant_id)
         .bind(&ctx.user_id)
         .bind(channel_id)
+        .bind(home_id(&ctx.tenant_id, &ctx.user_id).to_string())
         .execute(&self.pool)
         .await
         .map_err(database)?;
@@ -285,14 +286,15 @@ impl ConversationStore for SqliteConversations {
     ) -> Result<Vec<ConversationSummary>, StoreError> {
         let limit = i64::try_from(limit.max(1)).unwrap_or(i64::MAX);
         let rows = sqlx::query(
-            "SELECT c.id, c.updated_at, (SELECT m.content FROM messages m \
+            "SELECT c.id, c.updated_at, c.parent_id, c.parent_seq, (SELECT m.content FROM messages m \
              WHERE m.conversation_id = c.id AND m.role = 'user' ORDER BY m.seq LIMIT 1) AS first \
              FROM conversations c WHERE c.tenant_id = ? AND c.user_id = ? AND c.channel_id = ? \
-             AND c.ended_at IS NULL ORDER BY c.updated_at DESC LIMIT ?",
+             AND c.ended_at IS NULL AND c.id != ? ORDER BY c.updated_at DESC LIMIT ?",
         )
         .bind(&ctx.tenant_id)
         .bind(&ctx.user_id)
         .bind(channel_id)
+        .bind(home_id(&ctx.tenant_id, &ctx.user_id).to_string())
         .bind(limit)
         .fetch_all(&self.pool)
         .await
@@ -303,10 +305,19 @@ impl ConversationStore for SqliteConversations {
             let Some(first) = first else {
                 continue;
             };
+            let parent_id: Option<String> = row.try_get("parent_id").map_err(database)?;
+            let parent_seq: Option<i64> = row.try_get("parent_seq").map_err(database)?;
+            let parent = parent_id.zip(parent_seq).and_then(|(id, position)| {
+                Uuid::parse_str(&id).ok().map(|conversation_id| Parent {
+                    conversation_id,
+                    position,
+                })
+            });
             out.push(ConversationSummary {
                 id: row.try_get("id").map_err(database)?,
                 title: message(&first)?.content,
                 updated_at: row.try_get("updated_at").map_err(database)?,
+                parent,
             });
         }
         Ok(out)
@@ -349,6 +360,29 @@ impl ConversationStore for SqliteConversations {
                 })
             })
             .collect()
+    }
+
+    async fn link(&self, ctx: &RequestContext, parent: &Parent) -> Result<(), StoreError> {
+        sqlx::query(
+            "UPDATE conversations SET parent_id = ?, parent_seq = ? \
+             WHERE id = ? AND tenant_id = ? AND user_id = ? AND parent_id IS NULL AND id != ? \
+             AND EXISTS (SELECT 1 FROM messages m JOIN conversations p ON p.id = m.conversation_id \
+             WHERE p.id = ? AND p.tenant_id = ? AND p.user_id = ? AND m.seq = ?)",
+        )
+        .bind(parent.conversation_id.to_string())
+        .bind(parent.position)
+        .bind(ctx.conversation_id.to_string())
+        .bind(&ctx.tenant_id)
+        .bind(&ctx.user_id)
+        .bind(parent.conversation_id.to_string())
+        .bind(parent.conversation_id.to_string())
+        .bind(&ctx.tenant_id)
+        .bind(&ctx.user_id)
+        .bind(parent.position)
+        .execute(&self.pool)
+        .await
+        .map_err(database)?;
+        Ok(())
     }
 
     async fn delete(&self, ctx: &RequestContext) -> Result<bool, StoreError> {

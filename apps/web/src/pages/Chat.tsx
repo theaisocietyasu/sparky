@@ -1,20 +1,25 @@
-import { FileText, RotateCcw } from "lucide-react";
+import { ArrowLeft, FileText, RotateCcw } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import ChatFrame from "../app/ChatFrame";
 import { useMe } from "../app/useMe";
-import { ask, chatTurns, confirm, EngineError } from "../chat/client";
+import { ask, chats as listChats, chatTurns, confirm, EngineError, homeId, readNotices, type ThreadStart } from "../chat/client";
 import { addFiles, toUpload } from "../chat/files";
 import { applyProgress, type Line } from "../chat/lines";
-import type { Answer } from "../chat/types";
+import type { Answer, ChatSummary, ChatTurn } from "../chat/types";
 import Composer from "../components/chat/Composer";
 import Reply, { AssistantRow } from "../components/chat/Reply";
 import Running from "../components/chat/Running";
 import Sparky from "../components/sparky/Sparky";
 
-/** One exchange. reveal is where the answer starts typing out, set only for an answer that arrived live. */
-type Turn = { id: number; question: string; files?: string[]; answer: Answer | null; error: string | null; reveal?: number };
+/**
+ * One exchange. A message Sparky sent on its own has no question. position is where a stored answer sits,
+ * the one a thread names. reveal is where the answer starts typing out, set only for an answer that arrived live.
+ */
+type Turn = { id: number; question: string; files?: string[]; answer: Answer | null; error: string | null; reveal?: number; position?: number };
+
+const EVERY_MS = 60_000;
 
 type Live = { lines: Line[]; draft: string; next: number };
 
@@ -50,25 +55,38 @@ const shared = (a: string, b: string) => {
   return i;
 };
 
-/** Pairs stored messages into exchanges. An answer with no question before it is dropped. */
-const exchanges = (id: string, stored: { role: string; text: string }[]): Turn[] => {
+/** Pairs stored messages into exchanges. An answer with no question before it stands alone. */
+const exchanges = (id: string, stored: ChatTurn[], from = 0): Turn[] => {
   const out: Turn[] = [];
   for (const m of stored) {
-    if (m.role === "user") out.push({ id: out.length + 1, question: m.text, answer: null, error: null });
-    else {
-      const last = out[out.length - 1];
-      if (last && !last.answer) last.answer = { request_id: "", conversation_id: id, text: m.text, status: "answered" };
+    if (m.role === "user") {
+      out.push({ id: from + out.length + 1, question: m.text, answer: null, error: null });
+      continue;
     }
+    const answer: Answer = { request_id: "", conversation_id: id, text: m.text, status: "answered", notice: m.notice };
+    const last = out[out.length - 1];
+    if (last && !last.answer && !m.notice) Object.assign(last, { answer, position: m.position });
+    else out.push({ id: from + out.length + 1, question: "", answer, error: null, position: m.position });
   }
   return out;
 };
 
-/** /chat and /chat/:id: the web chat for a signed-in student, new or reopened. */
+/** The newest stored position, or 0. */
+const newest = (stored: ChatTurn[]) => stored.reduce((n, m) => Math.max(n, m.position ?? 0), 0);
+
+/**
+ * /chat is home: the one chat Sparky's own messages land in. /chat/:id is a thread or an older chat, and
+ * /chat/new starts a thread off the home message the page was sent with.
+ */
 const Chat = () => {
   const { me } = useMe();
   const { id: opened } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
   const [chats, setChats] = useState(0);
+  const [seen, setSeen] = useState(0);
+  const [home, setHome] = useState<string | null | undefined>(undefined);
+  const [threads, setThreads] = useState<ChatSummary[]>([]);
   const [shown, setShown] = useState<string | null>(null);
   const still = useReducedMotion() ?? false;
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -80,10 +98,38 @@ const Chat = () => {
   const [liveId, setLiveId] = useState(0);
   const conversation = useRef<string | null>(null);
   const counter = useRef(0);
+  const latest = useRef(0);
+  const busyNow = useRef(false);
   const abort = useRef<AbortController | null>(null);
   const drafted = useRef("");
   const scroller = useRef<HTMLDivElement>(null);
   const pinned = useRef(true);
+
+  const start = opened === "new" ? ((location.state as ThreadStart | null) ?? null) : null;
+  // undefined while the home id loads; null is a new conversation.
+  const target = opened === "new" ? null : (opened ?? home);
+  const atHome = Boolean(home) && target === home;
+
+  useEffect(() => {
+    let live = true;
+    homeId()
+      .then((id) => live && setHome(id))
+      .catch(() => live && setHome(null));
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!home) return;
+    let live = true;
+    listChats()
+      .then((all) => live && setThreads(all.filter((c) => c.parent?.conversation_id === home)))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [home, chats]);
 
   // Follows new text only while the reader is at the bottom, so scrolling up to read is never pulled back.
   const follow = () => {
@@ -95,29 +141,60 @@ const Chat = () => {
     if (el && pinned.current) el.scrollTop = el.scrollHeight;
   });
 
-  // Loads a reopened chat; a chat this page just started is already on screen.
+  const markRead = useCallback(() => {
+    readNotices()
+      .then(() => setSeen((v) => v + 1))
+      .catch(() => undefined);
+  }, []);
+
+  // Loads the chat the page is on; a chat this page just started is already on screen.
   useEffect(() => {
-    const id = opened ?? null;
-    if (id === conversation.current) return;
+    if (target === undefined) return;
+    if (target === conversation.current) return;
     abort.current?.abort();
-    conversation.current = id;
+    conversation.current = target;
+    latest.current = 0;
     setTurns([]);
-    if (!id) return;
+    if (!target) return;
     let live = true;
-    chatTurns(id)
+    chatTurns(target)
       .then((stored) => {
         if (!live) return;
-        const loaded = exchanges(id, stored);
+        const loaded = exchanges(target, stored);
         counter.current = loaded.length;
+        latest.current = newest(stored);
         pinned.current = true;
         setTurns(loaded);
+        if (target === home) markRead();
       })
       .catch(() => live && navigate("/chat", { replace: true }))
-      .finally(() => live && setShown(id));
+      .finally(() => live && setShown(target));
     return () => {
       live = false;
     };
-  }, [opened, navigate]);
+  }, [target, home, navigate, markRead]);
+
+  // While home is open, Sparky's new messages appear in it.
+  useEffect(() => {
+    if (!home || !atHome) return;
+    const check = () => {
+      if (document.visibilityState !== "visible" || busyNow.current) return;
+      chatTurns(home)
+        .then((stored) => {
+          if (conversation.current !== home || busyNow.current) return;
+          const fresh = stored.filter((m) => m.notice && (m.position ?? 0) > latest.current);
+          latest.current = Math.max(latest.current, newest(stored));
+          if (fresh.length === 0) return;
+          const added = exchanges(home, fresh, counter.current);
+          counter.current += added.length;
+          setTurns((all) => [...all, ...added]);
+          markRead();
+        })
+        .catch(() => undefined);
+    };
+    const timer = window.setInterval(check, EVERY_MS);
+    return () => window.clearInterval(timer);
+  }, [home, atHome, markRead]);
 
   const onShown = useCallback((shown: string) => {
     drafted.current = shown;
@@ -144,17 +221,20 @@ const Chat = () => {
     setFiles([]);
     setFileError(null);
     setBusy(true);
+    busyNow.current = true;
     setLive(IDLE);
     const controller = new AbortController();
     abort.current = controller;
     try {
       const uploads = await Promise.all(attached.map(toUpload));
-      const answer = await ask(question, conversation.current, (p) => setLive((s) => applyProgress(s, p)), controller.signal, uploads);
+      const onProgress = (p: Parameters<typeof applyProgress>[1]) => setLive((s) => applyProgress(s, p));
+      const answer = await ask(question, conversation.current, onProgress, controller.signal, uploads, start ?? undefined);
       settle(id, answer, null, shared(drafted.current, answer.text));
     } catch (err) {
       settle(id, null, message(err));
     } finally {
       abort.current = null;
+      busyNow.current = false;
       setBusy(false);
       setLive(IDLE);
     }
@@ -179,15 +259,23 @@ const Chat = () => {
     }
   };
 
-  const startOver = () => {
-    abort.current?.abort();
-    conversation.current = null;
-    setTurns([]);
-    navigate("/chat");
+  /** The thread controls under one home message. */
+  const threadsOf = (t: Turn) => {
+    if (!atHome || !home || t.position === undefined || !t.answer) return undefined;
+    const position = t.position;
+    const quote = t.answer.text;
+    const mine = threads.filter((c) => c.parent?.position === position);
+    return {
+      count: mine.length,
+      onOpen: mine[0] ? () => navigate(`/chat/${mine[0].id}`) : undefined,
+      onStart: () => navigate("/chat/new", { state: { parent: { conversation_id: home, position }, quote } satisfies ThreadStart }),
+    };
   };
 
-  const loading = Boolean(opened) && opened !== shown && turns.length === 0;
-  const empty = turns.length === 0 && !loading;
+  const waiting = target === undefined;
+  const loading = waiting || (Boolean(target) && target !== shown && turns.length === 0);
+  const empty = turns.length === 0 && !loading && !start;
+  const thread = Boolean(home) && !atHome && !waiting;
   const enter = still ? false : { opacity: 0, y: 8 };
   const composer = (
     <motion.div layoutId="composer" layout={!still} transition={{ type: "spring", stiffness: 380, damping: 36 }}>
@@ -218,8 +306,10 @@ const Chat = () => {
   );
 
   return (
-    <ChatFrame onNewChat={startOver} chats={chats}>
-      {empty ? (
+    <ChatFrame chats={chats} seen={seen}>
+      {waiting ? (
+        <main className="flex-1" />
+      ) : empty ? (
         <main className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-4 pb-16">
           <motion.div initial={enter} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: "easeOut" }} className="w-full max-w-2xl">
             <motion.div
@@ -258,7 +348,22 @@ const Chat = () => {
         </main>
       ) : (
         <main className="flex min-h-0 flex-1 flex-col">
+          {thread && (
+            <div className="mx-auto flex w-full max-w-3xl items-center gap-2 px-4 pt-4 text-sm text-dim">
+              <Link to="/chat" aria-label="Back to home" className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2 hover:bg-sunk/70 hover:text-fg">
+                <ArrowLeft className="size-4" />
+                Home
+              </Link>
+              <span aria-hidden>/</span>
+              <span>Thread</span>
+            </div>
+          )}
           <div ref={scroller} onScroll={follow} className="flex-1 overflow-y-auto [scrollbar-gutter:stable]">
+            {start && (
+              <blockquote aria-label="Thread of" className="mx-auto mt-6 w-full max-w-3xl px-4">
+                <p className="glass line-clamp-4 rounded-2xl px-4 py-3 text-sm text-dim">{start.quote}</p>
+              </blockquote>
+            )}
             <ol aria-label="Conversation" className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-8">
               {turns.map((t) => (
                 <motion.li key={t.id} initial={enter} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, ease: "easeOut" }} className="flex flex-col gap-6">
@@ -282,6 +387,7 @@ const Chat = () => {
                       revealFrom={t.reveal}
                       onConfirm={(approve) => answerHeld(t, approve)}
                       onChoose={t.id === turns[turns.length - 1]?.id ? (choice) => send(choice) : undefined}
+                      threads={threadsOf(t)}
                     />
                   )}
                   {t.error && (
@@ -290,7 +396,7 @@ const Chat = () => {
                         <p role="alert" className="text-sm text-bad">
                           {t.error}
                         </p>
-                        {!busy && !HELD.has(t.question) && (
+                        {!busy && t.question && !HELD.has(t.question) && (
                           <button
                             type="button"
                             onClick={() => send(t.question)}

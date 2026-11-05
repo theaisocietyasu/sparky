@@ -545,8 +545,8 @@ async fn a_signed_in_student_lists_reads_and_deletes_only_their_web_chats() {
     assert_eq!(
         chat,
         json!([
-            {"role": "user", "text": "when   is my next exam and more"},
-            {"role": "assistant", "text": "Friday"}
+            {"position": 1, "role": "user", "text": "when   is my next exam and more"},
+            {"position": 2, "role": "assistant", "text": "Friday"}
         ])
     );
     for refused in [
@@ -578,4 +578,59 @@ async fn a_signed_in_student_lists_reads_and_deletes_only_their_web_chats() {
     assert_eq!(gone.status(), StatusCode::OK);
     let (_, empty) = body(list(State(state), browser(SITE, &sealed)).await).await;
     assert_eq!(empty, json!([]));
+}
+
+#[tokio::test]
+async fn a_signed_in_student_has_one_home_that_holds_what_sparky_sent() {
+    use crate::core::tests::http::web::{SITE, auth, browser, session};
+    use crate::core::traits::nudge::NudgeStore;
+    use crate::core::types::nudge::{Nudge, NudgeKind, Person};
+    use crate::routes::conversation::{home, list, read};
+    use crate::stores::sqlite::{Seal, SqliteStore, StoreOptions};
+    use axum::extract::Path;
+
+    let options = StoreOptions {
+        path: "sqlite::memory:".into(),
+        max_connections: 1,
+        busy_timeout: Duration::from_secs(1),
+    };
+    let Ok(sqlite) = SqliteStore::open(&options).await else {
+        unreachable!("an in-memory store opens")
+    };
+    let who = Person {
+        tenant: "g".into(),
+        user: "111".into(),
+    };
+    let nudge = Nudge {
+        kind: NudgeKind::Brief,
+        keys: vec!["brief".into()],
+        text: "Two things due today.".into(),
+    };
+    assert!(
+        sqlite
+            .nudges(Seal::new(&[7; 32]))
+            .send(&who, &nudge)
+            .await
+            .is_ok()
+    );
+    let web = auth();
+    let Some(sealed) = web.seal(&session("111", &[], 3600)) else {
+        unreachable!("the session seals")
+    };
+    let mut state = state_with_web(Arc::new(Rooms::default()), Some(web));
+    state.conversations = Some(Arc::new(sqlite.conversations()));
+
+    let (status, first) = body(home(State(state.clone()), browser(SITE, &sealed)).await).await;
+    assert_eq!(status, StatusCode::OK);
+    let (_, again) = body(home(State(state.clone()), browser(SITE, &sealed)).await).await;
+    assert_eq!(first, again);
+    let id = first["id"].as_str().unwrap_or_default().to_owned();
+    let (_, turns) = body(read(State(state.clone()), browser(SITE, &sealed), Path(id)).await).await;
+    assert_eq!(turns[0]["role"], json!("assistant"));
+    assert_eq!(turns[0]["text"], json!("Two things due today."));
+    assert_eq!(turns[0]["notice"]["kind"], json!("brief"));
+    let (_, listed) = body(list(State(state.clone()), browser(SITE, &sealed)).await).await;
+    assert_eq!(listed, json!([]));
+    let anonymous = home(State(state), HeaderMap::new()).await;
+    assert_eq!(anonymous.status(), StatusCode::UNAUTHORIZED);
 }

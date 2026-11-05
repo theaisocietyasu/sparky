@@ -5,6 +5,7 @@ mod backup;
 mod canvas;
 mod confirmation;
 mod conversation;
+mod home;
 mod import;
 mod memory;
 mod nudge;

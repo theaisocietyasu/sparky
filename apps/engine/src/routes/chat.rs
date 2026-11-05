@@ -287,6 +287,7 @@ async fn run_turn(
     let tenant = req
         .tenant_id
         .unwrap_or_else(|| state.default_tenant.clone());
+    let parent = req.parent.filter(|_| req.conversation_id.is_none());
     let ctx = RequestContext::new(tenant, req.user_id, state.request_budget)
         .with_widgets(req.channel_id == WEB_CHANNEL)
         .with_roles(req.roles)
@@ -306,6 +307,11 @@ async fn run_turn(
         &req.channel_id,
     )
     .await?;
+    if let (Some(parent), Some(store)) = (parent, &state.conversations)
+        && let Err(error) = store.link(&ctx, &parent).await
+    {
+        tracing::warn!(%error, "could not make the conversation a thread");
+    }
     if let Some(tx) = watcher {
         ctx = ctx.listening_to(tx);
     }

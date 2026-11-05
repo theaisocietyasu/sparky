@@ -1,4 +1,4 @@
-import { ShieldCheck } from "lucide-react";
+import { MessageSquareText, ShieldCheck } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import type { ReactNode } from "react";
 import { splitChoices } from "../../chat/choices";
@@ -8,6 +8,7 @@ import { host, isWeb } from "../../chat/links";
 import Sparky, { type Mood } from "../sparky/Sparky";
 import { useHopWhen } from "../sparky/cue";
 import Markdown, { CopyButton } from "./Markdown";
+import { NoticeTag, NoticeThumbs } from "./Notice";
 
 /** Sparky beside each answer: at work while the turn runs, a hop when it lands, a droop on a failure. */
 export const Avatar = ({ mood = "idle", fly = false }: { mood?: Mood; fly?: boolean }) => (
@@ -24,10 +25,13 @@ export const AssistantRow = ({ mood, fly, children }: { mood?: Mood; fly?: boole
   </div>
 );
 
+/** What hangs off one message: open its threads, or start one. */
+export type Threads = { count: number; onOpen?: () => void; onStart: () => void };
+
 /**
  * One answer: its text, its sources, approval buttons when it asks, and choices to tap when it
- * asked a question and onChoose is set. With revealFrom set, the text types out from that character
- * and the rest fades in after it.
+ * asked a question and onChoose is set. A message Sparky sent on its own carries a tag and thumbs.
+ * With revealFrom set, the text types out from that character and the rest fades in after it.
  */
 const Reply = ({
   answer,
@@ -35,12 +39,14 @@ const Reply = ({
   onChoose,
   busy,
   revealFrom,
+  threads,
 }: {
   answer: Answer;
   onConfirm: (approve: boolean) => void;
   onChoose?: (choice: string) => void;
   busy: boolean;
   revealFrom?: number;
+  threads?: Threads;
 }) => {
   const still = useReducedMotion() ?? false;
   const { text, done } = useSmoothText(answer.text, { from: revealFrom ?? 0, off: revealFrom === undefined || still });
@@ -51,6 +57,7 @@ const Reply = ({
   const mood = useHopWhen(animate && done);
   return (
     <AssistantRow mood={mood}>
+      {answer.notice && <NoticeTag notice={answer.notice} />}
       <Markdown text={shown} streaming={!done} />
       {done && onChoose && choices.length > 0 && (
         <ul aria-label="Choices" className="mt-3 flex flex-wrap gap-2">
@@ -73,7 +80,7 @@ const Reply = ({
           ))}
         </ul>
       )}
-      {done && <Extras answer={answer} onConfirm={onConfirm} busy={busy} sources={sources} animate={animate} />}
+      {done && <Extras answer={answer} onConfirm={onConfirm} busy={busy} sources={sources} animate={animate} threads={threads} />}
     </AssistantRow>
   );
 };
@@ -84,12 +91,14 @@ const Extras = ({
   busy,
   sources,
   animate,
+  threads,
 }: {
   answer: Answer;
   onConfirm: (approve: boolean) => void;
   busy: boolean;
   sources: NonNullable<Answer["citations"]>;
   animate: boolean;
+  threads?: Threads;
 }) => {
   return (
     <motion.div initial={animate ? { opacity: 0, y: 4 } : false} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, ease: "easeOut" }}>
@@ -146,6 +155,17 @@ const Extras = ({
       )}
       <div className="mt-2 flex flex-wrap items-center gap-1">
         <CopyButton text={splitChoices(answer.text).text} label="Copy answer" />
+        {threads && (
+          <button
+            type="button"
+            onClick={threads.count > 0 && threads.onOpen ? threads.onOpen : threads.onStart}
+            className="inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-xs text-dim hover:bg-sunk hover:text-fg"
+          >
+            <MessageSquareText className="size-3.5" />
+            {threads.count === 0 ? "Thread" : threads.count === 1 ? "1 thread" : `${threads.count} threads`}
+          </button>
+        )}
+        {answer.notice && <NoticeThumbs notice={answer.notice} />}
       </div>
     </motion.div>
   );

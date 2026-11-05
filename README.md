@@ -20,7 +20,7 @@ SparkyAI is an assistant for Arizona State University students in Discord and on
 
 ## Architecture
 
-The engine runs its own agent loop and calls its tools itself. Knowledge search, live ASU queries, the Sun Devil Central clubs and events, and account linking come from [Platform](https://github.com/asusoda/platform), a separate service, over its HTTP API and its MCP tools. Platform crawls ASU pages and runs web search. The engine keeps conversations (with a full-text index for `search_chats`), memories, confirmations, reminders, nudges and each student's sealed Canvas calendar feed link in its own SQLite file, and reads Canvas due dates from that feed. A background loop turns those into nudges the bot DMs and the web bell shows.
+The engine runs its own agent loop and calls its tools itself. Knowledge search, live ASU queries, the Sun Devil Central clubs and events, and account linking come from [Platform](https://github.com/asusoda/platform), a separate service, over its HTTP API and its MCP tools. Platform crawls ASU pages and runs web search. The engine keeps conversations (with a full-text index for `search_chats`), memories, confirmations, reminders, nudges and each student's sealed Canvas calendar feed link in its own SQLite file, and reads Canvas due dates from that feed. A background loop turns those into nudges the bot DMs and that land in the student's home chat on the web.
 
 ```mermaid
 flowchart LR

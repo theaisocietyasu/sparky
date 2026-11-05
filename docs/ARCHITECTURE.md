@@ -110,7 +110,7 @@ The engine serves `/chat` and `/chat/stream` for the bot; both run the same loop
 
 With `[web] enabled`, a browser signs in with Discord instead of holding the token. `GET /web/login` sets a short state cookie and sends the browser to Discord with the scopes `identify guilds`. `GET /web/callback` checks the state, trades the code through `DiscordIdentity` (`stores/discord.rs`), and admits only members of `discord.guild_id`; a member whose guild permissions include Manage Server or Administrator gets the first `policy.write_roles` entry as a role. The session is the user id, display name, roles and expiry, sealed with XChaCha20-Poly1305 under `SPARKY_WEB__SESSION_KEY` into an `HttpOnly; Secure; SameSite=None` cookie that lasts `web.session_hours`. `GET /web/me` returns it and `POST /web/logout` clears it.
 
-`/chat`, `/chat/stream`, `/chat/confirm`, `/conversation/reset`, `/memories/*` and `/canvas/feed*` take either the bearer token or the session cookie. A cookie counts only when the request `Origin` is `SPARKY_WEB__SITE_URL`, or, with no `Origin`, when the browser sends `Sec-Fetch-Site: same-origin`; this stands in for a CSRF token. On Vercel, `apps/web/api/engine.ts` serves the engine under `/api/engine` on the site origin, so the cookie is first-party; the sign-in state cookie takes the path of `SPARKY_WEB__PUBLIC_URL`. With a session, the engine replaces the user, roles and tenant in the body with the session's, and runs the turn as private on channel `web`. `apps/web` serves the client: `/chat` streams `/chat/stream` and shows the newest progress line in place, the answer with its sources, and approval buttons; the sidebar bell lists notifications; the profile menu opens `/settings`, whose sections are Profile, Connected accounts (Canvas), Notifications (check-in switches, quiet hours, reminders), Memories (list and forget) and Appearance. `/memories` and `/connections` redirect there. The web-only routes `GET /web/conversations` (the newest `web.conversation_list` open web conversations, titled by the first question cut to `web.title_chars`), `GET /web/conversations/{id}` (its questions and answers, at most `web.conversation_turns` messages) and `DELETE /web/conversations/{id}` back the chat list in the sidebar, and `GET /canvas/feed` says whether the student has a link. The page starts each new chat with `continue_channel` off and reopens one at `/chat/{id}`. They call the engine at `VITE_ENGINE_URL` with `credentials: include`. CORS allows credentials only while the web sign-in is on, and `Config::validate` then requires the site in `http.cors_origins` and refuses `*`.
+`/chat`, `/chat/stream`, `/chat/confirm`, `/conversation/reset`, `/memories/*` and `/canvas/feed*` take either the bearer token or the session cookie. A cookie counts only when the request `Origin` is `SPARKY_WEB__SITE_URL`, or, with no `Origin`, when the browser sends `Sec-Fetch-Site: same-origin`; this stands in for a CSRF token. On Vercel, `apps/web/api/engine.ts` serves the engine under `/api/engine` on the site origin, so the cookie is first-party; the sign-in state cookie takes the path of `SPARKY_WEB__PUBLIC_URL`. With a session, the engine replaces the user, roles and tenant in the body with the session's, and runs the turn as private on channel `web`. `apps/web` serves the client: `/chat` is home, which streams `/chat/stream` and shows the newest progress line in place, the answer with its sources, and approval buttons; Sparky's own messages sit in home with a tag and thumbs, and the Home link shows a dot while any are unread; `/chat/new` starts a thread off a home message and `/chat/{id}` reopens a thread; the profile menu opens `/settings`, whose sections are Profile, Connected accounts (Canvas), Notifications (check-in switches, quiet hours, reminders), Memories (list and forget) and Appearance. `/memories` and `/connections` redirect there. The web-only routes `GET /web/home` (the id of the student's home conversation; see Home chat), `GET /web/conversations` (the newest `web.conversation_list` open web conversations besides home, titled by the first question cut to `web.title_chars`, each with its `parent` when it is a thread), `GET /web/conversations/{id}` (its questions and answers with their positions, at most `web.conversation_turns` messages) and `DELETE /web/conversations/{id}` back the threads list in the sidebar, and `GET /canvas/feed` says whether the student has a link. The page sends every turn with `continue_channel` off and the conversation id of home or the thread. They call the engine at `VITE_ENGINE_URL` with `credentials: include`. CORS allows credentials only while the web sign-in is on, and `Config::validate` then requires the site in `http.cors_origins` and refuses `*`.
 
 ### Admin surface
 
@@ -508,7 +508,7 @@ sequenceDiagram
     W->>E: GET /web/notifications
 ```
 
-The bot polls `GET /notifications/outgoing` every `bot.notify_every_secs` with the service token, sends each as a direct message, and reports the ids with `POST /notifications/sent`; a student who does not accept direct messages is reported too, so nothing loops. The web reads `GET /web/notifications` for the bell, `POST /web/notifications/read` when it opens, and `GET /web/reminders` and `DELETE /web/reminders/{id}` for Settings, Reminders, all with the session only.
+The bot polls `GET /notifications/outgoing` every `bot.notify_every_secs` with the service token, sends each as a direct message, and reports the ids with `POST /notifications/sent`; a student who does not accept direct messages is reported too, so nothing loops. The web reads `GET /web/notifications` for the unread dot, `POST /web/notifications/read` when home is shown, and `GET /web/reminders` and `DELETE /web/reminders/{id}` for Settings, Reminders, all with the session only.
 
 ## Linked accounts and integrations
 
@@ -522,6 +522,23 @@ Platform runs every per-user login and holds the grants. Canvas is the exception
 
 `search_chats` (`runtime/tools/chats.rs`) finds what the student and Sparky said in earlier private chats. Migration 0007 keeps an FTS5 table, `messages_fts`, over the text of user and assistant messages; triggers add each new one and drop deleted ones, so tool results and summaries are never indexed. `ConversationStore::search` matches any of the query's words as prefixes, ranks by bm25, and returns at most `chat_search.max_hits` snippets from the caller's own private conversations, leaving out the one in progress. It is `ReadAuthenticated` and private, registered when `[chat_search] enabled` and `store.backend` is `sqlite`. Memories are what Sparky chose to keep; chat search is the rest.
 
+## Home chat
+
+Each student has one home conversation, id `home_id(tenant, user)` (a UUID v5), on channel `web`, private. When a reminder fires or a nudge is sent, the same transaction that writes the `notifications` row writes an assistant message to home with `notice: {id, kind}`, so the student sees it in the chat and the agent reads it as history when they reply. Writing there leaves `updated_at` alone, so only the student's own turns count as activity. A reset never ends home, and the conversation list leaves it out.
+
+A thread is a web conversation started from one message: the first turn sends `parent: {conversation_id, position}` and `reply_to` with that message's text. `ConversationStore::link` keeps the parent only when both conversations are the student's and the message exists.
+
+```mermaid
+flowchart LR
+  R[reminder fires] --> N[(notifications)]
+  G[nudge sent] --> N
+  R --> H[home: Sparky message + notice]
+  G --> H
+  H --> W[web chat]
+  W -->|reply| H
+  W -->|thread off a message| T[thread conversation, parent set]
+```
+
 ## Nudges
 
 Nudges are notifications Sparky sends on its own. `runtime/nudge/` holds the loop; it reads only `core` traits. Every `nudges.tick_secs` it takes each student with a private conversation in the last `nudges.active_days` (`NudgeStore::people`, one row per user at their latest tenant), skips them in quiet time, and stops at `nudges.daily_cap` a local day.
@@ -534,7 +551,7 @@ flowchart LR
   Q -->|no| A[background agent: events, calendar, study]
   R --> S[(notifications, nudges_sent)]
   A --> S
-  S --> W[web bell]
+  S --> W[web home chat]
   S --> D[Discord DM]
 ```
 
@@ -551,7 +568,7 @@ The rules (`runtime/nudge/rules.rs`) need no model call. They read the `upcoming
 
 `event`, `calendar` and `study` run the agent through the `Background` trait: `Agent::background` is a copy with only `ReadPublic` and `ReadAuthenticated` tools, no conversation store and no confirmations, so nothing is kept or written. Each runs at most once a day (`calendar` once a week) from its configured hour, and the instruction (`nudges.event_prompt`, `calendar_prompt`, `study_prompt`) asks for `nudges.nothing` when nothing is worth saying. `event` runs only for a student Sparky knows something about.
 
-Every nudge carries keys in `nudges_sent`, so nothing is said twice; keys older than `nudges.keep_days` are dropped. A nudge is a `notifications` row with `kind` set, so the bell and the bot deliver it like a reminder. `GET` and `PUT /web/nudges` read and keep a student's quiet hours and switched off kinds; `POST /web/notifications/{id}/feedback` records whether a nudge was useful, and not useful switches its kind off.
+Every nudge carries keys in `nudges_sent`, so nothing is said twice; keys older than `nudges.keep_days` are dropped. A nudge is a `notifications` row with `kind` set, so home and the bot deliver it like a reminder. `GET` and `PUT /web/nudges` read and keep a student's quiet hours and switched off kinds; `POST /web/notifications/{id}/feedback` records whether a nudge was useful, and not useful switches its kind off.
 
 `upcoming` (`runtime/tools/upcoming.rs`) lists what the caller has coming up in one call: remembered tasks, reminders, Canvas due dates, and Google and Outlook events, merged and sorted by date, at most `upcoming.max_items`, for the next `days` (default `upcoming.default_days`, at most `upcoming.max_days`). Each integration that has dated items adds an `UpcomingSource` (`core/traits/tools/upcoming.rs`) beside its tools; a source whose tool is in `tools.disabled` is left out, and the tool is registered only when `[upcoming] enabled` and at least one source is. The sources are read in parallel within the request deadline. A source that is not linked, fails, or runs out of time adds one line naming it. `upcoming` is `ReadAuthenticated` and `private`.
 
