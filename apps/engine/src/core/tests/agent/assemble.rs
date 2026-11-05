@@ -583,7 +583,7 @@ fn the_memory_and_discovery_rules_are_only_in_a_private_turn() {
 }
 
 #[test]
-fn the_onboarding_rule_meets_only_a_student_with_no_memories_or_turns() {
+fn the_onboarding_rule_stays_until_enough_memories_describe_the_student() {
     let templates = Templates {
         proactive_rules: "PROACTIVE RULES",
         onboarding_rules: "ONBOARDING RULES",
@@ -603,7 +603,26 @@ fn the_onboarding_rule_meets_only_a_student_with_no_memories_or_turns() {
     assert!(shown.contains("ONBOARDING RULES") && shown.contains("PROACTIVE RULES"));
     assert!(!text(assemble(&ctx(), &first, Budget::default())).contains("ONBOARDING RULES"));
 
-    let known = [remembered(MemoryKind::Fact, "CS junior")];
+    let some = [
+        remembered(MemoryKind::Fact, "CS junior"),
+        remembered(MemoryKind::Task, "Lab 4 due Friday"),
+    ];
+    let getting_there = Sections {
+        memory: &some,
+        ..first
+    };
+    let shown = text(assemble(&private, &getting_there, Budget::default()));
+    assert!(
+        shown.contains("ONBOARDING RULES"),
+        "one profile memory is not enough"
+    );
+
+    let known = [
+        remembered(MemoryKind::Fact, "CS junior"),
+        remembered(MemoryKind::Fact, "Tempe campus"),
+        remembered(MemoryKind::Preference, "wants deadline help"),
+        remembered(MemoryKind::Preference, "likes robotics"),
+    ];
     let returning = Sections {
         memory: &known,
         ..first
