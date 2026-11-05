@@ -32,6 +32,8 @@ max_images = 4
 # and the hosts they are downloaded from.
 max_files = 4
 max_file_bytes = 2000000
+# Seconds between polls for due reminders, each sent as a direct message. 0 sends none.
+notify_every_secs = 30
 file_hosts = ["cdn.discordapp.com", "media.discordapp.net"]
 upload_preview_chars = 800       # characters of the start of an attached file's text put beside the question
 upload_match_chars = 2400        # characters of its passages that match the question
@@ -293,6 +295,17 @@ enabled = true
 default_days = 7               # days ahead when the model gives none
 max_days = 30
 max_items = 30
+
+# Reminders the student sets with remind. Each one becomes a notification when due: a bell on the
+# web and a direct message from the bot. Needs store.backend sqlite.
+[reminders]
+enabled = true
+tick_secs = 30                 # seconds between checks for due reminders
+max_per_user = 50
+max_chars = 200
+max_days_ahead = 365
+keep_days = 30                 # days a notification stays
+list_limit = 50                # most notifications one list or bot poll returns
 
 # Academic paper search over Semantic Scholar. Public, no key.
 [papers]

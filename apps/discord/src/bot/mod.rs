@@ -8,6 +8,7 @@ mod destination;
 mod feedback;
 mod login;
 pub(crate) mod memory;
+pub(crate) mod notify;
 mod respond;
 mod turn;
 
@@ -61,6 +62,10 @@ struct Handler {
     me: OnceLock<UserId>,
     /// The role Discord manages for the bot, set once the gateway is ready.
     role: OnceLock<RoleId>,
+    /// Seconds between reminder polls. Zero sends none.
+    notify_every: Duration,
+    /// Set once the reminder loop has started, so a reconnect does not start another.
+    notifying: OnceLock<()>,
     /// When each user last asked, for the cooldown.
     last_ask: Mutex<HashMap<UserId, Instant>>,
 }
@@ -102,6 +107,8 @@ pub async fn run(cfg: Config) -> anyhow::Result<()> {
         max_file_bytes: cfg.bot.max_file_bytes,
         me: OnceLock::new(),
         role: OnceLock::new(),
+        notify_every: Duration::from_secs(cfg.bot.notify_every_secs),
+        notifying: OnceLock::new(),
         last_ask: Mutex::new(HashMap::new()),
     };
     // MESSAGE_CONTENT is privileged and must be enabled on the application at discord.com/developers.
@@ -222,6 +229,13 @@ impl EventHandler for Handler {
             tracing::debug!("gateway ready again after a reconnect");
         }
         tracing::info!(user = %ready.user.name, guild = %self.guild_id, "connected");
+        if !self.notify_every.is_zero() && self.notifying.set(()).is_ok() {
+            tokio::spawn(notify::run(
+                self.engine.clone(),
+                ctx.http.clone(),
+                self.notify_every,
+            ));
+        }
         match self.guild_id.set_commands(&ctx.http, commands::all()).await {
             Ok(cmds) => tracing::info!(count = cmds.len(), "commands registered"),
             Err(e) => tracing::error!(error = %e, "command registration failed"),

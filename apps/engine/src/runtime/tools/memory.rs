@@ -305,7 +305,7 @@ impl MemoryTasks {
 #[async_trait]
 impl UpcomingSource for MemoryTasks {
     fn label(&self) -> &'static str {
-        "Reminder"
+        "Task"
     }
 
     fn tool(&self) -> &'static str {

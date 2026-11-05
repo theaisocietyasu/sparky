@@ -52,6 +52,8 @@ pub struct Bot {
     pub max_files: usize,
     /// Largest file sent to the engine, in bytes.
     pub max_file_bytes: u64,
+    /// Seconds between polls for reminders to send as direct messages. 0 sends none.
+    pub notify_every_secs: u64,
 }
 
 /// Smallest bot.max_message_chars accepted.
@@ -73,6 +75,7 @@ impl Default for Bot {
             max_images: 4,
             max_files: 4,
             max_file_bytes: 2_000_000,
+            notify_every_secs: 30,
         }
     }
 }

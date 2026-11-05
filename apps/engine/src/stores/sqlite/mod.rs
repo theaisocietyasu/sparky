@@ -1,4 +1,4 @@
-//! Adapters over one SQLite file: conversations, memories, pending actions, Canvas feed links and admin changes.
+//! Adapters over one SQLite file: conversations, memories, pending actions, Canvas feed links, reminders and admin changes.
 //!
 //! Every query binds tenant_id and user_id from the request; no query reads across users.
 
@@ -11,6 +11,7 @@ mod health;
 mod import;
 mod memory;
 mod prune;
+mod reminder;
 mod seal;
 
 use std::path::Path;
@@ -38,6 +39,7 @@ pub use memory::{MemoryLimits, SqliteMemory};
 pub use prune::{PrunePlan, run_prunes};
 #[cfg(test)]
 pub use prune::{Pruned, prune_once};
+pub use reminder::{ReminderLimits, SqliteReminders, run_reminders};
 pub use seal::Seal;
 
 /// How to open the file.
@@ -116,6 +118,11 @@ impl SqliteStore {
     /// Canvas calendar feed links in this file, sealed and opened with seal.
     pub fn canvas_feeds(&self, seal: Seal) -> SqliteCanvasFeeds {
         SqliteCanvasFeeds::new(self.pool.clone(), seal)
+    }
+
+    /// Reminders and notifications in this file, sealed and opened with seal.
+    pub fn reminders(&self, seal: Seal, limits: ReminderLimits) -> SqliteReminders {
+        SqliteReminders::new(self.pool.clone(), seal, limits)
     }
 
     /// Admin changes and held actions in this file.

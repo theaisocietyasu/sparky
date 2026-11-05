@@ -12,6 +12,7 @@ use crate::core::traits::knowledge::query::SourceQueries;
 use crate::core::traits::knowledge::retrieval::Retriever;
 use crate::core::traits::memory::MemoryStore;
 use crate::core::traits::oauth::OAuthStore;
+use crate::core::traits::reminder::ReminderStore;
 use crate::core::traits::tools::Tool;
 use crate::core::traits::tools::canvas::CanvasFeeds;
 use crate::core::traits::tools::upcoming::UpcomingSource;
@@ -24,6 +25,7 @@ use crate::runtime::tools::knowledge::search::live::{LiveSearch, Wording as Live
 use crate::runtime::tools::knowledge::search::stored::{StoredSearch, Wording as StoredWording};
 use crate::runtime::tools::mcp::{self, McpLimits};
 use crate::runtime::tools::memory::{self, MemoryRules, MemoryTasks};
+use crate::runtime::tools::remind::{self, RemindRules};
 use crate::runtime::tools::sandbox::{
     ContainerSandbox, SandboxTool, Wording as SandboxWording, reap_sessions,
 };
@@ -36,6 +38,17 @@ type Build<'a> = Box<dyn FnOnce() -> Result<Built, String> + 'a>;
 /// One integration: its name, whether it is enabled, and how its tools are built.
 type Integration<'a> = (&'static str, bool, Build<'a>);
 
+/// The per-student stores the account tools read: Canvas links, reminders, and memories with their trace.
+#[derive(Default)]
+pub(crate) struct Personal {
+    /// Canvas calendar feed links.
+    pub canvas: Option<Arc<dyn CanvasFeeds>>,
+    /// Reminders and notifications.
+    pub reminders: Option<Arc<dyn ReminderStore>>,
+    /// Memories and the trace their writes report on.
+    pub memory: Option<(Arc<dyn MemoryStore>, Arc<dyn TraceSink>)>,
+}
+
 /// Every tool the model may call, with tools.disabled removed at registration.
 pub(crate) async fn build_tools(
     cfg: &Config,
@@ -43,8 +56,7 @@ pub(crate) async fn build_tools(
     retriever: Arc<dyn Retriever>,
     sandbox: Option<Arc<ContainerSandbox>>,
     oauth_store: Arc<dyn OAuthStore>,
-    canvas: Option<Arc<dyn CanvasFeeds>>,
-    memory: Option<(Arc<dyn MemoryStore>, Arc<dyn TraceSink>)>,
+    personal: Personal,
 ) -> anyhow::Result<(ToolSet, Vec<String>)> {
     let disabled = |name: &str| cfg.tools.disabled.iter().any(|d| d == name);
     let mut tools = ToolSet::new();
@@ -121,7 +133,7 @@ pub(crate) async fn build_tools(
         tracing::info!(url = %url, count = registered, "platform mcp tools registered");
     }
     let mut sources: Vec<Arc<dyn UpcomingSource>> = Vec::new();
-    for (integration, enabled, build) in integrations(cfg, &oauth_store, canvas, memory) {
+    for (integration, enabled, build) in integrations(cfg, &oauth_store, personal) {
         if !enabled {
             continue;
         }
@@ -161,11 +173,15 @@ fn upcoming(
 fn integrations<'a>(
     cfg: &'a Config,
     oauth_store: &'a Arc<dyn OAuthStore>,
-    canvas_feeds: Option<Arc<dyn CanvasFeeds>>,
-    memory: Option<(Arc<dyn MemoryStore>, Arc<dyn TraceSink>)>,
+    personal: Personal,
 ) -> Vec<Integration<'a>> {
+    let Personal {
+        canvas: canvas_feeds,
+        reminders,
+        memory,
+    } = personal;
     let mut all: Vec<Integration<'a>> = Vec::new();
-    all.extend::<[Integration<'a>; 6]>([
+    all.extend::<[Integration<'a>; 7]>([
         (
             "memory",
             memory.is_some(),
@@ -178,6 +194,23 @@ fn integrations<'a>(
                     tools: memory::tools(&store, &trace, rules),
                     upcoming: vec![Arc::new(MemoryTasks::new(store))],
                 })
+            }),
+        ),
+        (
+            "reminders",
+            cfg.reminders.enabled && reminders.is_some(),
+            Box::new(move || {
+                let Some(store) = reminders else {
+                    return Ok(Built::default());
+                };
+                let offset = FixedOffset::east_opt(cfg.prompt.utc_offset_hours * 3600)
+                    .ok_or("prompt.utc_offset_hours is out of range")?;
+                let rules = RemindRules {
+                    max_chars: cfg.reminders.max_chars,
+                    max_days_ahead: cfg.reminders.max_days_ahead,
+                    offset,
+                };
+                Ok(remind::tools(&store, rules))
             }),
         ),
         (

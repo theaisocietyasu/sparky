@@ -1,4 +1,4 @@
-//! Local store composition: conversations, memories, pending actions and Canvas feed links in the SQLite file.
+//! Local store composition: conversations, memories, pending actions, Canvas feed links and reminders in the SQLite file.
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -7,7 +7,8 @@ use std::time::Duration;
 use super::Stores;
 use crate::core::config::{Config, StoreBackend};
 use crate::stores::sqlite::{
-    BackupPlan, MemoryLimits, PrunePlan, Seal, SqliteStore, StoreOptions, run_backups, run_prunes,
+    BackupPlan, MemoryLimits, PrunePlan, ReminderLimits, Seal, SqliteStore, StoreOptions,
+    run_backups, run_prunes, run_reminders,
 };
 
 /// Opens the SQLite file named by the store section and runs its migrations.
@@ -46,6 +47,18 @@ pub(super) async fn localize(cfg: &Config, stores: &mut Stores) -> anyhow::Resul
     stores.memory = Arc::new(store.memory(seal(cfg)?, limits));
     if cfg.canvas.enabled {
         stores.canvas = Some(Arc::new(store.canvas_feeds(seal(cfg)?)));
+    }
+    if cfg.reminders.enabled {
+        let limits = ReminderLimits {
+            max_per_user: cfg.reminders.max_per_user,
+            keep_days: cfg.reminders.keep_days,
+        };
+        let reminders = Arc::new(store.reminders(seal(cfg)?, limits));
+        tokio::spawn(run_reminders(
+            Arc::clone(&reminders),
+            Duration::from_secs(cfg.reminders.tick_secs),
+        ));
+        stores.reminders = Some(reminders);
     }
     stores.confirmations = Arc::new(store.confirmations());
     stores.admin = Some(Arc::new(store.admin()));

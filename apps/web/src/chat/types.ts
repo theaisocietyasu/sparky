@@ -32,3 +32,12 @@ export type ChatTurn = { role: "user" | "assistant"; text: string };
 
 /** A file sent inline with a message. */
 export type Upload = { name: string; media_type: string; size: number; data: string };
+
+/** How often a reminder comes back. */
+export type Repeat = "once" | "daily" | "weekly";
+
+/** A reminder the student set in a chat. */
+export type Reminder = { id: string; text: string; due_at: string; repeat: Repeat };
+
+/** A message for the student, made when a reminder fires. */
+export type Notice = { id: string; text: string; created_at: string; read: boolean };

@@ -1,10 +1,11 @@
 import { SquarePen } from "lucide-react";
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
+import Bell from "./Bell";
 import ChatList from "./ChatList";
 import Frame from "./Frame";
 
-/** The frame of the student pages: a new chat button and the chat list. Settings and admin sit in the profile menu. */
+/** The frame of the student pages: the notification bell, a new chat button and the chat list. Settings and admin sit in the profile menu. */
 const ChatFrame = ({ onNewChat, chats, children }: { onNewChat?: () => void; chats?: number; children: ReactNode }) => {
   const navigate = useNavigate();
   const actions = (
@@ -18,7 +19,7 @@ const ChatFrame = ({ onNewChat, chats, children }: { onNewChat?: () => void; cha
     </button>
   );
   return (
-    <Frame label="Chats" groups={[]} actions={actions} extra={<ChatList version={chats} />}>
+    <Frame label="Chats" groups={[]} tools={<Bell />} actions={actions} extra={<ChatList version={chats} />}>
       {children}
     </Frame>
   );

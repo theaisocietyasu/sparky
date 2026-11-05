@@ -1,4 +1,4 @@
-import { Brain, Link2, Palette, UserRound, type LucideIcon } from "lucide-react";
+import { AlarmClock, Brain, Link2, Palette, UserRound, type LucideIcon } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { Navigate, NavLink, useParams } from "react-router-dom";
 import ChatFrame from "../../app/ChatFrame";
@@ -6,15 +6,17 @@ import Accounts from "./Accounts";
 import Appearance from "./Appearance";
 import Memories from "./Memories";
 import Profile from "./Profile";
+import Reminders from "./Reminders";
 
 const SECTIONS: { key: string; label: string; icon: LucideIcon; page: () => React.JSX.Element }[] = [
   { key: "profile", label: "Profile", icon: UserRound, page: Profile },
   { key: "accounts", label: "Connected accounts", icon: Link2, page: Accounts },
+  { key: "reminders", label: "Reminders", icon: AlarmClock, page: Reminders },
   { key: "memories", label: "Memories", icon: Brain, page: Memories },
   { key: "appearance", label: "Appearance", icon: Palette, page: Appearance },
 ];
 
-/** /settings/:section: the student's profile, linked accounts, memories and theme. */
+/** /settings/:section: the student's profile, linked accounts, reminders, memories and theme. */
 const Settings = () => {
   const { section = "profile" } = useParams();
   const still = useReducedMotion() ?? false;

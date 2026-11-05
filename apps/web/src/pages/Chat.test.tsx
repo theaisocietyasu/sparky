@@ -131,6 +131,39 @@ describe("web chat", () => {
     expect(screen.queryByRole("link", { name: "Connections" })).toBeNull();
   });
 
+  it("shows a dot for new reminders and marks them read when the bell opens", async () => {
+    const calls = engine({
+      "/web/me": () => Response.json(ME),
+      "/web/notifications": () =>
+        Response.json({ notifications: [{ id: "n1", text: "Submit the lab", created_at: new Date().toISOString(), read: false }], unread: 1 }),
+      "/web/notifications/read": () => new Response(null, { status: 204 }),
+    });
+    open("/chat");
+    const bell = await screen.findByRole("button", { name: "Notifications, 1 new" });
+    fireEvent.click(bell);
+    expect(within(screen.getByRole("dialog", { name: "Notifications" })).getByText("Submit the lab")).toBeInTheDocument();
+    await waitFor(() => expect(calls.some((c) => c.url === `${ENGINE}/web/notifications/read` && c.init?.method === "POST")).toBe(true));
+    expect(screen.getByRole("button", { name: "Notifications" })).toBeInTheDocument();
+  });
+
+  it("lists reminders in settings and cancels one", async () => {
+    let listed = [{ id: "r1", text: "Gym", due_at: "2026-11-06T16:00:00Z", repeat: "daily" }];
+    const calls = engine({
+      "/web/me": () => Response.json(ME),
+      "/web/reminders": () => Response.json({ reminders: listed }),
+      "/web/reminders/r1": () => {
+        listed = [];
+        return new Response(null, { status: 204 });
+      },
+    });
+    open("/settings/reminders");
+    expect(await screen.findByText("Gym")).toBeInTheDocument();
+    expect(screen.getByText(/repeats daily/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel reminder Gym" }));
+    expect(await screen.findByText("No reminders set")).toBeInTheDocument();
+    expect(calls.some((c) => c.url === `${ENGINE}/web/reminders/r1` && c.init?.method === "DELETE")).toBe(true);
+  });
+
   it("sends attached files inline and shows them on the turn", async () => {
     const calls = engine({
       "/web/me": () => Response.json(ME),

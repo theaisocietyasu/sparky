@@ -91,6 +91,9 @@ pub struct Config {
     /// The upcoming tool over tasks, Canvas and calendars.
     #[serde(default)]
     pub upcoming: Upcoming,
+    /// Reminders and notifications.
+    #[serde(default)]
+    pub reminders: Reminders,
     /// Academic paper search.
     #[serde(default)]
     pub papers: Papers,
@@ -431,6 +434,7 @@ fn validate_mcp_risks(mcp: &Mcp) -> Result<(), ConfigError> {
 fn validate_integrations(cfg: &Config) -> Result<(), ConfigError> {
     validate_canvas(cfg)?;
     validate_upcoming(&cfg.upcoming)?;
+    validate_reminders(&cfg.reminders)?;
     if cfg.outlook.enabled {
         if !cfg.outlook.base_url.starts_with("https://") {
             return Err(ConfigError::Invalid(
@@ -484,6 +488,24 @@ fn validate_web(cfg: &Config) -> Result<(), ConfigError> {
     }
     if web.session_hours == 0 || web.timeout_secs == 0 || web.cookie_name.trim().is_empty() {
         return invalid("session_hours, timeout_secs and cookie_name must be set");
+    }
+    Ok(())
+}
+
+fn validate_reminders(reminders: &Reminders) -> Result<(), ConfigError> {
+    if !reminders.enabled {
+        return Ok(());
+    }
+    if reminders.tick_secs == 0
+        || reminders.max_per_user == 0
+        || reminders.max_chars == 0
+        || reminders.max_days_ahead == 0
+        || reminders.keep_days == 0
+        || reminders.list_limit == 0
+    {
+        return Err(ConfigError::Invalid(
+            "reminders: every limit must be at least 1".into(),
+        ));
     }
     Ok(())
 }

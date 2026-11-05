@@ -24,6 +24,12 @@ pub const REMEMBER: &str = "remember";
 /// Name of the tool that removes a memory.
 pub const FORGET_MEMORY: &str = "forget_memory";
 
+/// Name of the tool that sets a reminder.
+pub const REMIND: &str = "remind";
+
+/// Name of the tool that cancels a reminder.
+pub const CANCEL_REMINDER: &str = "cancel_reminder";
+
 /// Name of the tool that runs a command in the isolated environment.
 pub const SANDBOX: &str = "run_sandbox";
 

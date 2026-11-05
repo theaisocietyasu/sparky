@@ -10,7 +10,7 @@ use crate::core::config::Config;
 use crate::core::tests::support::{FakeQueries, HostedLogins, Stored};
 use crate::core::types::knowledge::query::QuerySourceInfo;
 use crate::core::types::tools::ToolDefinition;
-use crate::wiring::tools::build_tools;
+use crate::wiring::tools::{Personal, build_tools};
 
 /// The sections with no defaults.
 const BASE: &str = r#"
@@ -63,8 +63,7 @@ async fn registered(cfg: &Config, keys: &[&str]) -> Vec<ToolDefinition> {
         Arc::new(Stored::empty()),
         None,
         Arc::new(HostedLogins),
-        None,
-        None,
+        Personal::default(),
     )
     .await;
     match built {

@@ -9,6 +9,7 @@ use crate::core::traits::conversation::ConversationStore;
 use crate::core::traits::identity::DiscordIdentity;
 use crate::core::traits::memory::MemoryStore;
 use crate::core::traits::oauth::OAuthStore;
+use crate::core::traits::reminder::ReminderStore;
 use crate::core::traits::safety::confirmation::ConfirmationStore;
 use crate::core::traits::tools::canvas::CanvasFeeds;
 use crate::core::traits::tools::sandbox::Sandbox;
@@ -20,6 +21,7 @@ use crate::routes::canvas::CanvasState;
 use crate::routes::chat::{ChatState, WebLists};
 use crate::routes::health::HealthState;
 use crate::routes::memories::MemoryState;
+use crate::routes::notifications::NotificationState;
 use crate::routes::oauth::OAuthState;
 use crate::routes::rate_limit::RateLimiter;
 use crate::routes::session::WebAuth;
@@ -224,6 +226,21 @@ pub(super) fn canvas_state(
     }
 }
 
+/// The state the reminder and notification routes read: the store when reminders are on.
+pub(super) fn notification_state(
+    cfg: &Config,
+    store: Option<Arc<dyn ReminderStore>>,
+    web: Option<WebAuth>,
+) -> NotificationState {
+    NotificationState {
+        store: store.filter(|_| cfg.reminders.enabled),
+        default_tenant: cfg.discord.guild_id.to_string(),
+        list_limit: cfg.reminders.list_limit,
+        service_token: cfg.engine.service_token.clone(),
+        web,
+    }
+}
+
 /// The whole HTTP surface, with the state each group of routes reads.
 pub(super) fn http_router(
     cfg: &Config,
@@ -268,6 +285,7 @@ pub(super) fn http_router(
         sandbox: sandbox_state(cfg, sandbox),
         oauth: oauth_state(cfg, stores.oauth_store),
         canvas: canvas_state(cfg, stores.canvas, web.clone()),
+        notifications: notification_state(cfg, stores.reminders, web.clone()),
         web: web_state(cfg, web)?,
         admin,
     };

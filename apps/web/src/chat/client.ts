@@ -1,5 +1,5 @@
 import { drainFrames } from "./sse";
-import type { Answer, ChatSummary, ChatTurn, Me, Memory, Progress, Upload } from "./types";
+import type { Answer, ChatSummary, ChatTurn, Me, Memory, Notice, Progress, Reminder, Upload } from "./types";
 
 /** The engine origin the page talks to, or empty when the build has none. */
 export const engineUrl = () => (import.meta.env.VITE_ENGINE_URL ?? "").replace(/\/$/, "");
@@ -46,6 +46,12 @@ export const call = async <T>(method: string, path: string, body?: unknown): Pro
       body: body === undefined ? undefined : JSON.stringify(body),
     }),
   );
+
+/** Calls the engine for a route that answers with no body, throwing on a refusal. */
+const send = async (method: string, path: string) => {
+  const res = await fetch(`${engineUrl()}${path}`, { method, credentials: "include" });
+  if (!res.ok) throw await failure(res);
+};
 
 const json = async <T>(res: Response): Promise<T> => {
   if (!res.ok) throw await failure(res);
@@ -133,3 +139,15 @@ export const saveCanvas = async (link: string) => {
 export const removeCanvas = async () => {
   await call<{ removed: boolean }>("POST", "/canvas/feed/remove", {});
 };
+
+/** The student's newest notifications and how many are unread. */
+export const notices = (): Promise<{ notifications: Notice[]; unread: number }> => call("GET", "/web/notifications");
+
+/** Marks every notification read. */
+export const readNotices = () => send("POST", "/web/notifications/read");
+
+/** The student's reminders, soonest first. */
+export const reminders = async (): Promise<Reminder[]> => (await call<{ reminders: Reminder[] }>("GET", "/web/reminders")).reminders;
+
+/** Cancels one reminder. */
+export const cancelReminder = (id: string) => send("DELETE", `/web/reminders/${encodeURIComponent(id)}`);

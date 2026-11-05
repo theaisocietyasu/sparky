@@ -1,4 +1,4 @@
-//! Router assembly: /chat, /conversation, /memories, /sandbox, /oauth, /canvas, /web, /admin, and /health.
+//! Router assembly: /chat, /conversation, /memories, /sandbox, /oauth, /canvas, /notifications, /web, /admin, and /health.
 
 use axum::Router;
 use axum::extract::DefaultBodyLimit;
@@ -15,6 +15,7 @@ pub mod conversation;
 pub mod failure;
 pub mod health;
 pub mod memories;
+pub mod notifications;
 pub mod oauth;
 pub mod rate_limit;
 pub mod sandbox;
@@ -97,6 +98,8 @@ pub struct States {
     pub oauth: oauth::OAuthState,
     /// Canvas feed link routes.
     pub canvas: canvas::CanvasState,
+    /// Reminder and notification routes.
+    pub notifications: notifications::NotificationState,
     /// Web sign-in routes. None while the web sign-in is off.
     pub web: Option<web::WebState>,
     /// Admin routes.
@@ -112,6 +115,7 @@ pub fn router(states: States, limits: Limits, cors_origins: &[String]) -> Router
         sandbox: sandbox_state,
         oauth: oauth_state,
         canvas: canvas_state,
+        notifications: notification_state,
         web: web_state,
         admin: admin_state,
     } = states;
@@ -148,6 +152,14 @@ pub fn router(states: States, limits: Limits, cors_origins: &[String]) -> Router
         .route("/canvas/feed", post(canvas::save).get(canvas::status))
         .route("/canvas/feed/remove", post(canvas::remove))
         .with_state(canvas_state);
+    let notifications = Router::new()
+        .route("/web/notifications", get(notifications::list))
+        .route("/web/notifications/read", post(notifications::read))
+        .route("/web/reminders", get(notifications::reminders))
+        .route("/web/reminders/{id}", delete(notifications::cancel))
+        .route("/notifications/outgoing", get(notifications::outgoing))
+        .route("/notifications/sent", post(notifications::sent))
+        .with_state(notification_state);
     let admin = Router::new()
         .route("/admin/tools", get(admin::tools))
         .route("/admin/tools/{name}", post(admin::switch_tool))
@@ -171,6 +183,7 @@ pub fn router(states: States, limits: Limits, cors_origins: &[String]) -> Router
         .merge(sandbox)
         .merge(oauth)
         .merge(canvas)
+        .merge(notifications)
         .merge(web_routes(web_state))
         .layer(DefaultBodyLimit::max(limits.max_body_bytes))
         .layer(TraceLayer::new_for_http());

@@ -25,6 +25,7 @@ use crate::core::traits::knowledge::retrieval::{Embedder, Retriever};
 use crate::core::traits::memory::MemoryStore;
 use crate::core::traits::model::ModelProvider;
 use crate::core::traits::oauth::OAuthStore;
+use crate::core::traits::reminder::ReminderStore;
 use crate::core::traits::safety::confirmation::ConfirmationStore;
 use crate::core::traits::tools::canvas::CanvasFeeds;
 use crate::core::traits::tools::files::FileSource;
@@ -42,7 +43,7 @@ use self::agent::{agent_config, compactor, guardrail, trace_sink};
 use self::boot::{fits_the_prompt, fits_the_slot};
 use self::http::http_router;
 use self::prompt::SYSTEM_PROMPT;
-use self::tools::{build_tools, sandbox};
+use self::tools::{Personal, build_tools, sandbox};
 
 pub use self::import::import_platform;
 
@@ -62,6 +63,8 @@ struct Stores {
     oauth_store: Arc<dyn OAuthStore>,
     /// Canvas calendar feed links, when the local store holds them.
     canvas: Option<Arc<dyn CanvasFeeds>>,
+    /// Reminders and notifications, when the local store holds them.
+    reminders: Option<Arc<dyn ReminderStore>>,
     /// Admin changes, when the local store holds them.
     admin: Option<Arc<dyn AdminStore>>,
     /// What readiness checks besides the model.
@@ -109,8 +112,11 @@ pub async fn serve(cfg: Config) -> anyhow::Result<()> {
         Arc::clone(&stores.retriever),
         sandbox.clone(),
         Arc::clone(&stores.oauth_store),
-        stores.canvas.clone(),
-        memory_tools(&cfg, &stores, &trace),
+        Personal {
+            canvas: stores.canvas.clone(),
+            reminders: stores.reminders.clone(),
+            memory: memory_tools(&cfg, &stores, &trace),
+        },
     )
     .await?;
     // Measured at boot with every tool offered, which is the largest the section ever gets.
