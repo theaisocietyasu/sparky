@@ -11,6 +11,7 @@ import type { Answer } from "../chat/types";
 import Composer from "../components/chat/Composer";
 import Reply, { AssistantRow } from "../components/chat/Reply";
 import Running from "../components/chat/Running";
+import Sparky from "../components/sparky/Sparky";
 
 /** One exchange. reveal is where the answer starts typing out, set only for an answer that arrived live. */
 type Turn = { id: number; question: string; files?: string[]; answer: Answer | null; error: string | null; reveal?: number };
@@ -25,6 +26,9 @@ const SUGGESTIONS = [
   "Find AI clubs I could join",
   "What do you remember about me?",
 ];
+
+/** A greeting for the hour of the day. */
+const greeting = (hour: number) => (hour < 5 ? "Up late" : hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening");
 
 const HELD = new Set(["Approve", "Cancel"]);
 
@@ -218,22 +222,35 @@ const Chat = () => {
       {empty ? (
         <main className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-4 pb-16">
           <motion.div initial={enter} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: "easeOut" }} className="w-full max-w-2xl">
-            <img src="/brand/sparkyai-logo.png" alt="" width={717} height={779} className="mx-auto h-12 w-auto" />
-            <h1 className="mt-5 text-center text-2xl font-semibold tracking-tight sm:text-3xl">
-              What can I help with, {me.name.split(" ")[0]}?
+            <motion.div
+              initial={still ? false : { opacity: 0, scale: 0.9, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={{ type: "spring", stiffness: 160, damping: 18, delay: 0.05 }}
+              className="mx-auto w-fit"
+            >
+              <Sparky watch className="h-28 w-auto drop-shadow-[0_12px_24px_rgb(120_28_53/0.25)]" />
+            </motion.div>
+            <h1 className="mt-6 text-center text-2xl font-semibold tracking-tight sm:text-3xl">
+              {greeting(new Date().getHours())}, {me.name.split(" ")[0]}
             </h1>
+            <p className="mt-2 text-center text-[15px] text-dim">What is on your plate today?</p>
             <div className="mt-8">{composer}</div>
             <ul aria-label="Suggestions" className="mt-4 flex flex-wrap justify-center gap-2">
-              {SUGGESTIONS.map((s) => (
-                <li key={s}>
+              {SUGGESTIONS.map((s, i) => (
+                <motion.li
+                  key={s}
+                  initial={still ? false : { opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, ease: "easeOut", delay: 0.25 + i * 0.05 }}
+                >
                   <button
                     type="button"
                     onClick={() => send(s)}
-                    className="h-9 rounded-full border border-edge px-3.5 text-sm text-dim transition-colors hover:bg-sunk hover:text-fg"
+                    className="glass h-9 rounded-full px-3.5 text-sm text-dim transition-colors hover:text-fg"
                   >
                     {s}
                   </button>
-                </li>
+                </motion.li>
               ))}
             </ul>
           </motion.div>
@@ -248,14 +265,14 @@ const Chat = () => {
                     {t.files && t.files.length > 0 && (
                       <ul aria-label="Files sent" className="flex flex-wrap justify-end gap-2">
                         {t.files.map((name, i) => (
-                          <li key={`${name}-${i}`} className="flex h-8 max-w-full items-center gap-1.5 rounded-lg border border-edge px-2.5 text-sm">
+                          <li key={`${name}-${i}`} className="glass flex h-8 max-w-full items-center gap-1.5 rounded-lg px-2.5 text-sm">
                             <FileText className="size-4 shrink-0 text-dim" />
                             <span className="truncate">{name}</span>
                           </li>
                         ))}
                       </ul>
                     )}
-                    {t.question && <p className="whitespace-pre-wrap rounded-3xl bg-sunk px-4 py-2.5 text-[15px] leading-6">{t.question}</p>}
+                    {t.question && <p className="whitespace-pre-wrap rounded-3xl bg-shu px-4 py-2.5 text-[15px] leading-6 text-white">{t.question}</p>}
                   </div>
                   {t.answer && <Reply answer={t.answer} busy={busy} revealFrom={t.reveal} onConfirm={(approve) => answerHeld(t, approve)} />}
                   {t.error && (

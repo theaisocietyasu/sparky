@@ -63,7 +63,7 @@ describe("web chat", () => {
     expect(screen.getByText(/not set up/i)).toBeInTheDocument();
   });
 
-  it("streams a turn with cookies and shows the answer, its sources and memories", async () => {
+  it("streams a turn with cookies and shows the answer and its sources, not the memories it used", async () => {
     const calls = engine({
       "/web/me": () => Response.json(ME),
       "/chat/stream": () =>
@@ -80,11 +80,55 @@ describe("web chat", () => {
     const convo = within(screen.getByRole("list", { name: "Conversation" }));
     expect(await convo.findByText(/open until midnight/i)).toBeInTheDocument();
     expect(await convo.findByRole("link", { name: /asu library hours/i })).toHaveAttribute("href", "https://lib.asu.edu/hours");
-    expect(convo.getByText(/memories used: 1/i)).toBeInTheDocument();
+    expect(convo.queryByText(/memories used/i)).toBeNull();
 
     const stream = calls.find((c) => c.url === `${ENGINE}/chat/stream`);
     expect(stream?.init?.credentials).toBe("include");
     expect(JSON.parse(String(stream?.init?.body))).toMatchObject({ message: "library hours?", conversation_id: null, continue_channel: false });
+  });
+
+  it("shows one status line that changes in place while a turn runs", async () => {
+    let finish: (r: Response) => void = () => {};
+    engine({
+      "/web/me": () => Response.json(ME),
+      "/chat/stream": () => {
+        const body = new ReadableStream({
+          start(c) {
+            const enc = new TextEncoder();
+            const frame = (name: string, data: unknown) => c.enqueue(enc.encode(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`));
+            frame("progress", { text: "\u{1f527} Searching ASU pages", slot: "a" });
+            frame("progress", { text: "\u{2705} Checked ASU pages", slot: "a" });
+            finish = () => {
+              frame("answer", answer());
+              frame("done", {});
+              c.close();
+            };
+          },
+        });
+        return new Response(body, { status: 200, headers: { "Content-Type": "text/event-stream" } });
+      },
+    });
+    open("/chat");
+    fireEvent.change(await screen.findByLabelText("Message"), { target: { value: "library hours?" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    const progress = await screen.findByLabelText("Progress");
+    await waitFor(() => expect(progress).toHaveTextContent("Checked ASU pages"));
+    expect(progress).not.toHaveTextContent("Searching ASU pages");
+    finish(new Response());
+    expect(await screen.findByText(/open until midnight/i)).toBeInTheDocument();
+  });
+
+  it("opens settings, the theme and sign out from the profile menu", async () => {
+    engine({ "/web/me": () => Response.json(ME), "/memories/list": () => Response.json({ memories: [] }) });
+    open("/chat");
+    fireEvent.click(await screen.findByRole("button", { name: "Account menu" }));
+    const menu = within(screen.getByRole("menu", { name: "Account" }));
+    expect(menu.getByRole("menuitem", { name: /sign out/i })).toBeInTheDocument();
+    expect(menu.queryByRole("menuitem", { name: "Admin" })).toBeNull();
+    fireEvent.click(menu.getByRole("menuitem", { name: "Settings" }));
+    expect(await screen.findByRole("heading", { name: "Profile" })).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/settings");
+    expect(screen.queryByRole("link", { name: "Connections" })).toBeNull();
   });
 
   it("sends attached files inline and shows them on the turn", async () => {
@@ -232,7 +276,7 @@ describe("web chat", () => {
     expect(removed).toBeDefined();
   });
 
-  it("links Canvas from the Connections page", async () => {
+  it("links Canvas from Connected accounts in settings", async () => {
     let linked = false;
     const calls = engine({
       "/web/me": () => Response.json(ME),

@@ -1,9 +1,8 @@
 import { Brain, List, Network, Trash2 } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useCallback, useEffect, useState } from "react";
-import ChatFrame from "../app/ChatFrame";
-import { forget, memories as fetchMemories } from "../chat/client";
-import type { Memory } from "../chat/types";
+import { forget, memories as fetchMemories } from "../../chat/client";
+import type { Memory } from "../../chat/types";
 import MemoryMap from "./MemoryMap";
 
 type View = "map" | "list";
@@ -17,7 +16,7 @@ const savedView = (): View => {
   }
 };
 
-/** /memories: what Sparky remembers about the signed-in student, with forget per item and for all. */
+/** Settings, Memories: what Sparky remembers about the student, with forget per item and for all. */
 const Memories = () => {
   const still = useReducedMotion() ?? false;
   const [items, setItems] = useState<Memory[] | null>(null);
@@ -56,12 +55,10 @@ const Memories = () => {
   };
 
   return (
-    <ChatFrame>
-      <main className="flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-3xl px-4 py-10">
+    <section aria-labelledby="settings-title">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-semibold tracking-tight">Memories</h1>
+              <h2 id="settings-title" className="text-lg font-semibold tracking-tight">Memories</h2>
               <p className="mt-1 text-sm text-dim">What Sparky remembers about you. The same list as /memories in Discord.</p>
             </div>
             {items && items.length > 0 && (
@@ -123,7 +120,7 @@ const Memories = () => {
           )}
           {items && items.length > 0 && view === "map" && <MemoryMap items={items} onForget={(n) => drop(n)} />}
           {items && items.length > 0 && view === "list" && (
-            <ol aria-label="Memories" className="mt-8 divide-y divide-edge overflow-hidden rounded-2xl border border-edge bg-raised">
+            <ol aria-label="Memories" className="mt-8 divide-y divide-edge overflow-hidden glass rounded-2xl">
               <AnimatePresence initial={false}>
                 {items.map((m) => (
                   <motion.li
@@ -155,9 +152,7 @@ const Memories = () => {
               </AnimatePresence>
             </ol>
           )}
-        </div>
-      </main>
-    </ChatFrame>
+    </section>
   );
 };
 

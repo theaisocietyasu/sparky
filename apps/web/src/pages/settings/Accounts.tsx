@@ -1,12 +1,11 @@
 import { CalendarDays, Check } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
-import ChatFrame from "../app/ChatFrame";
-import { canvasStatus, EngineError, removeCanvas, saveCanvas } from "../chat/client";
+import { canvasStatus, EngineError, removeCanvas, saveCanvas } from "../../chat/client";
 
 type Status = "loading" | "linked" | "unlinked" | "off" | "error";
 
-/** /connections: link or remove the Canvas calendar feed, the same as /canvas in Discord. */
-const Connections = () => {
+/** Settings, Connected accounts: link or remove the Canvas calendar feed, the same as /canvas in Discord. */
+const Accounts = () => {
   const [status, setStatus] = useState<Status>("loading");
   const [link, setLink] = useState("");
   const [busy, setBusy] = useState(false);
@@ -50,13 +49,11 @@ const Connections = () => {
   };
 
   return (
-    <ChatFrame>
-      <main className="flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-3xl px-4 py-10">
-          <h1 className="text-2xl font-semibold tracking-tight">Connections</h1>
+    <section aria-labelledby="settings-title">
+          <h2 id="settings-title" className="text-lg font-semibold tracking-tight">Connected accounts</h2>
           <p className="mt-1 text-sm text-dim">Accounts Sparky can read for you.</p>
 
-          <section aria-label="Canvas" className="mt-8 rounded-2xl border border-edge bg-raised p-5">
+          <section aria-label="Canvas" className="glass mt-6 rounded-2xl p-5">
             <div className="flex items-start gap-3">
               <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-sunk">
                 <CalendarDays className="size-4" />
@@ -100,7 +97,7 @@ const Connections = () => {
                     onChange={(e) => setLink(e.target.value)}
                     placeholder="https://canvas.asu.edu/feeds/calendars/user_....ics"
                     autoComplete="off"
-                    className="h-9 min-w-0 flex-1 rounded-lg border border-edge bg-canvas px-3 text-sm outline-none focus:border-accent"
+                    className="h-9 min-w-0 flex-1 rounded-lg border border-edge bg-raised/60 px-3 text-sm outline-none focus:border-accent"
                   />
                   <button
                     type="submit"
@@ -118,10 +115,8 @@ const Connections = () => {
               </p>
             )}
           </section>
-        </div>
-      </main>
-    </ChatFrame>
+    </section>
   );
 };
 
-export default Connections;
+export default Accounts;

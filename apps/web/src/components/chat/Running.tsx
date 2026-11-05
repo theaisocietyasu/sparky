@@ -5,34 +5,42 @@ import { parseStep } from "../../chat/step";
 import { useSmoothText } from "../../chat/useSmoothText";
 import Markdown from "./Markdown";
 import { AssistantRow } from "./Reply";
-import StepLine from "./StepLine";
 
-/** What the running turn shows: each progress line the engine sends, then the draft as it streams in. */
+/** The words of the newest progress line, with its mark and any code ticks taken off. */
+const latest = (lines: Line[]) => {
+  const last = lines[lines.length - 1];
+  if (!last) return "Thinking";
+  return parseStep(last.text).text.replace(/`/g, "") || "Thinking";
+};
+
+/**
+ * What the running turn shows: Sparky at work and one status line that changes in place as the engine
+ * reports each step, then the draft as it streams in.
+ */
 const Running = ({ lines, draft, onShown }: { lines: Line[]; draft: string; onShown: (text: string) => void }) => {
   const still = useReducedMotion() ?? false;
   const { text } = useSmoothText(draft, { off: still });
   useEffect(() => onShown(text), [text, onShown]);
+  const status = latest(lines);
   return (
-    <AssistantRow>
+    <AssistantRow mood={draft ? "idle" : "thinking"}>
       <div aria-live="polite" aria-label="Progress">
         {!draft && (
-          <ul className="space-y-1.5 text-sm text-dim">
-            <AnimatePresence initial={false}>
-              {lines.map((l) => (
-                <motion.li
-                  key={l.key}
-                  layout={!still}
-                  initial={still ? false : { opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <StepLine {...parseStep(l.text)} />
-                </motion.li>
-              ))}
+          <div className="relative h-6 overflow-hidden text-sm">
+            <AnimatePresence initial={false} mode="popLayout">
+              <motion.p
+                key={status}
+                initial={still ? false : { opacity: 0, y: 10, filter: "blur(4px)" }}
+                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                exit={still ? undefined : { opacity: 0, y: -10, filter: "blur(4px)" }}
+                transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+                title={status}
+                className="shimmer truncate leading-6"
+              >
+                {status}
+              </motion.p>
             </AnimatePresence>
-            <li className="shimmer w-fit pl-6">{lines.length === 0 ? "Thinking" : "Working"}</li>
-          </ul>
+          </div>
         )}
         {draft && <Markdown text={text} streaming />}
       </div>

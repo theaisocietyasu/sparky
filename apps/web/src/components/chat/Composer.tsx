@@ -59,7 +59,7 @@ const Composer = ({
       onSubmit={submit}
       onDragOver={(e) => onFiles && e.preventDefault()}
       onDrop={drop}
-      className="rounded-3xl border border-edge bg-raised p-2 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_4px_16px_rgb(0_0_0/0.04)] focus-within:border-dim"
+      className="glass rounded-3xl p-2 transition-shadow focus-within:shadow-[0_0_0_3px_rgb(120_28_53/0.12),0_8px_32px_-12px_rgb(0_0_0/0.18)]"
     >
       {files.length > 0 && (
         <ul aria-label="Attached files" className="flex flex-wrap gap-2 px-2 pb-2 pt-1">
