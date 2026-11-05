@@ -517,6 +517,10 @@ Platform runs every per-user login and holds the grants. Canvas is the exception
 
 `runtime/tools/account/gcal` offers a read-only `google_calendar` tool over the Google Calendar API, off until `[gcal] enabled`: it lists the caller's upcoming events, is `ReadAuthenticated` and direct-message only, and is keyed to the `google` provider. The Calendar REST client sits behind the `GoogleCalendar` trait in `core/traits/tools/gcal.rs`.
 
+## Chat search
+
+`search_chats` (`runtime/tools/chats.rs`) finds what the student and Sparky said in earlier private chats. Migration 0007 keeps an FTS5 table, `messages_fts`, over the text of user and assistant messages; triggers add each new one and drop deleted ones, so tool results and summaries are never indexed. `ConversationStore::search` matches any of the query's words as prefixes, ranks by bm25, and returns at most `chat_search.max_hits` snippets from the caller's own private conversations, leaving out the one in progress. It is `ReadAuthenticated` and private, registered when `[chat_search] enabled` and `store.backend` is `sqlite`. Memories are what Sparky chose to keep; chat search is the rest.
+
 ## Nudges
 
 Nudges are notifications Sparky sends on its own. `runtime/nudge/` holds the loop; it reads only `core` traits. Every `nudges.tick_secs` it takes each student with a private conversation in the last `nudges.active_days` (`NudgeStore::people`, one row per user at their latest tenant), skips them in quiet time, and stops at `nudges.daily_cap` a local day.

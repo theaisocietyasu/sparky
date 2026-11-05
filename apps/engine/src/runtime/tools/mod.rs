@@ -2,6 +2,7 @@
 
 pub mod account;
 pub mod calculate;
+pub mod chats;
 pub mod files;
 pub mod http;
 pub mod knowledge;

@@ -120,6 +120,8 @@ pub async fn serve(cfg: Config) -> anyhow::Result<()> {
             canvas: stores.canvas.clone(),
             reminders: stores.reminders.clone(),
             memory: memory_tools(&cfg, &stores, &trace),
+            chats: (cfg.store.backend == StoreBackend::Sqlite)
+                .then(|| Arc::clone(&stores.conversations)),
         },
     )
     .await?;

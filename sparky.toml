@@ -348,6 +348,11 @@ event_prompt = "Background check, not a question from the student. Search ASU ev
 calendar_prompt = "Background check, not a question from the student. Search the ASU academic calendar for dates in the next 14 days that matter to a student: the last day to add or drop, the withdrawal deadline, registration opening, tuition due, financial aid deadlines, and days with no classes. Use what you remember about them, such as their year and campus. If one is coming up, write a short friendly message, two sentences at most, with the date and the link. You already told them: {already}. Do not repeat those. If nothing new is coming up, answer exactly {nothing}."
 study_prompt = "Background check, not a question from the student. They have {item} due {due}. Check ASU library hours tonight and the study rooms. If the main libraries near their campus close before midnight tonight, write a short friendly message, two sentences at most, naming a place that stays open later and its hours, with a link. If they are open late anyway, or you cannot tell, answer exactly {nothing}."
 
+# search_chats: full text search over the student's earlier private chats. Needs store.backend sqlite.
+[chat_search]
+enabled = true
+max_hits = 6                    # most messages one search returns
+
 # Arithmetic and date math, worked out in the engine. Today is at prompt.utc_offset_hours.
 [calculate]
 enabled = true

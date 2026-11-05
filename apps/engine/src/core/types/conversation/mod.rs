@@ -70,6 +70,21 @@ pub struct ConversationSummary {
     pub updated_at: String,
 }
 
+/// One past message that matched a chat search.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ChatHit {
+    /// Conversation it is in.
+    pub conversation_id: String,
+    /// Channel of that conversation; web for the web chat.
+    pub channel_id: String,
+    /// user or assistant.
+    pub role: String,
+    /// The part of the message around the match.
+    pub snippet: String,
+    /// When it was said, RFC 3339 UTC.
+    pub at: String,
+}
+
 /// One question or answer of a conversation as the web shows it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Turn {

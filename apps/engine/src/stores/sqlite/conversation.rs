@@ -9,7 +9,7 @@ use super::{database, stamp};
 use crate::core::traits::conversation::ConversationStore;
 use crate::core::types::agent::context::RequestContext;
 use crate::core::types::conversation::message::{Message, Role};
-use crate::core::types::conversation::{ConversationSummary, Stored};
+use crate::core::types::conversation::{ChatHit, ConversationSummary, Stored};
 use crate::core::types::store::StoreError;
 
 /// The row role of a summary.
@@ -34,6 +34,17 @@ fn content(message: &Message) -> Result<String, StoreError> {
 /// One message from the content column.
 fn message(text: &str) -> Result<Message, StoreError> {
     serde_json::from_str(text).map_err(|e| StoreError::Database(format!("message: {e}")))
+}
+
+/// An FTS5 match over the words of query, each quoted and prefix matched, any of them.
+fn fts_query(query: &str) -> Option<String> {
+    let words: Vec<String> = query
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|w| w.chars().count() > 1)
+        .take(12)
+        .map(|w| format!("\"{}\"*", w.to_lowercase()))
+        .collect();
+    (!words.is_empty()).then(|| words.join(" OR "))
 }
 
 /// Conversations held in the SQLite file.
@@ -299,6 +310,45 @@ impl ConversationStore for SqliteConversations {
             });
         }
         Ok(out)
+    }
+
+    async fn search(
+        &self,
+        ctx: &RequestContext,
+        query: &str,
+        limit: usize,
+    ) -> Result<Vec<ChatHit>, StoreError> {
+        let Some(matched) = fts_query(query) else {
+            return Ok(Vec::new());
+        };
+        let rows = sqlx::query(
+            "SELECT c.id, c.channel_id, m.role, m.created_at, \
+             snippet(messages_fts, 0, '', '', ' ... ', 24) AS snippet \
+             FROM messages_fts JOIN messages m ON m.seq = messages_fts.rowid \
+             JOIN conversations c ON c.id = m.conversation_id \
+             WHERE messages_fts MATCH ? AND c.tenant_id = ? AND c.user_id = ? \
+             AND c.visibility = 'private' AND c.id != ? \
+             ORDER BY bm25(messages_fts) LIMIT ?",
+        )
+        .bind(matched)
+        .bind(&ctx.tenant_id)
+        .bind(&ctx.user_id)
+        .bind(ctx.conversation_id.to_string())
+        .bind(i64::try_from(limit.max(1)).unwrap_or(i64::MAX))
+        .fetch_all(&self.pool)
+        .await
+        .map_err(database)?;
+        rows.iter()
+            .map(|row| {
+                Ok(ChatHit {
+                    conversation_id: row.try_get("id").map_err(database)?,
+                    channel_id: row.try_get("channel_id").map_err(database)?,
+                    role: row.try_get("role").map_err(database)?,
+                    snippet: row.try_get("snippet").map_err(database)?,
+                    at: row.try_get("created_at").map_err(database)?,
+                })
+            })
+            .collect()
     }
 
     async fn delete(&self, ctx: &RequestContext) -> Result<bool, StoreError> {

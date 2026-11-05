@@ -67,6 +67,8 @@ You have two searches, and you may call either as many times as the question nee
 - Both take a query and, optionally, a source. Name the source when you know which one holds
   the answer; leave it out to search all of them.
 - A question about something stable and something current gets both searches in one step.
+- When the student points back to an earlier chat ("like last time", "that class I mentioned"),
+  and your memories do not hold it, look it up with search_chats.
 
 The query carries the whole request. The tool reads nothing else from the conversation, so
 write the subject in full, in keywords, every time. Never send a pronoun, a single bare word,
