@@ -81,11 +81,14 @@ fn settings_the_platform_cannot_serve_are_rejected() {
 }
 
 #[test]
-fn platform_canvas_tools_are_skipped_unless_told_otherwise() {
+fn platform_canvas_knowledge_and_batch_tools_are_skipped_unless_told_otherwise() {
     let Ok(cfg) = load(ON) else {
         unreachable!("a complete platform section is valid")
     };
-    assert_eq!(cfg.platform.mcp_skip, vec!["canvas.".to_owned()]);
+    assert_eq!(
+        cfg.platform.mcp_skip,
+        vec!["canvas.", "knowledge.", "batch"]
+    );
     assert_eq!(cfg.platform.mcp_private, Vec::<String>::new());
     assert!(load(&format!("{ON}mcp_private = [\"\"]\n")).is_err_and(|e| e.contains("mcp_private")));
     assert!(load(&format!("{ON}mcp_skip = [\"\"]\n")).is_err_and(|e| e.contains("mcp_skip")));

@@ -14,6 +14,8 @@ pub struct ProgressStyle {
     pub detail_chars: usize,
     /// Characters of reasoning a thinking line keeps.
     pub thought_chars: usize,
+    /// Short everyday phrases with no tool names, arguments or results.
+    pub plain: bool,
 }
 
 /// Characters of detail a progress line carries when nothing is configured.
@@ -27,6 +29,7 @@ impl Default for ProgressStyle {
         Self {
             detail_chars: DETAIL_CHARS,
             thought_chars: THOUGHT_CHARS,
+            plain: false,
         }
     }
 }
@@ -74,6 +77,9 @@ impl Progress {
 impl TraceEvent {
     /// What to show someone waiting on this run, or None when the event is bookkeeping.
     pub fn progress(&self, style: ProgressStyle) -> Option<String> {
+        if style.plain && !matches!(self, Self::AnswerDraft { .. }) {
+            return self.plain();
+        }
         let detail = style.detail_chars;
         match self {
             Self::ModelStarted { .. } => Some("\u{1f914} thinking".to_owned()),

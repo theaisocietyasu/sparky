@@ -132,6 +132,7 @@ impl Agent {
         let mut templates = self.prompt.templates();
         if self.deps.tools.get(REMEMBER).is_none() {
             templates.memory_rules = "";
+            templates.onboarding_rules = "";
         }
         // The discovery rule goes only where search_live is offered.
         if self.deps.tools.get(SEARCH_LIVE).is_none() {

@@ -41,6 +41,10 @@ pub struct Templates<'a> {
     pub memory_rules: &'a str,
     /// How to use memories to find events and clubs. Added to the system prompt in a private turn.
     pub discovery_rules: &'a str,
+    /// How to look ahead for the student. Added to the system prompt in a private turn.
+    pub proactive_rules: &'a str,
+    /// How to meet a student Sparky knows nothing about. Added to the first private turn with no memories.
+    pub onboarding_rules: &'a str,
 }
 
 /// Default line naming the user, with {user} and {roles}.
@@ -57,6 +61,10 @@ status, finances, passwords or codes, or anything about another person. Call for
 with the id in brackets when they ask you to forget something.";
 /// Default rule for finding events and clubs from memories, added in a private turn.
 pub const DISCOVERY_RULES: &str = "Discovery. When the student asks for something to do, join or attend, take their major, interests, clubs and campus from what you remember, use them as the words of a search_live query on events or clubs, and say which memory you used.";
+/// Default rule on looking ahead for the student.
+pub const PROACTIVE_RULES: &str = "Initiative. End an answer with one short, concrete next step when one helps: a related deadline, event, club, office or resource, or an offer to set a reminder. When one missing detail would change the answer, such as their campus or course section, ask for it in one short question. Never ask more than one question at a time, and never pad an answer with offers.";
+/// Default rule for the first private turn with a student Sparky knows nothing about.
+pub const ONBOARDING_RULES: &str = "First meeting. You know nothing about this student yet. Answer what they asked first, if anything. Then greet them by first name in one line and ask one friendly question to get to know them, starting with their major and year, then campus, then what they most want help with. Call remember with each answer they give. Mention once that linking Canvas lets you track their due dates.";
 /// Default line naming the current date, with {date}.
 pub const DATE_LINE: &str = "Today is {date}. Search results are labelled by day or date; read \
                              the label the question asks for, never the first value in a row.";
@@ -104,6 +112,8 @@ impl Default for Templates<'_> {
             result_cut_line: RESULT_CUT_LINE,
             memory_rules: MEMORY_RULES,
             discovery_rules: DISCOVERY_RULES,
+            proactive_rules: PROACTIVE_RULES,
+            onboarding_rules: ONBOARDING_RULES,
         }
     }
 }

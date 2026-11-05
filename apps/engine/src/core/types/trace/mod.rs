@@ -1,5 +1,6 @@
 //! TraceEvent, RunStatus, TraceRecord.
 
+pub mod plain;
 pub mod progress;
 pub mod status;
 

@@ -38,6 +38,10 @@ pub struct PromptText {
     pub memory_rules: String,
     /// How to find events and clubs from memories, for a private turn with search_live.
     pub discovery_rules: String,
+    /// How to look ahead for the student, for a private turn.
+    pub proactive_rules: String,
+    /// How to meet a student Sparky knows nothing about, for the first private turn with no memories.
+    pub onboarding_rules: String,
     /// Hours from UTC the date is rendered in.
     pub utc_offset_hours: i32,
 }
@@ -66,6 +70,8 @@ impl From<&crate::core::config::Prompt> for PromptText {
             upload_failed_line: cfg.upload_failed_line.clone(),
             memory_rules: cfg.memory_rules.clone(),
             discovery_rules: cfg.discovery_rules.clone(),
+            proactive_rules: cfg.proactive_rules.clone(),
+            onboarding_rules: cfg.onboarding_rules.clone(),
             utc_offset_hours: cfg.utc_offset_hours,
         }
     }
@@ -102,6 +108,8 @@ impl PromptText {
             result_cut_line: &self.result_cut_line,
             memory_rules: &self.memory_rules,
             discovery_rules: &self.discovery_rules,
+            proactive_rules: &self.proactive_rules,
+            onboarding_rules: &self.onboarding_rules,
         }
     }
 }
