@@ -28,6 +28,8 @@ pub struct Facts<'a> {
     pub memories: &'a [Memory],
     /// Keys already sent to the student.
     pub sent: &'a HashSet<String>,
+    /// When the student first talked to Sparky, when known.
+    pub first_seen: Option<DateTime<Utc>>,
 }
 
 impl Facts<'_> {
@@ -71,6 +73,56 @@ pub struct Rules {
     pub follow_up_days: i64,
     /// A plan older than this gets no follow up.
     pub follow_up_max_days: i64,
+    /// Hours after a big item was due that the check in may still go out.
+    pub after_due_hours: i64,
+    /// Lines of the after due check in, one picked per item. {title} is replaced.
+    pub after_due_lines: Vec<String>,
+    /// Lowercase words that make an item an exam.
+    pub exam_words: Vec<String>,
+    /// Exams in the next 7 days that make an exam week.
+    pub exam_week_min: usize,
+    /// Lines of the exam week nudge. {count} and {list} are replaced.
+    pub exam_week_lines: Vec<String>,
+    /// Local hour the Friday wins go out from.
+    pub wins_hour: u32,
+    /// Items done this week that make wins worth sending.
+    pub wins_min: usize,
+    /// Lines of the Friday wins. {count} and {list} are replaced.
+    pub wins_lines: Vec<String>,
+    /// Days after the first chat that tips go out.
+    pub tips_days: i64,
+    /// Local hour tips go out from.
+    pub tip_hour: u32,
+    /// The tips, in order, each sent once.
+    pub tips: Vec<String>,
+}
+
+impl Default for Rules {
+    fn default() -> Self {
+        let lines = |all: &[&str]| all.iter().map(|l| (*l).to_owned()).collect();
+        Self {
+            brief_hour: 8,
+            brief_days: 7,
+            week_plan_hour: 18,
+            due_soon_hours: 24,
+            start_early_days: 3,
+            big_work: lines(&["exam", "midterm", "final", "project", "paper", "essay"]),
+            new_item_days: 21,
+            follow_up_days: 3,
+            follow_up_max_days: 10,
+            after_due_hours: 8,
+            after_due_lines: lines(&["How did {title} go?"]),
+            exam_words: lines(&["exam", "midterm", "final", "quiz", "test"]),
+            exam_week_min: 2,
+            exam_week_lines: lines(&["Exam week: {count} coming up.{list}"]),
+            wins_hour: 15,
+            wins_min: 2,
+            wins_lines: lines(&["You got through {count} things this week.{list}"]),
+            tips_days: 14,
+            tip_hour: 11,
+            tips: Vec::new(),
+        }
+    }
 }
 
 /// What a rule wants done.
@@ -113,7 +165,44 @@ pub fn candidate_keys(f: &Facts<'_>, r: &Rules) -> Vec<String> {
     for m in follow_ups(f, r) {
         keys.push(follow_key(m));
     }
+    for (tool, item) in f.items {
+        keys.push(item_key("after", tool, item));
+    }
+    keys.push(week_key("exams", local.date_naive()));
+    keys.push(week_key("wins", local.date_naive()));
+    keys.push(day_key("tipday", local.date_naive()));
+    keys.extend((0..r.tips.len()).map(tip_key));
     keys
+}
+
+/// The key of one tip.
+fn tip_key(index: usize) -> String {
+    format!("tip:{index}")
+}
+
+/// One of lines, picked by key so the same nudge reads the same but the next one reads differently.
+fn pick<'a>(lines: &'a [String], key: &str) -> Option<&'a str> {
+    if lines.is_empty() {
+        return None;
+    }
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    for byte in key.bytes() {
+        hash ^= u64::from(byte);
+        hash = hash.wrapping_mul(0x0100_0000_01b3);
+    }
+    let index = usize::try_from(hash % lines.len() as u64).unwrap_or(0);
+    lines.get(index).map(String::as_str)
+}
+
+/// Items as list lines, each on a new line after a dash.
+fn listed(items: &[&UpcomingItem], f: &Facts<'_>) -> String {
+    items
+        .iter()
+        .take(MAX_LISTED)
+        .fold(String::new(), |mut out, i| {
+            let _ = write!(out, "\n- {}", line(i, f));
+            out
+        })
 }
 
 /// The key that says a source's items were seen once.
@@ -369,14 +458,154 @@ pub fn week_plan(f: &Facts<'_>, r: &Rules) -> Vec<Action> {
     })]
 }
 
+/// Whether an item is the student's own work: not a reminder or a memory.
+fn is_work(tool: &str) -> bool {
+    tool != REMIND && tool != REMEMBER
+}
+
+/// A check in on one big item a few hours after it was due, in the daytime.
+pub fn after_due(f: &Facts<'_>, r: &Rules) -> Vec<Action> {
+    if !(10..21).contains(&f.local().hour()) {
+        return Vec::new();
+    }
+    let from = f.now - Duration::hours(r.after_due_hours);
+    let until = f.now - Duration::hours(1);
+    f.items
+        .iter()
+        .filter(|(tool, i)| {
+            is_work(tool)
+                && i.at > from
+                && i.at <= until
+                && is_big(&i.title, &r.big_work)
+                && !f.was_sent(&item_key("after", tool, i))
+        })
+        .take(1)
+        .filter_map(|(tool, i)| {
+            let key = item_key("after", tool, i);
+            let text = pick(&r.after_due_lines, &key)?.replace("{title}", &i.title);
+            Some(Action::Send(Nudge {
+                kind: NudgeKind::AfterDue,
+                keys: vec![key],
+                text,
+            }))
+        })
+        .collect()
+}
+
+/// The exams due in the next 7 days, soonest first.
+fn exams<'a>(f: &'a Facts<'_>, r: &Rules) -> Vec<&'a UpcomingItem> {
+    f.within(7 * 24)
+        .filter(|(tool, i)| is_work(tool) && is_big(&i.title, &r.exam_words))
+        .map(|(_, i)| i)
+        .collect()
+}
+
+/// Whether the coming 7 days hold an exam week.
+pub fn exam_week_on(f: &Facts<'_>, r: &Rules) -> bool {
+    r.exam_week_min > 0 && exams(f, r).len() >= r.exam_week_min
+}
+
+/// One nudge a week when several exams are close: the list and an offer to plan.
+pub fn exam_week(f: &Facts<'_>, r: &Rules) -> Vec<Action> {
+    let local = f.local();
+    let key = week_key("exams", local.date_naive());
+    if !(9..20).contains(&local.hour()) || f.was_sent(&key) || !exam_week_on(f, r) {
+        return Vec::new();
+    }
+    let list = exams(f, r);
+    let Some(line) = pick(&r.exam_week_lines, &key) else {
+        return Vec::new();
+    };
+    let text = line
+        .replace("{count}", &list.len().to_string())
+        .replace("{list}", &listed(&list, f));
+    vec![Action::Send(Nudge {
+        kind: NudgeKind::ExamWeek,
+        keys: vec![key],
+        text,
+    })]
+}
+
+/// Friday afternoon: what was due since Monday, as something done.
+pub fn wins(f: &Facts<'_>, r: &Rules) -> Vec<Action> {
+    let local = f.local();
+    let key = week_key("wins", local.date_naive());
+    if local.weekday() != Weekday::Fri || local.hour() < r.wins_hour || f.was_sent(&key) {
+        return Vec::new();
+    }
+    let monday =
+        local.date_naive() - Duration::days(i64::from(local.weekday().num_days_from_monday()));
+    let done: Vec<&UpcomingItem> = f
+        .items
+        .iter()
+        .filter(|(tool, i)| {
+            is_work(tool) && i.at <= f.now && i.at.with_timezone(&f.offset).date_naive() >= monday
+        })
+        .map(|(_, i)| i)
+        .collect();
+    if r.wins_min == 0 || done.len() < r.wins_min {
+        return Vec::new();
+    }
+    let Some(line) = pick(&r.wins_lines, &key) else {
+        return Vec::new();
+    };
+    let names = done
+        .iter()
+        .take(MAX_LISTED)
+        .fold(String::new(), |mut out, i| {
+            let _ = write!(out, "\n- {}", i.title);
+            out
+        });
+    let text = line
+        .replace("{count}", &done.len().to_string())
+        .replace("{list}", &names);
+    vec![Action::Send(Nudge {
+        kind: NudgeKind::Wins,
+        keys: vec![key],
+        text,
+    })]
+}
+
+/// In a student's first tips_days, one tip a day that was not sent before.
+pub fn tips(f: &Facts<'_>, r: &Rules) -> Vec<Action> {
+    let Some(first) = f.first_seen else {
+        return Vec::new();
+    };
+    let local = f.local();
+    let day = day_key("tipday", local.date_naive());
+    if f.now - first > Duration::days(r.tips_days)
+        || !(r.tip_hour..20).contains(&local.hour())
+        || f.was_sent(&day)
+    {
+        return Vec::new();
+    }
+    r.tips
+        .iter()
+        .enumerate()
+        .find(|(i, _)| !f.was_sent(&tip_key(*i)))
+        .map(|(i, tip)| {
+            Action::Send(Nudge {
+                kind: NudgeKind::Tips,
+                keys: vec![day.clone(), tip_key(i)],
+                text: tip.clone(),
+            })
+        })
+        .into_iter()
+        .collect()
+}
+
 /// Every rule in the order nudges are worth sending: the most urgent first.
 pub fn all(f: &Facts<'_>, r: &Rules) -> Vec<Action> {
     let mut out = Vec::new();
     out.extend(due_soon(f, r));
     out.extend(new_items(f, r));
+    out.extend(exam_week(f, r));
     out.extend(start_early(f, r));
+    out.extend(after_due(f, r));
     out.extend(follow_up(f, r));
     out.extend(brief(f, r));
     out.extend(week_plan(f, r));
+    out.extend(wins(f, r));
+    out.extend(tips(f, r));
     out
 }

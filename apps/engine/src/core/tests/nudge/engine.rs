@@ -88,6 +88,7 @@ fn settings(cap: usize) -> Settings {
             new_item_days: 21,
             follow_up_days: 3,
             follow_up_max_days: 10,
+            ..Rules::default()
         },
         active_days: 30,
         daily_cap: cap,
@@ -108,6 +109,10 @@ fn settings(cap: usize) -> Settings {
         event_prompt: "events {nothing}".into(),
         calendar_prompt: "calendar {already} {nothing}".into(),
         study_prompt: "study {item} {due} {nothing}".into(),
+        // 0 never runs the openings check.
+        opportunity_weekday: 0,
+        opportunity_hour: 0,
+        opportunity_prompt: "openings {already} {nothing}".into(),
     }
 }
 

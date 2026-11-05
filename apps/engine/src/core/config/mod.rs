@@ -484,12 +484,20 @@ fn validate_nudges(n: &Nudges) -> Result<(), ConfigError> {
         n.event_hour,
         n.study_hour,
         n.calendar_hour,
+        n.opportunity_hour,
+        n.wins_hour,
+        n.tip_hour,
     ];
     if hours.iter().any(|h| *h > 23) {
         return invalid("every hour must be 0 to 23");
     }
-    if !(1..=7).contains(&n.calendar_weekday) {
-        return invalid("calendar_weekday must be 1 for Monday to 7 for Sunday");
+    if !(1..=7).contains(&n.calendar_weekday) || !(1..=7).contains(&n.opportunity_weekday) {
+        return invalid(
+            "calendar_weekday and opportunity_weekday must be 1 for Monday to 7 for Sunday",
+        );
+    }
+    if n.after_due_hours < 2 || n.tips_days < 1 {
+        return invalid("after_due_hours must be at least 2 and tips_days at least 1");
     }
     if n.brief_days < 1 || n.due_soon_hours < 1 || n.start_early_days < 1 || n.new_item_days < 1 {
         return invalid(

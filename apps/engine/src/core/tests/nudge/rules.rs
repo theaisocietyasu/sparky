@@ -45,6 +45,7 @@ fn rules() -> Rules {
         new_item_days: 21,
         follow_up_days: 3,
         follow_up_max_days: 10,
+        ..Rules::default()
     }
 }
 
@@ -60,6 +61,7 @@ fn facts<'a>(
         items,
         memories,
         sent,
+        first_seen: None,
     }
 }
 
@@ -267,4 +269,114 @@ fn the_sunday_plan_lists_the_week_by_day() {
         0,
         "Monday"
     );
+}
+
+#[test]
+fn a_big_item_gets_one_check_in_a_few_hours_after_it_was_due() {
+    let r = Rules {
+        after_due_lines: vec!["How did {title} go?".into(), "{title} is done.".into()],
+        ..rules()
+    };
+    let items = [(CANVAS_TOOL, item("Midterm exam", at(5, 10)))];
+    let mut sent = HashSet::new();
+    let said = rules::after_due(&facts(at(5, 14), &items, &[], &sent), &r);
+    assert_eq!(sent_kinds(&said), vec![NudgeKind::AfterDue]);
+    assert!(texts(&said)[0].contains("Midterm exam"));
+    // Not before an hour has passed, not at night, and not twice.
+    assert_eq!(
+        rules::after_due(
+            &facts(at(5, 10) + Duration::minutes(30), &items, &[], &sent),
+            &r
+        )
+        .len(),
+        0
+    );
+    assert_eq!(
+        rules::after_due(&facts(at(5, 22), &items, &[], &sent), &r).len(),
+        0
+    );
+    sent.insert(item_key("after", CANVAS_TOOL, &items[0].1));
+    assert_eq!(
+        rules::after_due(&facts(at(5, 14), &items, &[], &sent), &r).len(),
+        0
+    );
+    let small = [(CANVAS_TOOL, item("Reading quiz 3", at(5, 10)))];
+    assert_eq!(
+        rules::after_due(&facts(at(5, 14), &small, &[], &HashSet::new()), &r).len(),
+        0
+    );
+}
+
+#[test]
+fn two_exams_in_a_week_make_an_exam_week_and_one_does_not() {
+    let r = rules();
+    let sent = HashSet::new();
+    let one = [(CANVAS_TOOL, item("Midterm", at(9, 9)))];
+    assert!(!rules::exam_week_on(
+        &facts(at(5, 12), &one, &[], &sent),
+        &r
+    ));
+    let two = [
+        (CANVAS_TOOL, item("Midterm", at(9, 9))),
+        (CANVAS_TOOL, item("Quiz 4", at(10, 9))),
+    ];
+    let f = facts(at(5, 12), &two, &[], &sent);
+    assert!(rules::exam_week_on(&f, &r));
+    let said = rules::exam_week(&f, &r);
+    assert_eq!(sent_kinds(&said), vec![NudgeKind::ExamWeek]);
+    assert!(texts(&said)[0].contains("2 coming up"));
+    assert!(texts(&said)[0].contains("- Quiz 4"));
+}
+
+#[test]
+fn friday_wins_list_what_was_due_since_monday() {
+    let r = rules();
+    let sent = HashSet::new();
+    // Friday November 6, 2026, with two items due Tuesday and Thursday and one last week.
+    let items = [
+        (CANVAS_TOOL, item("Lab 5", at(3, 23))),
+        (CANVAS_TOOL, item("Essay draft", at(5, 17))),
+        (CANVAS_TOOL, item("Old lab", at(1, 9))),
+    ];
+    let said = rules::wins(&facts(at(6, 16), &items, &[], &sent), &r);
+    assert_eq!(sent_kinds(&said), vec![NudgeKind::Wins]);
+    let text = &texts(&said)[0];
+    assert!(text.contains("2 things"), "{text}");
+    assert!(text.contains("- Essay draft") && !text.contains("Old lab"));
+    assert_eq!(
+        rules::wins(&facts(at(6, 10), &items, &[], &sent), &r).len(),
+        0
+    );
+    assert_eq!(
+        rules::wins(&facts(at(5, 16), &items, &[], &sent), &r).len(),
+        0
+    );
+}
+
+#[test]
+fn a_new_student_gets_one_tip_a_day_each_once() {
+    let r = Rules {
+        tips: vec!["first".into(), "second".into()],
+        ..rules()
+    };
+    let mut sent = HashSet::new();
+    let mut f = facts(at(5, 12), &[], &[], &sent);
+    f.first_seen = Some(at(4, 9));
+    let said = rules::tips(&f, &r);
+    assert_eq!(texts(&said), vec!["first".to_owned()]);
+    sent.insert(day_key(
+        "tipday",
+        at(5, 12).with_timezone(&phoenix()).date_naive(),
+    ));
+    sent.insert("tip:0".into());
+    let mut same_day = facts(at(5, 13), &[], &[], &sent);
+    same_day.first_seen = Some(at(4, 9));
+    assert_eq!(rules::tips(&same_day, &r).len(), 0);
+    let mut next = facts(at(6, 12), &[], &[], &sent);
+    next.first_seen = Some(at(4, 9));
+    assert_eq!(texts(&rules::tips(&next, &r)), vec!["second".to_owned()]);
+    let none = HashSet::new();
+    let mut late = facts(at(28, 12), &[], &[], &none);
+    late.first_seen = Some(at(4, 9));
+    assert_eq!(rules::tips(&late, &r).len(), 0);
 }

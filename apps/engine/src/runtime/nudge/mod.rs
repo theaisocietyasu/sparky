@@ -52,6 +52,12 @@ pub struct Settings {
     pub calendar_prompt: String,
     /// Instruction of the late study check.
     pub study_prompt: String,
+    /// Local weekday of the openings check, 1 for Monday. 0 never runs it.
+    pub opportunity_weekday: u32,
+    /// Local hour the openings check runs from.
+    pub opportunity_hour: u32,
+    /// Instruction of the openings check.
+    pub opportunity_prompt: String,
 }
 
 /// What the loop reads and writes.
@@ -143,6 +149,10 @@ impl Nudger {
         let ctx = self.context(who);
         let items = self.items(&ctx, now).await;
         let memories = self.memories(&ctx).await;
+        let first_seen = self.store.first_seen(who).await.unwrap_or_else(|error| {
+            tracing::warn!(%error, "could not read when a student first talked");
+            None
+        });
         let empty = HashSet::new();
         let probe = Facts {
             now,
@@ -150,6 +160,7 @@ impl Nudger {
             items: &items,
             memories: &memories,
             sent: &empty,
+            first_seen,
         };
         let mut keys = rules::candidate_keys(&probe, &s.rules);
         let asks = self.asks(&probe);
@@ -208,7 +219,7 @@ impl Nudger {
         ctx
     }
 
-    /// Dated items from every source, from an hour ago to the furthest any rule looks.
+    /// Dated items from every source, from the start of the week before to the furthest any rule looks.
     async fn items(
         &self,
         ctx: &RequestContext,
@@ -219,7 +230,7 @@ impl Nudger {
             .brief_days
             .max(r.new_item_days)
             .max(r.start_early_days + 1);
-        let (from, until) = (now - Duration::hours(1), now + Duration::days(days));
+        let (from, until) = (now - Duration::days(7), now + Duration::days(days));
         let mut out = Vec::new();
         for source in &self.sources {
             match source.upcoming(ctx, from, until).await {
@@ -271,7 +282,19 @@ impl Nudger {
             .memories
             .iter()
             .any(|m| matches!(m.kind, MemoryKind::Fact | MemoryKind::Preference));
-        if knows_them && (s.event_hour..20).contains(&hour) {
+        let busy = rules::exam_week_on(f, &s.rules);
+        if knows_them
+            && !busy
+            && local.weekday().number_from_monday() == s.opportunity_weekday
+            && (s.opportunity_hour..20).contains(&hour)
+        {
+            out.push(Ask {
+                kind: NudgeKind::Opportunity,
+                key: week_key("opportunity", today),
+                instruction: s.opportunity_prompt.replace("{nothing}", &s.nothing),
+            });
+        }
+        if knows_them && !busy && (s.event_hour..20).contains(&hour) {
             out.push(Ask {
                 kind: NudgeKind::Event,
                 key: day_key("event", today),
