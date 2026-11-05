@@ -5,6 +5,7 @@ import Hero from "@/components/site/Hero";
 import HowItWorks from "@/components/site/HowItWorks";
 import InAction from "@/components/site/InAction";
 import Nav from "@/components/site/Nav";
+import OnTheWeb from "@/components/site/OnTheWeb";
 import OpenSource from "@/components/site/OpenSource";
 import Sources from "@/components/site/Sources";
 import { useSmoothScroll } from "@/components/site/motion";
@@ -20,6 +21,7 @@ const Home = () => {
         <Hero />
         <Crossing />
         <InAction />
+        <OnTheWeb />
         <Crossing flip />
         <Sources />
         <Crossing />

@@ -1,5 +1,6 @@
 import GithubMark from "./GithubMark";
-import { REPO, ROADMAP } from "./content";
+import { Link } from "react-router-dom";
+import { CHAT, REPO, ROADMAP } from "./content";
 
 /** Bottom line: who made it, what it is not, and where the source is. */
 const Footer = () => (
@@ -11,6 +12,9 @@ const Footer = () => (
         <span>Unofficial student project. Not affiliated with Arizona State University.</span>
       </div>
       <div className="flex items-center gap-6">
+        <Link to={CHAT} className="transition-colors hover:text-shu">
+          Chat
+        </Link>
         <a
           href={ROADMAP}
           target="_blank"

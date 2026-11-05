@@ -14,16 +14,14 @@ describe("website routes", () => {
 
     const main = within(screen.getByRole("main"));
     expect(main.getByRole("heading", { level: 1 })).toHaveTextContent(/your university\s*copilot/i);
-    expect(main.getByRole("link", { name: /run sparky/i })).toHaveAttribute(
-      "href",
-      `${REPO}#run-it`,
-    );
+    expect(main.getByRole("link", { name: /chat with sparky/i })).toHaveAttribute("href", "/chat");
+    expect(main.getByRole("link", { name: /run your own/i })).toHaveAttribute("href", `${REPO}#run-it`);
   });
 
   it("shows every section of the product", () => {
     render(<App />);
 
-    for (const label of [/sparky in action/i, /what students ask/i, /how it works/i, /open source/i]) {
+    for (const label of [/sparky in action/i, /web chat/i, /what students ask/i, /how it works/i, /open source/i]) {
       expect(screen.getByRole("region", { name: label })).toBeInTheDocument();
     }
   });
@@ -55,7 +53,7 @@ describe("website routes", () => {
     render(<App />);
 
     const nav = within(screen.getByRole("navigation", { name: /primary/i }));
-    for (const id of ["in-action", "sources", "how-it-works", "open-source"]) {
+    for (const id of ["in-action", "web-chat", "sources", "how-it-works", "open-source"]) {
       expect(document.getElementById(id)).not.toBeNull();
       expect(nav.getByRole("link", { name: new RegExp(id.replace(/-/g, " "), "i") })).toHaveAttribute(
         "href",
@@ -63,6 +61,7 @@ describe("website routes", () => {
       );
     }
     expect(nav.getByRole("link", { name: /github/i })).toHaveAttribute("href", REPO);
+    expect(nav.getByRole("link", { name: /open chat/i })).toHaveAttribute("href", "/chat");
   });
 
   it("serves a not found page for unknown paths, including the retired legacy site", () => {

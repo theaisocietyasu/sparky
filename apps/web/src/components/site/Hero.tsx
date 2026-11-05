@@ -1,11 +1,11 @@
 import { ArrowRight } from "lucide-react";
 import Embers from "@/components/dragon/Embers";
-import GithubMark from "./GithubMark";
-import { REPO, RUN } from "./content";
+import { Link } from "react-router-dom";
+import { CHAT, RUN } from "./content";
 
 const WORDS = ["Your", "university", "copilot."];
 
-/** Opening screen: the promise, the two ways in, and the dragon coiled beside them. */
+/** Opening screen: the promise, the web chat and self-hosting, and the dragon coiled beside them. */
 const Hero = () => (
   <section aria-label="Introduction" className="relative isolate min-h-[100svh] overflow-hidden">
     <Embers className="absolute inset-0 -z-10 h-full w-full" />
@@ -43,30 +43,27 @@ const Hero = () => (
           style={{ animationDelay: "0.3s" }}
         >
           Ask about a course, a scholarship, tonight&rsquo;s library hours or the next shuttle.
-          Sparky reads the real ASU pages and answers with the source.
+          Sparky reads the real ASU pages and answers with the source, in Discord or in your browser.
         </p>
 
         <div
           className="mt-10 flex flex-wrap items-center gap-3 motion-safe:animate-rise"
           style={{ animationDelay: "0.4s" }}
         >
+          <Link
+            to={CHAT}
+            className="group inline-flex h-13 items-center gap-2 rounded-full bg-shu px-8 text-sm font-semibold text-paper shadow-[0_0_0_2px_var(--color-paper),0_0_0_4px_var(--color-kin),0_14px_30px_-10px_rgba(120,28,53,0.6)] transition-transform hover:-translate-y-0.5"
+          >
+            Chat with Sparky
+            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
+          </Link>
           <a
             href={RUN}
             target="_blank"
             rel="noreferrer"
-            className="group inline-flex h-13 items-center gap-2 rounded-full bg-shu px-8 text-sm font-semibold text-paper shadow-[0_0_0_2px_var(--color-paper),0_0_0_4px_var(--color-kin),0_14px_30px_-10px_rgba(120,28,53,0.6)] transition-transform hover:-translate-y-0.5"
-          >
-            Run Sparky
-            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
-          </a>
-          <a
-            href={REPO}
-            target="_blank"
-            rel="noreferrer"
             className="inline-flex h-13 items-center gap-2 rounded-full border-2 border-ink px-7 text-sm font-semibold transition-colors hover:bg-ink hover:text-paper"
           >
-            <GithubMark className="h-4 w-4" />
-            GitHub
+            Run your own
           </a>
         </div>
       </div>

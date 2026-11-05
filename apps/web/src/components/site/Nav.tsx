@@ -1,9 +1,10 @@
 import { Link } from "react-router-dom";
 import GithubMark from "./GithubMark";
-import { REPO } from "./content";
+import { CHAT, REPO } from "./content";
 
 const LINKS = [
   { href: "#in-action", label: "In action" },
+  { href: "#web-chat", label: "Web chat" },
   { href: "#sources", label: "Sources" },
   { href: "#how-it-works", label: "How it works" },
   { href: "#open-source", label: "Open source" },
@@ -21,7 +22,7 @@ const Nav = () => (
         <span className="font-serif text-lg font-semibold tracking-tight">SparkyAI</span>
       </Link>
 
-      <div className="flex items-center gap-7">
+      <div className="flex items-center gap-3 md:gap-7">
         <ul className="hidden items-center gap-7 md:flex">
           {LINKS.map((link) => (
             <li key={link.href}>
@@ -34,6 +35,12 @@ const Nav = () => (
             </li>
           ))}
         </ul>
+        <Link
+          to={CHAT}
+          className="inline-flex h-9 items-center rounded-full bg-shu px-4 text-sm font-semibold text-paper transition-colors hover:bg-shu-deep"
+        >
+          Open chat
+        </Link>
         <a
           href={REPO}
           target="_blank"
