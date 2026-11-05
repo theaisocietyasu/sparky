@@ -14,6 +14,7 @@ use crate::core::types::conversation::{
 use crate::routes::auth::{Caller, caller, too_many};
 use crate::routes::chat::ChatState;
 use crate::routes::failure::Failure;
+use crate::routes::home::welcome;
 use crate::routes::session::WEB_CHANNEL;
 
 /// Ends every open conversation of the caller in the channel, any visibility. Next turn starts new.
@@ -152,10 +153,14 @@ pub async fn home(State(state): State<ChatState>, headers: HeaderMap) -> Respons
     let Some(store) = &state.conversations else {
         return StatusCode::NOT_IMPLEMENTED.into_response();
     };
-    match store.ensure(&ctx, WEB_CHANNEL).await {
-        Ok(()) => Json(Home { id }).into_response(),
-        Err(e) => unavailable(&ctx, &e),
+    if let Err(e) = store.ensure(&ctx, WEB_CHANNEL).await {
+        return unavailable(&ctx, &e);
     }
+    // The welcome is written once; a failure leaves home empty and is tried again next time.
+    if let Err(error) = welcome(store.as_ref(), &ctx, &state.home.welcome).await {
+        tracing::warn!(%error, "could not write the home welcome");
+    }
+    Json(Home { id }).into_response()
 }
 
 /// GET /web/conversations/{id}: the questions and answers of one of the student's conversations.

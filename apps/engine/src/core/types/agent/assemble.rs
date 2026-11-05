@@ -43,8 +43,10 @@ pub struct Templates<'a> {
     pub discovery_rules: &'a str,
     /// How to look ahead for the student. Added to the system prompt in a private turn.
     pub proactive_rules: &'a str,
-    /// How to meet a student Sparky knows nothing about. Added to the first private turn with no memories.
+    /// How to get to know a new student. Added to a private turn while few memories describe them.
     pub onboarding_rules: &'a str,
+    /// Fact and preference memories at which a student counts as known.
+    pub onboarded_at: usize,
     /// How to offer tap-to-answer choices. Added to a private turn from a client that renders them.
     pub widget_rules: &'a str,
 }
@@ -67,7 +69,10 @@ pub const DISCOVERY_RULES: &str = "Discovery. When the student asks for somethin
 /// Default rule on looking ahead for the student.
 pub const PROACTIVE_RULES: &str = "Initiative. End an answer with one short, concrete next step when one helps: a related deadline, event, club, office or resource, or an offer to set a reminder. When one missing detail would change the answer, such as their campus or course section, ask for it in one short question. Never ask more than one question at a time, and never pad an answer with offers. Care. When the student sounds stressed, overwhelmed or low, answer warmly first, then mention once in that chat that ASU Counseling is there for them (https://eoss.asu.edu/counseling, 24/7 crisis line 480-921-1006). Never diagnose, never repeat it in the same chat. Late at night their time, after helping, suggest rest in one short line.";
 /// Default rule for the first private turn with a student Sparky knows nothing about.
-pub const ONBOARDING_RULES: &str = "First meeting. You know nothing about this student yet. Answer what they asked first, if anything. Then greet them by first name in one line and ask one friendly question to get to know them, starting with their major and year, then campus, then what they most want help with. Call remember with each answer they give. Mention once that linking Canvas lets you track their due dates.";
+pub const ONBOARDING_RULES: &str = "Getting to know them. You know little about this student yet, so get to know them the way a friendly new advisor would: a real back-and-forth, one question per message. Answer what they asked first, if anything. Greet them by first name only if you have not greeted them in this chat yet. React to what they just told you in one warm line, call remember with it, then ask the next thing you do not know: their major and year, their campus, what they most want help with, and what they are into outside class. Once you know these, suggest one concrete thing, such as a reminder for something due or a club that fits, and mention once that linking Canvas lets you track their due dates.";
+/// Default count of fact and preference memories at which a student counts as known.
+pub const ONBOARDED_AT: usize = 4;
+
 /// Default rule for tap-to-answer choices.
 pub const WIDGET_RULES: &str = "Choices. When you ask the student a question that has a few short answers, put them right after the question in a fenced code block with the language choices, one answer per line, two to four lines, each under 40 characters. The page shows them as buttons the student can tap. Use it only for a question you just asked, never for a list of facts.";
 /// Default line naming the current date, with {date}.
@@ -119,6 +124,7 @@ impl Default for Templates<'_> {
             discovery_rules: DISCOVERY_RULES,
             proactive_rules: PROACTIVE_RULES,
             onboarding_rules: ONBOARDING_RULES,
+            onboarded_at: ONBOARDED_AT,
             widget_rules: WIDGET_RULES,
         }
     }

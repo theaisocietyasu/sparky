@@ -117,3 +117,44 @@ fn id_text<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Option<S
         Id::Number(number) => number.to_string(),
     }))
 }
+
+/// Default first message of a new student's home chat.
+pub const HOME_WELCOME: &str = "Hey, I'm Sparky, your ASU sidekick. I keep an eye on what's due, find things on campus \
+     worth your time, and check in before anything sneaks up on you.\n\nI'd love to get to know \
+     you first so I can actually help. What are you studying, and what year are you in?";
+
+/// Default instructions of the choice between home and a new thread.
+pub const HOME_ROUTE_PROMPT: &str = "You sort one message a student sent in their home chat with Sparky, an ASU assistant. \
+     Answer THREAD when it opens a new topic worth its own conversation: a question about a class, \
+     a deadline, a plan, a campus service, a job, anything that needs looking up or some back and \
+     forth. Answer HOME when it is a greeting, small talk, thanks, an answer to what Sparky just \
+     asked (such as their major or interests), or a short reply to Sparky's last message. Answer \
+     with the one word THREAD or HOME.";
+
+/// The home chat: the first message a new student gets, and new topics moved into threads.
+#[derive(Debug, Deserialize)]
+#[serde(default)]
+pub struct Home {
+    /// Sparky's first message in an empty home chat. Empty sends none.
+    pub welcome: String,
+    /// Move a message that opens a new topic in home into a thread of its own.
+    pub threads: bool,
+    /// Instructions of the choice between home and a new thread.
+    pub route_prompt: String,
+    /// Completion budget of that choice.
+    pub route_max_tokens: u32,
+    /// Longest the choice may take before the message stays in home.
+    pub route_timeout_secs: u64,
+}
+
+impl Default for Home {
+    fn default() -> Self {
+        Self {
+            welcome: HOME_WELCOME.into(),
+            threads: true,
+            route_prompt: HOME_ROUTE_PROMPT.into(),
+            route_max_tokens: 8,
+            route_timeout_secs: 8,
+        }
+    }
+}

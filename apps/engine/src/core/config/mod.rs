@@ -124,6 +124,9 @@ pub struct Config {
     /// Discord sign-in for the web page.
     #[serde(default)]
     pub web: Web,
+    /// The home chat of the web page.
+    #[serde(default)]
+    pub home: Home,
     /// The admin surface.
     #[serde(default)]
     pub admin: Admin,
@@ -240,6 +243,7 @@ impl Config {
         validate_platform(self)?;
         validate_store(&self.store, &self.memory)?;
         validate_web(self)?;
+        validate_home(&self.home)?;
         if self.admin.max_instructions_chars == 0
             || self.admin.history_limit == 0
             || self.admin.traces_limit == 0
@@ -511,6 +515,23 @@ fn validate_nudges(n: &Nudges) -> Result<(), ConfigError> {
     }
     if n.nothing.trim().is_empty() {
         return invalid("nothing is empty");
+    }
+    Ok(())
+}
+
+fn validate_home(home: &Home) -> Result<(), ConfigError> {
+    if !home.threads {
+        return Ok(());
+    }
+    if home.route_prompt.trim().is_empty() {
+        return Err(ConfigError::Invalid(
+            "home.route_prompt is empty; give the choice its instructions or set home.threads = false".into(),
+        ));
+    }
+    if home.route_max_tokens == 0 || home.route_timeout_secs == 0 {
+        return Err(ConfigError::Invalid(
+            "home.route_max_tokens and home.route_timeout_secs must be at least 1".into(),
+        ));
     }
     Ok(())
 }

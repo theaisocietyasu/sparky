@@ -1,4 +1,4 @@
-import { ArrowLeft, FileText, RotateCcw } from "lucide-react";
+import { ArrowLeft, ChevronRight, FileText, MessageSquareText, RotateCcw } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
@@ -14,10 +14,20 @@ import Running from "../components/chat/Running";
 import Sparky from "../components/sparky/Sparky";
 
 /**
- * One exchange. A message Sparky sent on its own has no question. position is where a stored answer sits,
- * the one a thread names. reveal is where the answer starts typing out, set only for an answer that arrived live.
+ * One exchange. A message Sparky sent on its own has no question. position is where a stored answer sits and
+ * asked where the stored question sits, the places a thread names. reveal is where the answer starts typing out,
+ * set only for an answer that arrived live.
  */
-type Turn = { id: number; question: string; files?: string[]; answer: Answer | null; error: string | null; reveal?: number; position?: number };
+type Turn = {
+  id: number;
+  question: string;
+  files?: string[];
+  answer: Answer | null;
+  error: string | null;
+  reveal?: number;
+  position?: number;
+  asked?: number;
+};
 
 const EVERY_MS = 60_000;
 
@@ -60,7 +70,7 @@ const exchanges = (id: string, stored: ChatTurn[], from = 0): Turn[] => {
   const out: Turn[] = [];
   for (const m of stored) {
     if (m.role === "user") {
-      out.push({ id: from + out.length + 1, question: m.text, answer: null, error: null });
+      out.push({ id: from + out.length + 1, question: m.text, answer: null, error: null, asked: m.position });
       continue;
     }
     const answer: Answer = { request_id: "", conversation_id: id, text: m.text, status: "answered", notice: m.notice };
@@ -78,6 +88,19 @@ const newest = (stored: ChatTurn[]) => stored.reduce((n, m) => Math.max(n, m.pos
  * /chat is home: the one chat Sparky's own messages land in. /chat/:id is a thread or an older chat, and
  * /chat/new starts a thread off the home message the page was sent with.
  */
+/** The link under a home question to the thread it was answered in. */
+const MovedTo = ({ thread }: { thread?: ChatSummary }) =>
+  thread ? (
+    <Link
+      to={`/chat/${thread.id}`}
+      className="glass inline-flex h-8 max-w-full items-center gap-1.5 rounded-full px-3 text-xs text-dim transition-colors hover:text-fg"
+    >
+      <MessageSquareText className="size-3.5 shrink-0" />
+      <span className="truncate">Thread: {thread.title}</span>
+      <ChevronRight className="size-3.5 shrink-0" />
+    </Link>
+  ) : null;
+
 const Chat = () => {
   const { me } = useMe();
   const { id: opened } = useParams();
@@ -202,8 +225,10 @@ const Chat = () => {
 
   const settle = (id: number, answer: Answer | null, error: string | null, reveal?: number) => {
     if (answer && answer.conversation_id !== conversation.current) {
+      // A new topic asked in home comes back in a thread of its own; Back returns to home.
+      const fromHome = conversation.current === home;
       conversation.current = answer.conversation_id;
-      navigate(`/chat/${answer.conversation_id}`, { replace: true });
+      navigate(`/chat/${answer.conversation_id}`, { replace: !fromHome });
       setChats((v) => v + 1);
     }
     setTurns((all) => all.map((t) => (t.id === id ? { ...t, answer, error, reveal } : t)));
@@ -271,6 +296,10 @@ const Chat = () => {
       onStart: () => navigate("/chat/new", { state: { parent: { conversation_id: home, position }, quote } satisfies ThreadStart }),
     };
   };
+
+  /** The thread a home question was moved into, if any. */
+  const threadOfQuestion = (t: Turn) =>
+    atHome && t.asked !== undefined ? threads.find((c) => c.parent?.position === t.asked) : undefined;
 
   const waiting = target === undefined;
   const loading = waiting || (Boolean(target) && target !== shown && turns.length === 0);
@@ -379,6 +408,7 @@ const Chat = () => {
                       </ul>
                     )}
                     {t.question && <p className="whitespace-pre-wrap rounded-3xl bg-shu px-4 py-2.5 text-[15px] leading-6 text-white">{t.question}</p>}
+                    <MovedTo thread={threadOfQuestion(t)} />
                   </div>
                   {t.answer && (
                     <Reply

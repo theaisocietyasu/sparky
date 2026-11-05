@@ -42,7 +42,7 @@ use crate::runtime::model::limit::Limited;
 use crate::runtime::model::rig_openai::{self, RigChat, RigEmbedder};
 use crate::runtime::tools::files::HttpFiles;
 
-use self::agent::{agent_config, compactor, guardrail, trace_sink};
+use self::agent::{agent_config, compactor, guardrail, home_rules, trace_sink};
 use self::boot::{fits_the_prompt, fits_the_slot};
 use self::http::http_router;
 use self::prompt::SYSTEM_PROMPT;
@@ -138,6 +138,7 @@ pub async fn serve(cfg: Config) -> anyhow::Result<()> {
 
     let agent_cfg = agent_config(&cfg);
 
+    let home = home_rules(&cfg, &model);
     let deps = AgentDeps {
         compactor: compactor(&cfg, &model),
         guardrail: guardrail(&cfg, &tool_names),
@@ -167,7 +168,7 @@ pub async fn serve(cfg: Config) -> anyhow::Result<()> {
     }
 
     background::start(&cfg, &agent, &stores, upcoming)?;
-    let router = http_router(&cfg, agent, stores, sandbox)?;
+    let router = http_router(&cfg, agent, stores, sandbox, home)?;
 
     let listener = tokio::net::TcpListener::bind(&cfg.app.http_addr).await?;
     tracing::info!(addr = %cfg.app.http_addr, "listening");

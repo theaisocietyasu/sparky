@@ -7,6 +7,16 @@ use crate::core::types::conversation::message::{Message, Role};
 use crate::core::types::memory::MemoryKind;
 use crate::core::types::model::tokens::estimate;
 
+/// Whether fewer fact and preference memories than onboarded_at describe the student.
+fn getting_to_know(s: &Sections<'_>) -> bool {
+    let known = s
+        .memory
+        .iter()
+        .filter(|m| matches!(m.kind, MemoryKind::Fact | MemoryKind::Preference))
+        .count();
+    known < s.templates.onboarded_at
+}
+
 /// Builds the message list within budget.
 pub fn assemble(ctx: &RequestContext, s: &Sections<'_>, budget: Budget) -> Assembled {
     let mut messages = Vec::new();
@@ -24,9 +34,7 @@ pub fn assemble(ctx: &RequestContext, s: &Sections<'_>, budget: Budget) -> Assem
             .replace("{roles}", &ctx.roles.join(", "))
     };
     let mut system = format!("{}\n\n{role_line}", s.system.trim());
-    // A student with no memories and no earlier turns in this conversation is met for the first time.
-    let first = s.memory.is_empty() && s.history.is_empty();
-    let onboarding = if first {
+    let onboarding = if getting_to_know(s) {
         s.templates.onboarding_rules
     } else {
         ""

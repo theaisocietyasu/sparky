@@ -1,6 +1,6 @@
 # apps/web
 
-Public landing site, plus the web chat (`/chat`, `/chat/:id`), settings (`/settings/:section`: profile, connected accounts, notifications (nudge kinds, quiet hours, reminders), memories, appearance; opened from the profile menu), a home chat where reminders and nudges arrive as Sparky messages with thumbs, threads off any home message, and the admin pages (`/admin`). Vite, React, TypeScript, Tailwind 4. Self-hosted fonts. Runtime dependencies: React, React Router, motion, lenis, lucide-react, and react-markdown with remark-gfm for answers.
+Public landing site, plus the web chat (`/chat`, `/chat/:id`), settings (`/settings/:section`: profile, connected accounts, notifications (nudge kinds, quiet hours, reminders), memories, appearance; opened from the profile menu), a home chat that opens with Sparky's welcome, where reminders and nudges arrive as Sparky messages with thumbs and a new topic you ask moves into a thread linked under your question, threads off any home message, and the admin pages (`/admin`). Vite, React, TypeScript, Tailwind 4. Self-hosted fonts. Runtime dependencies: React, React Router, motion, lenis, lucide-react, and react-markdown with remark-gfm for answers.
 
 ```bash
 just web          # dev server on :5173
