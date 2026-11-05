@@ -147,6 +147,7 @@ pub fn router(states: States, limits: Limits, cors_origins: &[String]) -> Router
     let oauth = Router::new()
         .route("/oauth/{provider}/authorize", post(oauth::authorize))
         .route("/oauth/{provider}/logout", post(oauth::disconnect))
+        .route("/oauth/{provider}/status", get(oauth::status))
         .with_state(oauth_state);
     let canvas = Router::new()
         .route("/canvas/feed", post(canvas::save).get(canvas::status))

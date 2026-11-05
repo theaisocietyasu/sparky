@@ -151,3 +151,19 @@ export const reminders = async (): Promise<Reminder[]> => (await call<{ reminder
 
 /** Cancels one reminder. */
 export const cancelReminder = (id: string) => send("DELETE", `/web/reminders/${encodeURIComponent(id)}`);
+
+/** A calendar account Sparky can read once linked: google or microsoft. */
+export type Provider = "google" | "microsoft";
+
+/** Whether the student has linked an account for a provider. */
+export const accountStatus = async (provider: Provider): Promise<boolean> =>
+  (await call<{ linked: boolean }>("GET", `/oauth/${provider}/status`)).linked;
+
+/** The sign-in page that links an account for a provider. */
+export const accountLink = async (provider: Provider): Promise<string> =>
+  (await call<{ url: string }>("POST", `/oauth/${provider}/authorize`, {})).url;
+
+/** Unlinks the account for a provider. */
+export const unlinkAccount = async (provider: Provider) => {
+  await call<{ removed: boolean }>("POST", `/oauth/${provider}/logout`, {});
+};

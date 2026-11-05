@@ -204,11 +204,25 @@ pub(super) fn sandbox_state(
     }
 }
 
-/// The state the account link routes read: the grant store.
-pub(super) fn oauth_state(cfg: &Config, store: Arc<dyn OAuthStore>) -> OAuthState {
+/// The state the account link routes read: the grant store and the providers whose tool is on.
+pub(super) fn oauth_state(
+    cfg: &Config,
+    store: Arc<dyn OAuthStore>,
+    web: Option<WebAuth>,
+) -> OAuthState {
+    let providers = [
+        ("google", cfg.gcal.enabled),
+        ("microsoft", cfg.outlook.enabled),
+    ]
+    .into_iter()
+    .filter(|(_, on)| *on)
+    .map(|(name, _)| name.to_owned())
+    .collect();
     OAuthState {
         store,
         service_token: cfg.engine.service_token.clone(),
+        web,
+        providers,
     }
 }
 
@@ -283,7 +297,7 @@ pub(super) fn http_router(
         health,
         memories,
         sandbox: sandbox_state(cfg, sandbox),
-        oauth: oauth_state(cfg, stores.oauth_store),
+        oauth: oauth_state(cfg, stores.oauth_store, web.clone()),
         canvas: canvas_state(cfg, stores.canvas, web.clone()),
         notifications: notification_state(cfg, stores.reminders, web.clone()),
         web: web_state(cfg, web)?,
