@@ -87,7 +87,7 @@ pub(super) fn compactor(
 pub(super) fn guardrail(cfg: &Config, tool_names: &[String]) -> Option<Arc<dyn Guardrail>> {
     cfg.guardrail.enabled.then(|| {
         let mut rules = Rules::from(&cfg.guardrail);
-        rules.protect(tool_names.iter().cloned());
+        rules.protect_tools(tool_names);
         Arc::new(RuleGuardrail::new(rules)) as Arc<dyn Guardrail>
     })
 }

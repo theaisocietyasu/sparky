@@ -182,8 +182,8 @@ command_description = "The shell command to run."
 session_description = "Name a session to keep files in the workspace between calls. Reuse the same name to resume it. Results an earlier tool wrote to the workspace name the session they are in."
 
 # The gate every model response passes. denied_phrases block an answer wherever they appear.
-# protected_terms are removed from an answer as whole words; the registered tool names are added
-# to them at boot, so the agent cannot spill a tool name to a student.
+# protected_terms are removed from an answer as whole words; the registered tool names with an
+# underscore are added to them at boot, so the agent cannot spill a tool name to a student.
 [guardrail]
 enabled = true
 denied_phrases = []
