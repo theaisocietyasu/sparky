@@ -117,13 +117,25 @@ fn settings(cap: usize) -> Settings {
 }
 
 fn due_in(hours: i64, title: &str) -> UpcomingItem {
+    due_at(Utc::now() + Duration::hours(hours), title)
+}
+
+fn due_at(at: DateTime<Utc>, title: &str) -> UpcomingItem {
     UpcomingItem {
-        at: Utc::now() + Duration::hours(hours),
+        at,
         all_day: false,
         title: title.into(),
         detail: None,
         url: None,
     }
+}
+
+/// Noon UTC today, inside the hours the study check runs.
+fn noon_today() -> DateTime<Utc> {
+    Utc::now()
+        .date_naive()
+        .and_hms_opt(12, 0, 0)
+        .map_or_else(Utc::now, |t| t.and_utc())
 }
 
 async fn kinds(store: &SqliteStore) -> Vec<String> {
@@ -214,11 +226,17 @@ async fn a_background_none_sends_nothing_and_is_not_asked_again() {
         answer: "NONE".into(),
         runs: Mutex::new(0),
     });
-    let n = nudger(&store, vec![due_in(20, "Essay")], Some(Arc::clone(&bg)), 10);
-    let _ = n.person(&me(), Utc::now()).await;
+    let noon = noon_today();
+    let n = nudger(
+        &store,
+        vec![due_at(noon + Duration::hours(20), "Essay")],
+        Some(Arc::clone(&bg)),
+        10,
+    );
+    let _ = n.person(&me(), noon).await;
     let first = bg.runs.lock().map_or(0, |r| *r);
     assert!(first >= 1, "the study check runs before a deadline");
-    let _ = n.person(&me(), Utc::now()).await;
+    let _ = n.person(&me(), noon).await;
     assert_eq!(
         bg.runs.lock().map_or(0, |r| *r),
         first,
@@ -234,7 +252,13 @@ async fn a_background_answer_is_sent_as_its_kind() {
         answer: "Hayden closes at 10 tonight; Noble is open until 2 AM.".into(),
         runs: Mutex::new(0),
     });
-    let n = nudger(&store, vec![due_in(20, "Essay")], Some(bg), 10);
-    let _ = n.person(&me(), Utc::now()).await;
+    let noon = noon_today();
+    let n = nudger(
+        &store,
+        vec![due_at(noon + Duration::hours(20), "Essay")],
+        Some(bg),
+        10,
+    );
+    let _ = n.person(&me(), noon).await;
     assert!(kinds(&store).await.iter().any(|k| k == "study"));
 }
