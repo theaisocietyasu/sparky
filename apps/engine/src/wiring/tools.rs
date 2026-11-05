@@ -57,7 +57,7 @@ pub(crate) async fn build_tools(
     sandbox: Option<Arc<ContainerSandbox>>,
     oauth_store: Arc<dyn OAuthStore>,
     personal: Personal,
-) -> anyhow::Result<(ToolSet, Vec<String>)> {
+) -> anyhow::Result<(ToolSet, Vec<String>, Vec<Arc<dyn UpcomingSource>>)> {
     let disabled = |name: &str| cfg.tools.disabled.iter().any(|d| d == name);
     let mut tools = ToolSet::new();
     let mut mcp_names = Vec::new();
@@ -142,11 +142,11 @@ pub(crate) async fn build_tools(
         tools = register(tools, built.tools, &disabled, integration);
     }
     sources.retain(|s| !disabled(s.tool()));
-    if let Some(tool) = upcoming(cfg, sources)? {
+    if let Some(tool) = upcoming(cfg, sources.clone())? {
         tools = register(tools, vec![tool], &disabled, "upcoming");
     }
     tracing::info!(tools = ?tools, "tool set");
-    Ok((tools, mcp_names))
+    Ok((tools, mcp_names, sources))
 }
 
 /// The upcoming tool over the sources, when it is on and has at least one source.

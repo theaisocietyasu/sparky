@@ -1,4 +1,4 @@
-//! Local store composition: conversations, memories, pending actions, Canvas feed links and reminders in the SQLite file.
+//! Local store composition: conversations, memories, pending actions, Canvas feed links, reminders and nudges in the SQLite file.
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -59,6 +59,9 @@ pub(super) async fn localize(cfg: &Config, stores: &mut Stores) -> anyhow::Resul
             Duration::from_secs(cfg.reminders.tick_secs),
         ));
         stores.reminders = Some(reminders);
+        if cfg.nudges.enabled {
+            stores.nudges = Some(Arc::new(store.nudges(seal(cfg)?)));
+        }
     }
     stores.confirmations = Arc::new(store.confirmations());
     stores.admin = Some(Arc::new(store.admin()));

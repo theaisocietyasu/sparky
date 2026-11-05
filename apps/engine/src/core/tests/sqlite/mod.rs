@@ -7,6 +7,7 @@ mod confirmation;
 mod conversation;
 mod import;
 mod memory;
+mod nudge;
 mod prune;
 mod reminder;
 mod seal;

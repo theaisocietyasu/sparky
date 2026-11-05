@@ -7,6 +7,7 @@ mod http;
 mod knowledge;
 mod memory;
 mod model;
+mod nudge;
 mod platform;
 mod safety;
 mod sqlite;

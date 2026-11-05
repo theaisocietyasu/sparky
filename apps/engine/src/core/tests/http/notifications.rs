@@ -38,6 +38,12 @@ async fn reminders() -> Arc<dyn ReminderStore> {
 fn state(store: Option<Arc<dyn ReminderStore>>) -> NotificationState {
     NotificationState {
         store,
+        nudges: None,
+        nudge_defaults: crate::core::types::nudge::NudgePrefs {
+            quiet_start: 22,
+            quiet_end: 8,
+            off: Vec::new(),
+        },
         default_tenant: "g".into(),
         list_limit: 10,
         service_token: SecretString::from(TOKEN),
@@ -147,4 +153,62 @@ async fn the_web_routes_refuse_the_bot_and_everything_is_off_without_a_store() {
     assert_eq!(as_bot.status(), StatusCode::FORBIDDEN);
     let off = notifications::list(State(state(None)), student("111")).await;
     assert_eq!(off.status(), StatusCode::SERVICE_UNAVAILABLE);
+}
+
+#[tokio::test]
+async fn not_useful_on_a_nudge_switches_its_kind_off() {
+    use crate::core::traits::nudge::NudgeStore;
+    use crate::core::types::nudge::{Nudge, NudgeFeedback, NudgeKind, NudgePrefs, Person};
+    let options = StoreOptions {
+        path: "sqlite::memory:".into(),
+        max_connections: 1,
+        busy_timeout: Duration::from_secs(1),
+    };
+    let Ok(file) = SqliteStore::open(&options).await else {
+        unreachable!("an in-memory store opens")
+    };
+    let nudges: Arc<dyn NudgeStore> = Arc::new(file.nudges(Seal::new(&[7; 32])));
+    let reminders: Arc<dyn ReminderStore> = Arc::new(file.reminders(
+        Seal::new(&[7; 32]),
+        ReminderLimits {
+            max_per_user: 5,
+            keep_days: 30,
+        },
+    ));
+    let who = Person {
+        tenant: "g".into(),
+        user: "111".into(),
+    };
+    let event = Nudge {
+        kind: NudgeKind::Event,
+        keys: vec!["event:1".into()],
+        text: "Hackathon Friday".into(),
+    };
+    let _ = nudges.send(&who, &event).await;
+    let mut s = state(Some(reminders));
+    s.nudges = Some(Arc::clone(&nudges));
+    let (_, list) = body(notifications::list(State(s.clone()), student("111")).await).await;
+    assert_eq!(list["notifications"][0]["kind"], "event");
+    let Some(id) = list["notifications"][0]["id"].as_str().map(str::to_owned) else {
+        unreachable!("an id")
+    };
+    let answer = notifications::feedback(
+        State(s.clone()),
+        student("111"),
+        Path(id),
+        Json(NudgeFeedback { helpful: false }),
+    )
+    .await;
+    let (status, turned) = body(answer).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(turned["turned_off"], "event");
+    let (_, prefs) = body(notifications::nudge_prefs(State(s.clone()), student("111")).await).await;
+    assert_eq!(prefs["off"][0], "event");
+    let bad = NudgePrefs {
+        quiet_start: 30,
+        quiet_end: 8,
+        off: Vec::new(),
+    };
+    let refused = notifications::set_nudge_prefs(State(s), student("111"), Json(bad)).await;
+    assert_eq!(refused.status(), StatusCode::UNPROCESSABLE_ENTITY);
 }

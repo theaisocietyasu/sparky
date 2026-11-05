@@ -156,6 +156,14 @@ pub fn router(states: States, limits: Limits, cors_origins: &[String]) -> Router
     let notifications = Router::new()
         .route("/web/notifications", get(notifications::list))
         .route("/web/notifications/read", post(notifications::read))
+        .route(
+            "/web/notifications/{id}/feedback",
+            post(notifications::feedback),
+        )
+        .route(
+            "/web/nudges",
+            get(notifications::nudge_prefs).put(notifications::set_nudge_prefs),
+        )
         .route("/web/reminders", get(notifications::reminders))
         .route("/web/reminders/{id}", delete(notifications::cancel))
         .route("/notifications/outgoing", get(notifications::outgoing))

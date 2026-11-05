@@ -9,8 +9,10 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use secrecy::SecretString;
 
+use crate::core::traits::nudge::NudgeStore;
 use crate::core::traits::reminder::ReminderStore;
 use crate::core::types::http::web::Session;
+use crate::core::types::nudge::{NudgeFeedback, NudgeKind, NudgePrefs, Person};
 use crate::core::types::reminder::{NotificationList, OutgoingList, ReminderList, SentRequest};
 use crate::routes::auth::{Caller, authorized, caller};
 use crate::routes::session::WebAuth;
@@ -20,6 +22,10 @@ use crate::routes::session::WebAuth;
 pub struct NotificationState {
     /// Where reminders are kept. None when reminders are off.
     pub store: Option<Arc<dyn ReminderStore>>,
+    /// Where nudges are kept. None when nudges are off.
+    pub nudges: Option<Arc<dyn NudgeStore>>,
+    /// Quiet time for a student who set nothing.
+    pub nudge_defaults: NudgePrefs,
     /// Tenant a web session acts in.
     pub default_tenant: String,
     /// Most notifications a list or one poll returns.
@@ -43,6 +49,19 @@ impl NotificationState {
             }
         };
         Ok((self.store()?, session))
+    }
+
+    /// The nudge store and the student of a web request, or the response that refuses it.
+    fn nudge_caller(&self, headers: &HeaderMap) -> Result<(Arc<dyn NudgeStore>, Person), Response> {
+        let (_, session) = self.web_caller(headers)?;
+        let store = self.nudges.clone().ok_or_else(|| {
+            (StatusCode::SERVICE_UNAVAILABLE, "nudges are not enabled").into_response()
+        })?;
+        let who = Person {
+            tenant: self.default_tenant.clone(),
+            user: session.user_id,
+        };
+        Ok((store, who))
     }
 
     /// The store, or the answer when reminders are off.
@@ -164,4 +183,76 @@ pub async fn sent(
         Ok(()) => StatusCode::NO_CONTENT.into_response(),
         Err(error) => failed(&error, "mark notifications sent"),
     }
+}
+
+/// GET /web/nudges: the student's quiet time and the kinds they switched off.
+pub async fn nudge_prefs(State(state): State<NotificationState>, headers: HeaderMap) -> Response {
+    let (store, who) = match state.nudge_caller(&headers) {
+        Ok(found) => found,
+        Err(refused) => return refused,
+    };
+    match store.prefs(&who).await {
+        Ok(prefs) => Json(prefs.unwrap_or_else(|| state.nudge_defaults.clone())).into_response(),
+        Err(error) => failed(&error, "read nudge settings"),
+    }
+}
+
+/// PUT /web/nudges: keeps the student's quiet time and the kinds they switched off.
+pub async fn set_nudge_prefs(
+    State(state): State<NotificationState>,
+    headers: HeaderMap,
+    Json(prefs): Json<NudgePrefs>,
+) -> Response {
+    let (store, who) = match state.nudge_caller(&headers) {
+        Ok(found) => found,
+        Err(refused) => return refused,
+    };
+    if prefs.quiet_start > 23 || prefs.quiet_end > 23 {
+        return (StatusCode::UNPROCESSABLE_ENTITY, "hours are 0 to 23").into_response();
+    }
+    match store.set_prefs(&who, &prefs).await {
+        Ok(()) => Json(prefs).into_response(),
+        Err(error) => failed(&error, "keep nudge settings"),
+    }
+}
+
+/// What the student turned off by saying a nudge was not useful.
+#[derive(Debug, serde::Serialize)]
+pub struct FeedbackResult {
+    /// The kind switched off, when a nudge was marked not useful.
+    pub turned_off: Option<NudgeKind>,
+}
+
+/// POST /web/notifications/{id}/feedback: whether a nudge was useful. Not useful switches its kind off.
+pub async fn feedback(
+    State(state): State<NotificationState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    Json(req): Json<NudgeFeedback>,
+) -> Response {
+    let (store, who) = match state.nudge_caller(&headers) {
+        Ok(found) => found,
+        Err(refused) => return refused,
+    };
+    let kind = match store.feedback(&who, &id, req.helpful).await {
+        Ok(kind) => kind,
+        Err(error) => return failed(&error, "keep the feedback"),
+    };
+    let turned_off = match kind {
+        Some(kind) if !req.helpful => {
+            let mut prefs = match store.prefs(&who).await {
+                Ok(prefs) => prefs.unwrap_or_else(|| state.nudge_defaults.clone()),
+                Err(error) => return failed(&error, "read nudge settings"),
+            };
+            if !prefs.off.contains(&kind) {
+                prefs.off.push(kind);
+            }
+            if let Err(error) = store.set_prefs(&who, &prefs).await {
+                return failed(&error, "keep nudge settings");
+            }
+            Some(kind)
+        }
+        _ => None,
+    };
+    Json(FeedbackResult { turned_off }).into_response()
 }

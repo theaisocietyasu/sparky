@@ -53,7 +53,6 @@ async fn remember_refuses_what_it_must_not_keep() {
     for args in [
         json!({"kind": "fact", "text": "  "}),
         json!({"kind": "fact", "text": long}),
-        json!({"kind": "task", "text": "essay"}),
         json!({"kind": "task", "text": "essay", "due": day(-1)}),
         json!({"kind": "task", "text": "essay", "due": "next friday"}),
     ] {

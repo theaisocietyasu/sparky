@@ -1,8 +1,9 @@
-import { Bell as BellIcon } from "lucide-react";
+import { Bell as BellIcon, ThumbsDown, ThumbsUp } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { notices, readNotices } from "../chat/client";
+import { notices, rateNotice, readNotices } from "../chat/client";
 import type { Notice } from "../chat/types";
+import { nudgeLabel } from "./nudges";
 
 const EVERY_MS = 60_000;
 
@@ -16,11 +17,42 @@ const ago = (iso: string, now = Date.now()) => {
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 };
 
-/** The bell in the sidebar: a dot for unread reminders, and their list. Opening it marks them read. */
+/** Thumbs on a check-in. Not useful switches that kind off and says so. */
+const Rate = ({ notice, onRated }: { notice: Notice; onRated: (n: Notice, note: string | null) => void }) => {
+  if (notice.kind === "reminder") return null;
+  const rate = (helpful: boolean) => {
+    onRated({ ...notice, helpful }, null);
+    rateNotice(notice.id, helpful)
+      .then((r) => onRated({ ...notice, helpful }, r.turned_off ? `No more ${nudgeLabel(r.turned_off).toLowerCase()}. Turn it back on in Settings.` : null))
+      .catch(() => onRated(notice, null));
+  };
+  const button = (helpful: boolean, label: string, Icon: typeof ThumbsUp) => (
+    <button
+      type="button"
+      aria-label={label}
+      aria-pressed={notice.helpful === helpful}
+      onClick={() => rate(helpful)}
+      className={`grid size-6 place-items-center rounded-md transition-colors hover:bg-sunk ${
+        notice.helpful === helpful ? "text-kin" : "text-dim hover:text-fg"
+      }`}
+    >
+      <Icon className="size-3.5" />
+    </button>
+  );
+  return (
+    <span className="ml-auto flex gap-0.5">
+      {button(true, "Useful", ThumbsUp)}
+      {button(false, "Not useful", ThumbsDown)}
+    </span>
+  );
+};
+
+/** The bell in the sidebar: a dot for unread notifications, and their list. Opening it marks them read. */
 const Bell = () => {
   const [items, setItems] = useState<Notice[]>([]);
   const [unread, setUnread] = useState(0);
   const [open, setOpen] = useState(false);
+  const [notes, setNotes] = useState<Record<string, string>>({});
   const still = useReducedMotion() ?? false;
   const box = useRef<HTMLDivElement>(null);
 
@@ -86,13 +118,23 @@ const Bell = () => {
             className="glass absolute left-0 top-full z-50 mt-2 w-72 origin-top-left rounded-xl p-1.5"
           >
             {items.length === 0 ? (
-              <p className="px-3 py-6 text-center text-sm text-dim">No reminders yet. Ask Sparky to remind you of something.</p>
+              <p className="px-3 py-6 text-center text-sm text-dim">Nothing yet. Sparky checks in here when something comes up.</p>
             ) : (
               <ul className="max-h-80 overflow-y-auto">
                 {items.map((n) => (
                   <li key={n.id} className="rounded-lg px-3 py-2.5">
-                    <p className="text-sm">{n.text}</p>
-                    <p className="mt-0.5 text-xs text-dim">{ago(n.created_at)}</p>
+                    <p className="whitespace-pre-line text-sm">{n.text}</p>
+                    <div className="mt-1 flex items-center text-xs text-dim">
+                      <span>{ago(n.created_at)}</span>
+                      <Rate
+                        notice={n}
+                        onRated={(rated, note) => {
+                          setItems((all) => all.map((x) => (x.id === rated.id ? rated : x)));
+                          if (note) setNotes((all) => ({ ...all, [rated.id]: note }));
+                        }}
+                      />
+                    </div>
+                    {notes[n.id] && <p className="mt-1 text-xs text-dim">{notes[n.id]}</p>}
                   </li>
                 ))}
               </ul>

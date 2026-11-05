@@ -44,6 +44,7 @@ pub(super) fn stores(cfg: &Config, embedder: &Arc<dyn Embedder>) -> anyhow::Resu
         oauth_store: Arc::new(PlatformAccounts::new(client.clone())),
         canvas: None,
         reminders: None,
+        nudges: None,
         admin: None,
         probes: vec![Arc::new(PlatformProbe::new(client))],
     })

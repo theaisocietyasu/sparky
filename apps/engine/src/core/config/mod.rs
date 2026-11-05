@@ -100,6 +100,9 @@ pub struct Config {
     /// Arithmetic and date math.
     #[serde(default)]
     pub calculate: Calculate,
+    /// Notifications Sparky sends on its own.
+    #[serde(default)]
+    pub nudges: Nudges,
     /// Reading one public web page.
     #[serde(default)]
     pub read_page: ReadPage,
@@ -443,6 +446,7 @@ fn validate_integrations(cfg: &Config) -> Result<(), ConfigError> {
     validate_canvas(cfg)?;
     validate_upcoming(&cfg.upcoming)?;
     validate_reminders(&cfg.reminders)?;
+    validate_nudges(&cfg.nudges)?;
     if cfg.outlook.enabled {
         if !cfg.outlook.base_url.starts_with("https://") {
             return Err(ConfigError::Invalid(
@@ -454,6 +458,48 @@ fn validate_integrations(cfg: &Config) -> Result<(), ConfigError> {
                 "outlook: timeout_secs and max_items must be at least 1".into(),
             ));
         }
+    }
+    Ok(())
+}
+
+/// Rejects nudge settings that could never send or would send at an hour that does not exist.
+fn validate_nudges(n: &Nudges) -> Result<(), ConfigError> {
+    if !n.enabled {
+        return Ok(());
+    }
+    let invalid = |m: &str| Err(ConfigError::Invalid(format!("nudges: {m}")));
+    if n.tick_secs == 0 || n.active_days == 0 || n.ask_timeout_secs == 0 || n.keep_days == 0 {
+        return invalid(
+            "tick_secs, active_days, ask_timeout_secs and keep_days must be at least 1",
+        );
+    }
+    let hours = [
+        u32::from(n.quiet_start),
+        u32::from(n.quiet_end),
+        n.brief_hour,
+        n.week_plan_hour,
+        n.event_hour,
+        n.study_hour,
+        n.calendar_hour,
+    ];
+    if hours.iter().any(|h| *h > 23) {
+        return invalid("every hour must be 0 to 23");
+    }
+    if !(1..=7).contains(&n.calendar_weekday) {
+        return invalid("calendar_weekday must be 1 for Monday to 7 for Sunday");
+    }
+    if n.brief_days < 1 || n.due_soon_hours < 1 || n.start_early_days < 1 || n.new_item_days < 1 {
+        return invalid(
+            "brief_days, due_soon_hours, start_early_days and new_item_days must be at least 1",
+        );
+    }
+    if n.follow_up_days < 1 || n.follow_up_max_days <= n.follow_up_days {
+        return invalid(
+            "follow_up_max_days must be more than follow_up_days, which must be at least 1",
+        );
+    }
+    if n.nothing.trim().is_empty() {
+        return invalid("nothing is empty");
     }
     Ok(())
 }

@@ -3,11 +3,12 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use super::Stores;
+use super::{Stores, background};
 use crate::core::config::Config;
 use crate::core::traits::conversation::ConversationStore;
 use crate::core::traits::identity::DiscordIdentity;
 use crate::core::traits::memory::MemoryStore;
+use crate::core::traits::nudge::NudgeStore;
 use crate::core::traits::oauth::OAuthStore;
 use crate::core::traits::reminder::ReminderStore;
 use crate::core::traits::safety::confirmation::ConfirmationStore;
@@ -244,10 +245,13 @@ pub(super) fn canvas_state(
 pub(super) fn notification_state(
     cfg: &Config,
     store: Option<Arc<dyn ReminderStore>>,
+    nudges: Option<Arc<dyn NudgeStore>>,
     web: Option<WebAuth>,
 ) -> NotificationState {
     NotificationState {
         store: store.filter(|_| cfg.reminders.enabled),
+        nudges: nudges.filter(|_| cfg.nudges.enabled),
+        nudge_defaults: background::defaults(cfg),
         default_tenant: cfg.discord.guild_id.to_string(),
         list_limit: cfg.reminders.list_limit,
         service_token: cfg.engine.service_token.clone(),
@@ -299,7 +303,7 @@ pub(super) fn http_router(
         sandbox: sandbox_state(cfg, sandbox),
         oauth: oauth_state(cfg, stores.oauth_store, web.clone()),
         canvas: canvas_state(cfg, stores.canvas, web.clone()),
-        notifications: notification_state(cfg, stores.reminders, web.clone()),
+        notifications: notification_state(cfg, stores.reminders, stores.nudges, web.clone()),
         web: web_state(cfg, web)?,
         admin,
     };

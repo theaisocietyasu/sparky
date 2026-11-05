@@ -189,7 +189,7 @@ impl ReminderStore for SqliteReminders {
         limit: usize,
     ) -> Result<Vec<Notification>, StoreError> {
         let rows = sqlx::query(
-            "SELECT id, nonce, sealed, created_at, read_at FROM notifications \
+            "SELECT id, nonce, sealed, created_at, read_at, kind, helpful FROM notifications \
              WHERE tenant_id = ? AND user_id = ? ORDER BY created_at DESC LIMIT ?",
         )
         .bind(tenant)
@@ -202,11 +202,14 @@ impl ReminderStore for SqliteReminders {
             .map(|row| {
                 let created: String = row.try_get("created_at").map_err(database)?;
                 let read: Option<String> = row.try_get("read_at").map_err(database)?;
+                let helpful: Option<i64> = row.try_get("helpful").map_err(database)?;
                 Ok(Notification {
                     id: row.try_get("id").map_err(database)?,
                     text: self.open(row)?,
                     created_at: parse_stamp(&created)?,
                     read: read.is_some(),
+                    kind: row.try_get("kind").map_err(database)?,
+                    helpful: helpful.map(|h| h != 0),
                 })
             })
             .collect()

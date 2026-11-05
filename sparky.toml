@@ -84,7 +84,7 @@ role_line = "The user is `{user}`. Roles: {roles}."
 role_line_no_roles = "The user is `{user}`. They hold no special roles."
 memory_header = "What you remember about this user:"
 # Added to the system prompt in a direct message when the memory tools are registered.
-memory_rules = "Memory. Call remember when the student states something about themselves that helps later: their major, year, campus, clubs, how they want answers, or a task with its due date. Only what they said, never a guess. Never store grades, GPA, health, disability, immigration status, finances, passwords or codes, or anything about another person. Call forget_memory with the id in brackets when they ask you to forget something."
+memory_rules = "Memory. Call remember when the student states something about themselves that helps later: their major, year, campus, clubs, how they want answers, a task with its due date, or a plan they mention with no date, such as applying somewhere or emailing an advisor, as a task with no due date so you can check in on it later. Only what they said, never a guess. Never store grades, GPA, health, disability, immigration status, finances, passwords or codes, or anything about another person. Call forget_memory with the id in brackets when they ask you to forget something."
 # Added to the system prompt in a direct message when search_live is registered.
 discovery_rules = "Discovery. When the student asks for something to do, join or attend, take their major, interests, clubs and campus from what you remember, use them as the words of a search_live query on events or clubs, and say which memory you used."
 # Added to the system prompt in a direct message.
@@ -318,6 +318,35 @@ enabled = true
 base_url = "https://api.semanticscholar.org/graph/v1"
 timeout_secs = 20
 max_items = 5
+
+# Nudges: notifications Sparky sends on its own. Hours are local, at prompt.utc_offset_hours.
+# Deadlines and plans need no model call; event, calendar and study run the agent read-only.
+[nudges]
+enabled = true
+tick_secs = 600                 # seconds between passes over every student
+active_days = 30                # students with a private chat in this many days get nudges
+daily_cap = 4                   # most nudges one student gets in a day
+quiet_start = 22                # quiet time until a student sets their own
+quiet_end = 8
+brief_hour = 8                  # weekday brief from this hour
+brief_days = 7                  # days the brief and the Sunday plan cover
+week_plan_hour = 18             # Sunday plan from this hour
+due_soon_hours = 24
+start_early_days = 3
+big_work = ["exam", "midterm", "final", "project", "paper", "essay", "report", "presentation"]
+new_item_days = 21
+follow_up_days = 3              # check in on a plan this many days after it was said
+follow_up_max_days = 10
+event_hour = 12
+study_hour = 17                 # the evening before a deadline
+calendar_weekday = 1            # 1 is Monday
+calendar_hour = 10
+ask_timeout_secs = 120
+keep_days = 120                 # days a sent key is kept so it is never said twice
+nothing = "NONE"
+event_prompt = "Background check, not a question from the student. Search ASU events in the next 7 days that fit what you remember about this student: their major, interests, clubs and campus. If one clearly fits, write a short friendly message to them, two sentences at most, naming the event, when and where, with its link, and why it fits them. If nothing clearly fits, or you know too little about them, answer exactly {nothing}."
+calendar_prompt = "Background check, not a question from the student. Search the ASU academic calendar for dates in the next 14 days that matter to a student: the last day to add or drop, the withdrawal deadline, registration opening, tuition due, financial aid deadlines, and days with no classes. Use what you remember about them, such as their year and campus. If one is coming up, write a short friendly message, two sentences at most, with the date and the link. You already told them: {already}. Do not repeat those. If nothing new is coming up, answer exactly {nothing}."
+study_prompt = "Background check, not a question from the student. They have {item} due {due}. Check ASU library hours tonight and the study rooms. If the main libraries near their campus close before midnight tonight, write a short friendly message, two sentences at most, naming a place that stays open later and its hours, with a link. If they are open late anyway, or you cannot tell, answer exactly {nothing}."
 
 # Arithmetic and date math, worked out in the engine. Today is at prompt.utc_offset_hours.
 [calculate]

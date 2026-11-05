@@ -1,5 +1,5 @@
 import { drainFrames } from "./sse";
-import type { Answer, ChatSummary, ChatTurn, Me, Memory, Notice, Progress, Reminder, Upload } from "./types";
+import type { Answer, ChatSummary, ChatTurn, Me, Memory, Notice, NudgeKind, NudgePrefs, Progress, Reminder, Upload } from "./types";
 
 /** The engine origin the page talks to, or empty when the build has none. */
 export const engineUrl = () => (import.meta.env.VITE_ENGINE_URL ?? "").replace(/\/$/, "");
@@ -145,6 +145,16 @@ export const notices = (): Promise<{ notifications: Notice[]; unread: number }> 
 
 /** Marks every notification read. */
 export const readNotices = () => send("POST", "/web/notifications/read");
+
+/** Whether a check-in was useful. Not useful switches that kind off, and the answer names it. */
+export const rateNotice = (id: string, helpful: boolean): Promise<{ turned_off: NudgeKind | null }> =>
+  call("POST", `/web/notifications/${encodeURIComponent(id)}/feedback`, { helpful });
+
+/** The student's quiet hours and switched off check-ins. */
+export const nudgePrefs = (): Promise<NudgePrefs> => call("GET", "/web/nudges");
+
+/** Saves the student's quiet hours and switched off check-ins. */
+export const saveNudgePrefs = (prefs: NudgePrefs): Promise<NudgePrefs> => call("PUT", "/web/nudges", prefs);
 
 /** The student's reminders, soonest first. */
 export const reminders = async (): Promise<Reminder[]> => (await call<{ reminders: Reminder[] }>("GET", "/web/reminders")).reminders;

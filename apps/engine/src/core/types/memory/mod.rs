@@ -14,7 +14,7 @@ pub enum MemoryKind {
     Fact,
     /// How the student wants answers.
     Preference,
-    /// Something due on a date. Expires after it.
+    /// Something due on a date, which expires after it, or a plan with no date.
     Task,
 }
 

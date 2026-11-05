@@ -5,6 +5,7 @@
 //! Stores sees traits alone.
 
 mod agent;
+mod background;
 mod boot;
 mod http;
 mod import;
@@ -24,6 +25,7 @@ use crate::core::traits::knowledge::query::SourceQueries;
 use crate::core::traits::knowledge::retrieval::{Embedder, Retriever};
 use crate::core::traits::memory::MemoryStore;
 use crate::core::traits::model::ModelProvider;
+use crate::core::traits::nudge::NudgeStore;
 use crate::core::traits::oauth::OAuthStore;
 use crate::core::traits::reminder::ReminderStore;
 use crate::core::traits::safety::confirmation::ConfirmationStore;
@@ -65,6 +67,8 @@ struct Stores {
     canvas: Option<Arc<dyn CanvasFeeds>>,
     /// Reminders and notifications, when the local store holds them.
     reminders: Option<Arc<dyn ReminderStore>>,
+    /// Nudges, when the local store holds them and they are on.
+    nudges: Option<Arc<dyn NudgeStore>>,
     /// Admin changes, when the local store holds them.
     admin: Option<Arc<dyn AdminStore>>,
     /// What readiness checks besides the model.
@@ -106,7 +110,7 @@ pub async fn serve(cfg: Config) -> anyhow::Result<()> {
     let mut stores = platform::stores(&cfg, &embedder)?;
     store::localize(&cfg, &mut stores).await?;
     let sandbox = sandbox(&cfg).await?;
-    let (tools, mcp_names) = build_tools(
+    let (tools, mcp_names, upcoming) = build_tools(
         &cfg,
         Arc::clone(&stores.queries),
         Arc::clone(&stores.retriever),
@@ -156,6 +160,7 @@ pub async fn serve(cfg: Config) -> anyhow::Result<()> {
         tracing::info!(restored, "admin changes applied");
     }
 
+    background::start(&cfg, &agent, &stores, upcoming)?;
     let router = http_router(&cfg, agent, stores, sandbox)?;
 
     let listener = tokio::net::TcpListener::bind(&cfg.app.http_addr).await?;

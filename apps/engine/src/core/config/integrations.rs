@@ -173,6 +173,114 @@ impl Default for Papers {
     }
 }
 
+/// Nudges: notifications Sparky sends on its own, from deadlines, memories and live sources.
+#[derive(Debug, Deserialize)]
+#[serde(default)]
+pub struct Nudges {
+    /// Whether the nudge loop and its routes are on. Needs reminders on.
+    pub enabled: bool,
+    /// Seconds between passes over every student.
+    pub tick_secs: u64,
+    /// Students with a private conversation in this many days get nudges.
+    pub active_days: u32,
+    /// Most nudges one student gets in a local day.
+    pub daily_cap: usize,
+    /// Local hour quiet time starts, until a student sets their own.
+    pub quiet_start: u8,
+    /// Local hour quiet time ends.
+    pub quiet_end: u8,
+    /// Local hour the weekday brief goes out from.
+    pub brief_hour: u32,
+    /// Days ahead the brief and the Sunday plan cover.
+    pub brief_days: i64,
+    /// Local hour the Sunday plan goes out from.
+    pub week_plan_hour: u32,
+    /// Hours before a deadline the due soon nudge goes out.
+    pub due_soon_hours: i64,
+    /// Days before a big assignment the start early nudge goes out.
+    pub start_early_days: i64,
+    /// Words in a title that make an assignment big.
+    pub big_work: Vec<String>,
+    /// Days ahead a new assignment is looked for.
+    pub new_item_days: i64,
+    /// Days after a plan is saved that the follow up goes out.
+    pub follow_up_days: i64,
+    /// A plan older than this many days gets no follow up.
+    pub follow_up_max_days: i64,
+    /// Local hour from which the daily event match runs.
+    pub event_hour: u32,
+    /// Local hour from which the late study check runs, the evening before a deadline.
+    pub study_hour: u32,
+    /// Local weekday the academic calendar check runs, 1 for Monday to 7 for Sunday.
+    pub calendar_weekday: u32,
+    /// Local hour from which the academic calendar check runs.
+    pub calendar_hour: u32,
+    /// Seconds one background run may take.
+    pub ask_timeout_secs: u64,
+    /// Days a sent key is kept so it is not said again.
+    pub keep_days: u32,
+    /// What the background agent answers when there is nothing worth sending.
+    pub nothing: String,
+    /// Instruction for the event match. {nothing} is replaced.
+    pub event_prompt: String,
+    /// Instruction for the academic calendar check. {nothing} and {already} are replaced.
+    pub calendar_prompt: String,
+    /// Instruction for the late study check. {nothing}, {item} and {due} are replaced.
+    pub study_prompt: String,
+}
+
+impl Default for Nudges {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            tick_secs: 600,
+            active_days: 30,
+            daily_cap: 4,
+            quiet_start: 22,
+            quiet_end: 8,
+            brief_hour: 8,
+            brief_days: 7,
+            week_plan_hour: 18,
+            due_soon_hours: 24,
+            start_early_days: 3,
+            big_work: [
+                "exam",
+                "midterm",
+                "final",
+                "project",
+                "paper",
+                "essay",
+                "report",
+                "presentation",
+            ]
+            .map(String::from)
+            .to_vec(),
+            new_item_days: 21,
+            follow_up_days: 3,
+            follow_up_max_days: 10,
+            event_hour: 12,
+            study_hour: 17,
+            calendar_weekday: 1,
+            calendar_hour: 10,
+            ask_timeout_secs: 120,
+            keep_days: 120,
+            nothing: "NONE".into(),
+            event_prompt: EVENT_PROMPT.into(),
+            calendar_prompt: CALENDAR_PROMPT.into(),
+            study_prompt: STUDY_PROMPT.into(),
+        }
+    }
+}
+
+/// Default instruction for the event match.
+pub const EVENT_PROMPT: &str = "Background check, not a question from the student. Search ASU events in the next 7 days that fit what you remember about this student: their major, interests, clubs and campus. If one clearly fits, write a short friendly message to them, two sentences at most, naming the event, when and where, with its link, and why it fits them. If nothing clearly fits, or you know too little about them, answer exactly {nothing}.";
+
+/// Default instruction for the academic calendar check.
+pub const CALENDAR_PROMPT: &str = "Background check, not a question from the student. Search the ASU academic calendar for dates in the next 14 days that matter to a student: the last day to add or drop, the withdrawal deadline, registration opening, tuition due, financial aid deadlines, and days with no classes. Use what you remember about them, such as their year and campus. If one is coming up, write a short friendly message, two sentences at most, with the date and the link. You already told them: {already}. Do not repeat those. If nothing new is coming up, answer exactly {nothing}.";
+
+/// Default instruction for the late study check.
+pub const STUDY_PROMPT: &str = "Background check, not a question from the student. They have {item} due {due}. Check ASU library hours tonight and the study rooms. If the main libraries near their campus close before midnight tonight, write a short friendly message, two sentences at most, naming a place that stays open later and its hours, with a link. If they are open late anyway, or you cannot tell, answer exactly {nothing}.";
+
 /// Arithmetic and date math the model hands off instead of working out itself.
 #[derive(Debug, Deserialize)]
 #[serde(default)]
