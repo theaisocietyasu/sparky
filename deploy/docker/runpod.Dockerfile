@@ -6,7 +6,7 @@
 ARG LLAMA_IMAGE=ghcr.io/ggml-org/llama.cpp:server-cuda
 ARG PHOENIX_VERSION=21.0.0
 
-FROM mirror.gcr.io/library/rust:1.95-bookworm AS chef
+FROM mirror.gcr.io/library/rust:1.96-bookworm AS chef
 RUN cargo install cargo-chef --locked
 WORKDIR /app
 
