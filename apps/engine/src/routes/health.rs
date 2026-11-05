@@ -7,6 +7,7 @@ use axum::Json;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
+use secrecy::{ExposeSecret, SecretString};
 
 use crate::core::traits::health::Probe;
 use crate::core::types::http::health::Readiness;
@@ -18,6 +19,8 @@ pub struct HealthState {
     pub probes: Vec<Arc<dyn Probe>>,
     /// Chat model base URL, ending in /v1.
     pub model_base_url: String,
+    /// Bearer key the chat model endpoint takes.
+    pub model_api_key: SecretString,
 }
 
 /// Process is up.
@@ -40,6 +43,7 @@ pub async fn ready(State(state): State<HealthState>) -> Response {
             "{}/models",
             state.model_base_url.trim_end_matches('/')
         ))
+        .bearer_auth(state.model_api_key.expose_secret())
         .timeout(std::time::Duration::from_secs(5))
         .send()
         .await
