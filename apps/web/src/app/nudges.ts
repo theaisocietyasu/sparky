@@ -1,6 +1,6 @@
 import type { NudgeKind } from "../chat/types";
 
-/** Each check-in Sparky can send, in the words Settings and the bell use. */
+/** Each check-in Sparky can send, in the words Settings and the chat use. */
 export const NUDGES: { kind: NudgeKind; label: string; detail: string }[] = [
   { kind: "brief", label: "Morning brief", detail: "Weekday mornings: what is due today and this week." },
   { kind: "due_soon", label: "Due soon", detail: "A day before something is due." },

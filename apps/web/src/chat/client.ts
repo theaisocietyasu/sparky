@@ -1,5 +1,5 @@
 import { drainFrames } from "./sse";
-import type { Answer, ChatSummary, ChatTurn, Me, Memory, Notice, NudgeKind, NudgePrefs, Progress, Reminder, Upload } from "./types";
+import type { Answer, ChatSummary, ChatTurn, Me, Memory, Notice, NudgeKind, NudgePrefs, Parent, Progress, Reminder, Upload } from "./types";
 
 /** The engine origin the page talks to, or empty when the build has none. */
 export const engineUrl = () => (import.meta.env.VITE_ENGINE_URL ?? "").replace(/\/$/, "");
@@ -74,6 +74,9 @@ export const logout = async () => {
   if (!res.ok && res.status !== 401) throw await failure(res);
 };
 
+/** The first message of a thread: the message it starts from and that message's text. */
+export type ThreadStart = { parent: Parent; quote: string };
+
 /** Runs one turn, calling onProgress for each progress event, and returns the answer. */
 export const ask = async (
   message: string,
@@ -81,8 +84,16 @@ export const ask = async (
   onProgress: (p: Progress) => void,
   signal?: AbortSignal,
   files: Upload[] = [],
+  thread?: ThreadStart,
 ): Promise<Answer> => {
-  const body = { user_id: "", message, conversation_id: conversationId, continue_channel: false, files };
+  const body = {
+    user_id: "",
+    message,
+    conversation_id: conversationId,
+    continue_channel: false,
+    files,
+    ...(thread && !conversationId ? { parent: thread.parent, reply_to: thread.quote } : {}),
+  };
   const res = await post("/chat/stream", body, signal);
   if (!res.ok || !res.body) throw await failure(res);
   const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
@@ -116,7 +127,10 @@ export const memories = async (): Promise<Memory[]> =>
 export const forget = async (number: number | null): Promise<number> =>
   (await json<{ removed: number }>(await post("/memories/forget", { user_id: "", number }))).removed;
 
-/** The student's open web chats, newest first. */
+/** The id of the student's home chat, where Sparky's own messages land. */
+export const homeId = async (): Promise<string> => (await call<{ id: string }>("GET", "/web/home")).id;
+
+/** The student's threads and older chats, newest first. Home is not among them. */
 export const chats = (): Promise<ChatSummary[]> => call<ChatSummary[]>("GET", "/web/conversations");
 
 /** The questions and answers of one chat. */

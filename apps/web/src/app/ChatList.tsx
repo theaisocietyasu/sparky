@@ -4,7 +4,7 @@ import { NavLink, useNavigate, useParams } from "react-router-dom";
 import { chats, deleteChat } from "../chat/client";
 import type { ChatSummary } from "../chat/types";
 
-/** The student's chats in the sidebar: open one, or delete it. Reloads when version changes. */
+/** The student's threads in the sidebar: open one, or delete it. Reloads when version changes. */
 const ChatList = ({ version = 0 }: { version?: number }) => {
   const [items, setItems] = useState<ChatSummary[] | null>(null);
   const { id } = useParams();
@@ -33,8 +33,8 @@ const ChatList = ({ version = 0 }: { version?: number }) => {
   if (!items || items.length === 0) return null;
   return (
     <div className="mb-4">
-      <p className="px-2 pb-1 text-xs font-medium text-dim">Chats</p>
-      <ul aria-label="Chats" className="space-y-0.5">
+      <p className="px-2 pb-1 text-xs font-medium text-dim">Threads</p>
+      <ul aria-label="Threads" className="space-y-0.5">
         {items.map((c) => (
           <li key={c.id} className="group relative">
             <NavLink
@@ -50,7 +50,7 @@ const ChatList = ({ version = 0 }: { version?: number }) => {
             <button
               type="button"
               onClick={() => drop(c)}
-              aria-label={`Delete chat ${c.title}`}
+              aria-label={`Delete thread ${c.title}`}
               className="absolute right-1 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded-md text-dim opacity-60 transition md:opacity-0 hover:text-bad focus-visible:opacity-100 group-hover:opacity-100"
             >
               <Trash2 className="size-3.5" />
