@@ -79,7 +79,7 @@ describe("web chat", () => {
 
     const convo = within(screen.getByRole("list", { name: "Conversation" }));
     expect(await convo.findByText(/open until midnight/i)).toBeInTheDocument();
-    expect(convo.getByRole("link", { name: /asu library hours/i })).toHaveAttribute("href", "https://lib.asu.edu/hours");
+    expect(await convo.findByRole("link", { name: /asu library hours/i })).toHaveAttribute("href", "https://lib.asu.edu/hours");
     expect(convo.getByText(/memories used: 1/i)).toBeInTheDocument();
 
     const stream = calls.find((c) => c.url === `${ENGINE}/chat/stream`);
@@ -103,6 +103,22 @@ describe("web chat", () => {
     const sent = calls.find((c) => c.url === `${ENGINE}/confirm`);
     expect(JSON.parse(String(sent?.init?.body))).toMatchObject({ token: "t1", approve: true, conversation_id: "c1" });
     expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
+  });
+
+  it("renders markdown in the answer and keeps unsafe links as text", async () => {
+    engine({
+      "/web/me": () => Response.json(ME),
+      "/chat/stream": () =>
+        sse([["answer", answer({ text: "**Hours**\n\n- Mon: 7am\n- Tue: 7am\n\n```sh\nls\n```\n\n[bad](javascript:alert(1))", citations: [], memories: [] })]]),
+    });
+    open("/chat");
+    fireEvent.click(await screen.findByRole("button", { name: "When is Hayden Library open today?" }));
+    const convo = within(await screen.findByRole("list", { name: "Conversation" }));
+    expect(await convo.findByRole("button", { name: "Copy answer" })).toBeInTheDocument();
+    expect(convo.getByRole("button", { name: "Copy code" })).toBeInTheDocument();
+    expect(convo.getByText("Hours").tagName).toBe("STRONG");
+    expect(convo.getByText("Mon: 7am").tagName).toBe("LI");
+    expect(convo.getByText("bad").closest("a")).toBeNull();
   });
 
   it("shows an error frame as a message instead of an answer", async () => {
