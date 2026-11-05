@@ -1,10 +1,11 @@
-import { RotateCcw } from "lucide-react";
+import { FileText, RotateCcw } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import ChatFrame from "../app/ChatFrame";
 import { useMe } from "../app/useMe";
 import { ask, chatTurns, confirm, EngineError } from "../chat/client";
+import { addFiles, toUpload } from "../chat/files";
 import { applyProgress, type Line } from "../chat/lines";
 import type { Answer } from "../chat/types";
 import Composer from "../components/chat/Composer";
@@ -12,7 +13,7 @@ import Reply, { AssistantRow } from "../components/chat/Reply";
 import Running from "../components/chat/Running";
 
 /** One exchange. reveal is where the answer starts typing out, set only for an answer that arrived live. */
-type Turn = { id: number; question: string; answer: Answer | null; error: string | null; reveal?: number };
+type Turn = { id: number; question: string; files?: string[]; answer: Answer | null; error: string | null; reveal?: number };
 
 type Live = { lines: Line[]; draft: string; next: number };
 
@@ -69,6 +70,8 @@ const Chat = () => {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [live, setLive] = useState<Live>(IDLE);
   const [text, setText] = useState("");
+  const [files, setFiles] = useState<File[]>([]);
+  const [fileError, setFileError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [liveId, setLiveId] = useState(0);
   const conversation = useRef<string | null>(null);
@@ -125,21 +128,24 @@ const Chat = () => {
     setTurns((all) => all.map((t) => (t.id === id ? { ...t, answer, error, reveal } : t)));
   };
 
-  const send = async (raw: string) => {
+  const send = async (raw: string, attached: File[] = []) => {
     const question = raw.trim();
-    if (!question || busy) return;
+    if ((!question && attached.length === 0) || busy) return;
     const id = ++counter.current;
     pinned.current = true;
     drafted.current = "";
-    setTurns((all) => [...all, { id, question, answer: null, error: null }]);
+    setTurns((all) => [...all, { id, question, files: attached.map((f) => f.name), answer: null, error: null }]);
     setLiveId(id);
     setText("");
+    setFiles([]);
+    setFileError(null);
     setBusy(true);
     setLive(IDLE);
     const controller = new AbortController();
     abort.current = controller;
     try {
-      const answer = await ask(question, conversation.current, (p) => setLive((s) => applyProgress(s, p)), controller.signal);
+      const uploads = await Promise.all(attached.map(toUpload));
+      const answer = await ask(question, conversation.current, (p) => setLive((s) => applyProgress(s, p)), controller.signal, uploads);
       settle(id, answer, null, shared(drafted.current, answer.text));
     } catch (err) {
       settle(id, null, message(err));
@@ -181,7 +187,29 @@ const Chat = () => {
   const enter = still ? false : { opacity: 0, y: 8 };
   const composer = (
     <motion.div layoutId="composer" layout={!still} transition={{ type: "spring", stiffness: 380, damping: 36 }}>
-      <Composer value={text} onChange={setText} onSend={() => send(text)} onStop={() => abort.current?.abort()} busy={busy} autoFocus />
+      <Composer
+        value={text}
+        onChange={setText}
+        onSend={() => send(text, files)}
+        onStop={() => abort.current?.abort()}
+        busy={busy}
+        autoFocus
+        files={files}
+        onFiles={(more) => {
+          const next = addFiles(files, more);
+          setFiles(next.files);
+          setFileError(next.error);
+        }}
+        onRemoveFile={(i) => {
+          setFiles((all) => all.filter((_, j) => j !== i));
+          setFileError(null);
+        }}
+      />
+      {fileError && (
+        <p role="alert" className="mt-2 px-4 text-sm text-bad">
+          {fileError}
+        </p>
+      )}
     </motion.div>
   );
 
@@ -216,7 +244,19 @@ const Chat = () => {
             <ol aria-label="Conversation" className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-8">
               {turns.map((t) => (
                 <motion.li key={t.id} initial={enter} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, ease: "easeOut" }} className="flex flex-col gap-6">
-                  <p className="max-w-[85%] self-end whitespace-pre-wrap rounded-3xl bg-sunk px-4 py-2.5 text-[15px] leading-6">{t.question}</p>
+                  <div className="flex max-w-[85%] flex-col items-end gap-2 self-end">
+                    {t.files && t.files.length > 0 && (
+                      <ul aria-label="Files sent" className="flex flex-wrap justify-end gap-2">
+                        {t.files.map((name, i) => (
+                          <li key={`${name}-${i}`} className="flex h-8 max-w-full items-center gap-1.5 rounded-lg border border-edge px-2.5 text-sm">
+                            <FileText className="size-4 shrink-0 text-dim" />
+                            <span className="truncate">{name}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {t.question && <p className="whitespace-pre-wrap rounded-3xl bg-sunk px-4 py-2.5 text-[15px] leading-6">{t.question}</p>}
+                  </div>
                   {t.answer && <Reply answer={t.answer} busy={busy} revealFrom={t.reveal} onConfirm={(approve) => answerHeld(t, approve)} />}
                   {t.error && (
                     <AssistantRow>

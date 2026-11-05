@@ -29,3 +29,6 @@ export type ChatSummary = { id: string; title: string; updated_at: string };
 
 /** One stored message of a chat. */
 export type ChatTurn = { role: "user" | "assistant"; text: string };
+
+/** A file sent inline with a message. */
+export type Upload = { name: string; media_type: string; size: number; data: string };

@@ -234,6 +234,8 @@ pub struct Prompt {
     pub upload_line: String,
     /// Line naming a file no text could be pulled from.
     pub upload_raw_line: String,
+    /// Line naming a file read in the engine, for a host with no sandbox.
+    pub upload_inline_line: String,
     /// Line naming a file the user attached that could not be opened, with {reason}.
     pub upload_failed_line: String,
     /// The question sent in place of an empty message that carries attachments.
@@ -260,6 +262,7 @@ impl Default for Prompt {
             sandbox_retry_line: assemble::SANDBOX_RETRY_LINE.into(),
             upload_line: assemble::UPLOAD_LINE.into(),
             upload_raw_line: assemble::UPLOAD_RAW_LINE.into(),
+            upload_inline_line: assemble::UPLOAD_INLINE_LINE.into(),
             upload_failed_line: assemble::UPLOAD_FAILED_LINE.into(),
             attachments_only_input: assemble::ATTACHMENTS_ONLY_INPUT.into(),
             utc_offset_hours: -7,

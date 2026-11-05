@@ -1,5 +1,5 @@
 import { drainFrames } from "./sse";
-import type { Answer, ChatSummary, ChatTurn, Me, Memory, Progress } from "./types";
+import type { Answer, ChatSummary, ChatTurn, Me, Memory, Progress, Upload } from "./types";
 
 /** The engine origin the page talks to, or empty when the build has none. */
 export const engineUrl = () => (import.meta.env.VITE_ENGINE_URL ?? "").replace(/\/$/, "");
@@ -74,8 +74,9 @@ export const ask = async (
   conversationId: string | null,
   onProgress: (p: Progress) => void,
   signal?: AbortSignal,
+  files: Upload[] = [],
 ): Promise<Answer> => {
-  const body = { user_id: "", message, conversation_id: conversationId, continue_channel: false };
+  const body = { user_id: "", message, conversation_id: conversationId, continue_channel: false, files };
   const res = await post("/chat/stream", body, signal);
   if (!res.ok || !res.body) throw await failure(res);
   const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();

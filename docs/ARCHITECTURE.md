@@ -123,7 +123,7 @@ The console starts and stops the other units and tails their output. It does not
 ```mermaid
 flowchart TD
     ROUTES["routes and wiring<br/>compose everything, own main"]
-    HARNESS["runtime::harness<br/>agent: run, step, inputs, execute, conclude, task, uploads<br/>agent/call: thinking, relay, draft, thought, retry, spans<br/>agent/prompt: assemble, capability<br/>safety: guardrail, policy<br/>compact, tools, trace"]
+    HARNESS["runtime::harness<br/>agent: run, step, inputs, execute, conclude, task, uploads, read<br/>agent/call: thinking, relay, draft, thought, retry, spans<br/>agent/prompt: assemble, capability<br/>safety: guardrail, policy<br/>compact, tools, trace"]
     MODEL["runtime::model<br/>rig_openai: chat, embed, convert<br/>limit, props"]
     TOOLS["runtime::tools<br/>knowledge/search: live, stored, sources/ one file per source<br/>account: outlook, gcal, grant<br/>papers, wiki, files, mcp, http<br/>sandbox: container, session, egress, output"]
     STORES["stores<br/>platform: client, conversation, confirmation, memory, retrieval, query, accounts, health"]
@@ -429,11 +429,13 @@ What is kept on disk is pruned: JSONL traces after `trace.retention_hours`, chec
 
 ### Attached files
 
-`discord` forwards every non-image attachment, up to `bot.max_files` of at most `bot.max_file_bytes`, as `files` on the chat request. The engine takes up to `agent.max_files` of at most `agent.max_file_bytes` into `RequestContext.files`.
+`discord` forwards every non-image attachment, up to `bot.max_files` of at most `bot.max_file_bytes`, as `files` on the chat request. The web chat sends files inline: each carries its bytes in base64 as `data`, and `http.max_body_bytes` leaves room for them. The engine takes up to `agent.max_files` of at most `agent.max_file_bytes` into `RequestContext.files`.
 
-Before the first model call, `uploads.rs` downloads each through `FileSource` (`HttpFiles`: HTTPS only, hosts in `agent.file_hosts`, no redirects, the byte cap enforced while streaming) and writes it into the conversation's sandbox session as `upload-<name>`. One command there turns it into text at `<path>.txt`: pdftotext for a PDF, tesseract over its first `agent.upload_ocr_pages` pages when it has no text layer, python-docx, openpyxl and pandas for Word, Excel and CSV. The same command ranks the passages by how many words of the question each holds.
+Before the first model call, `uploads.rs` decodes an inline file, or downloads one through `FileSource` (`HttpFiles`: HTTPS only, hosts in `agent.file_hosts`, no redirects, the byte cap enforced while streaming) and writes it into the conversation's sandbox session as `upload-<name>`. One command there turns it into text at `<path>.txt`: pdftotext for a PDF, tesseract over its first `agent.upload_ocr_pages` pages when it has no text layer, python-docx, openpyxl and pandas for Word, Excel and CSV. The same command ranks the passages by how many words of the question each holds.
 
 The prompt gets one `prompt.upload_line` per file, just before the question: name, size, paths, session, the first `agent.upload_preview_chars` of its text, and the best passages up to `agent.upload_match_chars`. A file with no text gets `prompt.upload_raw_line`; one that could not be downloaded or written gets `prompt.upload_failed_line`. Each emits `TraceEvent::FileAttached`. The file stays in the session until the session idles out.
+
+With no sandbox, as on a RunPod pod, `agent/read.rs` reads the file in the engine: pdf-extract for a PDF, UTF-8 for text, CSV, JSON and code. It ranks passages the same way, and the prompt gets `prompt.upload_inline_line`, which names no paths. Other types, and a PDF with no text layer, get `prompt.upload_failed_line` with the reason.
 
 ## Compaction
 

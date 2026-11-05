@@ -87,6 +87,36 @@ describe("web chat", () => {
     expect(JSON.parse(String(stream?.init?.body))).toMatchObject({ message: "library hours?", conversation_id: null, continue_channel: false });
   });
 
+  it("sends attached files inline and shows them on the turn", async () => {
+    const calls = engine({
+      "/web/me": () => Response.json(ME),
+      "/chat/stream": () => sse([["answer", answer({ text: "The midterm is October 14." })], ["done", {}]]),
+    });
+    open("/chat");
+    const picker = await screen.findByLabelText("Attach files");
+    const notes = new File(["Midterm: October 14"], "notes.txt", { type: "text/plain" });
+    fireEvent.change(picker, { target: { files: [notes] } });
+    expect(within(screen.getByRole("list", { name: "Attached files" })).getByText("notes.txt")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    expect(await screen.findByText(/midterm is october 14/i)).toBeInTheDocument();
+    expect(within(screen.getByRole("list", { name: "Files sent" })).getByText("notes.txt")).toBeInTheDocument();
+    const stream = calls.find((c) => c.url === `${ENGINE}/chat/stream`);
+    const body = JSON.parse(String(stream?.init?.body));
+    expect(body.message).toBe("");
+    expect(body.files).toEqual([{ name: "notes.txt", media_type: "text/plain", size: 19, data: btoa("Midterm: October 14") }]);
+  });
+
+  it("refuses a file over 2 MB before sending", async () => {
+    engine({ "/web/me": () => Response.json(ME) });
+    open("/chat");
+    const picker = await screen.findByLabelText("Attach files");
+    const big = new File([new Uint8Array(2_000_001)], "big.pdf", { type: "application/pdf" });
+    fireEvent.change(picker, { target: { files: [big] } });
+    expect(screen.getByRole("alert")).toHaveTextContent(/up to 2 MB/i);
+    expect(screen.queryByRole("list", { name: "Attached files" })).toBeNull();
+  });
+
   it("asks before a held action and sends the answer to /confirm", async () => {
     const held = { token: "t1", tool: "gcal_create", summary: "Add Study group to your calendar" };
     const calls = engine({
