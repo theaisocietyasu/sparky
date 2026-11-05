@@ -9,6 +9,7 @@ use crate::core::traits::model::ModelProvider;
 use crate::core::traits::safety::guardrail::Guardrail;
 use crate::core::traits::trace::TraceSink;
 use crate::core::types::agent::AgentConfig;
+use crate::routes::home::HomeRules;
 use crate::runtime::harness::agent::task::{Task, TaskConfig};
 use crate::runtime::harness::compact::{self, ChatCompactor};
 use crate::runtime::harness::safety::guardrail::{RuleGuardrail, Rules};
@@ -119,4 +120,25 @@ pub(super) fn trace_sink(cfg: &Config) -> anyhow::Result<Arc<dyn TraceSink>> {
         });
     }
     Ok(Arc::new(sink))
+}
+
+/// The home chat rules: the welcome, and the choice that moves a new topic into a thread.
+pub(super) fn home_rules(cfg: &Config, model: &Arc<dyn ModelProvider>) -> HomeRules {
+    let router = cfg.home.threads.then(|| {
+        Arc::new(Task::new(
+            Arc::clone(model),
+            "home_route",
+            cfg.home.route_prompt.trim(),
+            TaskConfig {
+                max_tokens: cfg.home.route_max_tokens,
+                temperature: 0.0,
+                timeout: Duration::from_secs(cfg.home.route_timeout_secs),
+                ..task_config(cfg)
+            },
+        ))
+    });
+    HomeRules {
+        welcome: cfg.home.welcome.clone(),
+        router,
+    }
 }

@@ -27,6 +27,7 @@ use crate::core::types::agent::Answer;
 use crate::core::types::agent::context::RequestContext;
 use crate::core::types::conversation::Visibility;
 use crate::core::types::conversation::file::FileAttachment;
+use crate::core::types::conversation::home_id;
 use crate::core::types::conversation::image::Attachment;
 use crate::core::types::http::chat::{ChatRequest, ChatResponse, ConfirmRequest};
 use crate::core::types::http::web::Session;
@@ -34,6 +35,7 @@ use crate::core::types::store::StoreError;
 use crate::core::types::trace::progress::Progress;
 use crate::routes::auth::{Caller, caller, too_many};
 use crate::routes::failure::{Failure, NO_SUCH_CONVERSATION};
+use crate::routes::home::{HomeRules, branch, opens_topic};
 use crate::routes::rate_limit::RateLimiter;
 use crate::routes::session::{WEB_CHANNEL, WebAuth};
 use crate::runtime::harness::agent::Agent;
@@ -72,6 +74,8 @@ pub struct ChatState {
     pub web: Option<WebAuth>,
     /// What the web conversation list and view show.
     pub web_lists: WebLists,
+    /// The welcome and thread rules of the home chat.
+    pub home: HomeRules,
 }
 
 /// Bounds of the web conversation list and view.
@@ -288,6 +292,7 @@ async fn run_turn(
         .tenant_id
         .unwrap_or_else(|| state.default_tenant.clone());
     let parent = req.parent.filter(|_| req.conversation_id.is_none());
+    let attached = !req.images.is_empty() || !req.files.is_empty();
     let ctx = RequestContext::new(tenant, req.user_id, state.request_budget)
         .with_widgets(req.channel_id == WEB_CHANNEL)
         .with_roles(req.roles)
@@ -311,6 +316,18 @@ async fn run_turn(
         && let Err(error) = store.link(&ctx, &parent).await
     {
         tracing::warn!(%error, "could not make the conversation a thread");
+    }
+    // A new topic asked in home is answered in a thread off the message that asked it.
+    if !attached
+        && req.channel_id == WEB_CHANNEL
+        && ctx.conversation_id == home_id(&ctx.tenant_id, &ctx.user_id)
+        && let (Some(router), Some(store)) = (&state.home.router, &state.conversations)
+        && opens_topic(router, store.as_ref(), &ctx, &req.message).await
+    {
+        match branch(store.as_ref(), &ctx, &req.message).await {
+            Ok(thread) => ctx = thread,
+            Err(error) => tracing::warn!(%error, "could not open a thread; answering in home"),
+        }
     }
     if let Some(tx) = watcher {
         ctx = ctx.listening_to(tx);

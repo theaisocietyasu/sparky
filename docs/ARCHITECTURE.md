@@ -454,7 +454,7 @@ The system prompt is not a stored message; it is rebuilt on every request and al
 | Conversation | what was said, the question and the answer | Platform conversation messages |
 | Fact, preference, task | one short line a student stated about themselves | the engine store, written by `remember` |
 
-The model writes memories in the normal loop, so a turn costs no extra model call. `remember` takes a kind (`fact`, `preference`, or `task`: something due, with a date, or a plan with no date, which never expires), one line of at most `memory.max_chars`, and an optional sensitive flag. It refuses text with a term in `memory.refuse_terms` and seals text with a term in `memory.sensitive_terms`. `forget_memory` takes the short id the memory section shows. Both are `PrepareWrite`, private and sequential, and are registered when `memory.tools` is on and `store.backend` is `sqlite`. `prompt.memory_rules` tells the model what to keep and what never to store; it is added to the system prompt only in a private turn where the tools are registered. `prompt.discovery_rules` tells the model to use the student's memories (major, interests, clubs, campus) as the words of a `search_live` query on events or clubs when they ask for something to do or join, and to say which memory it used; it is added only in a private turn where `search_live` is registered. `prompt.proactive_rules` asks for one next step or one short question at the end of an answer, in every private turn. `prompt.onboarding_rules` is added only when the student has no memories and no earlier turns: Sparky greets them and asks one question at a time, saving each answer with `remember`. `prompt.widget_rules` is added to a private turn from the web chat (`RequestContext.widgets`, set when the channel is `web`): a question with a few short answers ends with a fenced `choices` block, which the page takes out of the text and shows as buttons under the newest answer; tapping one sends it as the next message. Sparky also sends check-ins on its own; see Nudges.
+The model writes memories in the normal loop, so a turn costs no extra model call. `remember` takes a kind (`fact`, `preference`, or `task`: something due, with a date, or a plan with no date, which never expires), one line of at most `memory.max_chars`, and an optional sensitive flag. It refuses text with a term in `memory.refuse_terms` and seals text with a term in `memory.sensitive_terms`. `forget_memory` takes the short id the memory section shows. Both are `PrepareWrite`, private and sequential, and are registered when `memory.tools` is on and `store.backend` is `sqlite`. `prompt.memory_rules` tells the model what to keep and what never to store; it is added to the system prompt only in a private turn where the tools are registered. `prompt.discovery_rules` tells the model to use the student's memories (major, interests, clubs, campus) as the words of a `search_live` query on events or clubs when they ask for something to do or join, and to say which memory it used; it is added only in a private turn where `search_live` is registered. `prompt.proactive_rules` asks for one next step or one short question at the end of an answer, in every private turn. `prompt.onboarding_rules` is added while fewer than `prompt.onboarded_at` fact and preference memories describe the student: Sparky gets to know them one question at a time (major and year, campus, what they want help with, interests), saving each answer with `remember`, then suggests one concrete thing. `prompt.widget_rules` is added to a private turn from the web chat (`RequestContext.widgets`, set when the channel is `web`): a question with a few short answers ends with a fenced `choices` block, which the page takes out of the text and shows as buttons under the newest answer; tapping one sends it as the next message. Sparky also sends check-ins on its own; see Nudges.
 
 Recall reads every unexpired memory: tasks due within `memory.task_soon_days` first, soonest first, then the rest newest first. The prompt lists them as `[short id] kind: text (date)` until `agent.memory_budget_tokens` is spent. A task expires at the end of its due day in `prompt.utc_offset_hours`.
 
@@ -526,7 +526,11 @@ Platform runs every per-user login and holds the grants. Canvas is the exception
 
 Each student has one home conversation, id `home_id(tenant, user)` (a UUID v5), on channel `web`, private. When a reminder fires or a nudge is sent, the same transaction that writes the `notifications` row writes an assistant message to home with `notice: {id, kind}`, so the student sees it in the chat and the agent reads it as history when they reply. Writing there leaves `updated_at` alone, so only the student's own turns count as activity. A reset never ends home, and the conversation list leaves it out.
 
+Home is never empty. `GET /web/home` writes `home.welcome` as Sparky's first message when home holds none, and the onboarding rule takes it from there (see Memory).
+
 A thread is a web conversation started from one message: the first turn sends `parent: {conversation_id, position}` and `reply_to` with that message's text. `ConversationStore::link` keeps the parent only when both conversations are the student's and the message exists.
+
+With `home.threads` on, a message the student sends in home goes through a short model call (`home.route_prompt`, a `Task`). THREAD keeps the message in home, opens a thread off it, and runs the turn there; the answer comes back with the thread's id, and the web follows it and links the thread under the question in home. HOME (a greeting, thanks, an answer to Sparky) runs the turn in home. A failed or slow call, or a message with attachments, stays in home.
 
 ```mermaid
 flowchart LR
@@ -535,8 +539,11 @@ flowchart LR
   R --> H[home: Sparky message + notice]
   G --> H
   H --> W[web chat]
-  W -->|reply| H
-  W -->|thread off a message| T[thread conversation, parent set]
+  W -->|reply or small talk| H
+  W -->|new topic| S{sort}
+  S -->|THREAD| T[thread off the question, parent set]
+  S -->|HOME| H
+  W -->|thread off a message| T
 ```
 
 ## Nudges

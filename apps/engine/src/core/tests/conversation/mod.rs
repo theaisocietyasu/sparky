@@ -58,6 +58,7 @@ pub(crate) fn state_with_web(
             turns: 200,
             title_chars: 20,
         },
+        home: crate::routes::home::HomeRules::default(),
     }
 }
 
@@ -633,4 +634,135 @@ async fn a_signed_in_student_has_one_home_that_holds_what_sparky_sent() {
     assert_eq!(listed, json!([]));
     let anonymous = home(State(state), HeaderMap::new()).await;
     assert_eq!(anonymous.status(), StatusCode::UNAUTHORIZED);
+}
+
+/// A signed-in web state over one in-memory store, with home welcome and router as given.
+async fn home_state(router: Option<&str>) -> (ChatState, String) {
+    use crate::core::tests::http::web::{auth, session};
+    use crate::routes::home::HomeRules;
+    use crate::runtime::harness::agent::task::{Task, TaskConfig};
+    use crate::stores::sqlite::{SqliteStore, StoreOptions};
+
+    let options = StoreOptions {
+        path: "sqlite::memory:".into(),
+        max_connections: 1,
+        busy_timeout: Duration::from_secs(1),
+    };
+    let Ok(sqlite) = SqliteStore::open(&options).await else {
+        unreachable!("an in-memory store opens")
+    };
+    let web = auth();
+    let Some(sealed) = web.seal(&session("111", &[], 3600)) else {
+        unreachable!("the session seals")
+    };
+    let store: Arc<dyn ConversationStore> = Arc::new(sqlite.conversations());
+    let mut state = state_with_web(Arc::new(Rooms::default()), Some(web));
+    state.agent = agent_with_store(
+        Scripted::new(vec![Ok(text("CSE 310 has 12 open seats."))]),
+        ToolSet::new(),
+        AgentConfig::default(),
+        Arc::clone(&store),
+    );
+    state.conversations = Some(store);
+    state.home = HomeRules {
+        welcome: "Hey, I'm Sparky. What are you studying?".into(),
+        router: router.map(|answer| {
+            Arc::new(Task::new(
+                Arc::new(Scripted::new(vec![Ok(text(answer))])),
+                "home_route",
+                "sort",
+                TaskConfig::default(),
+            ))
+        }),
+    };
+    (state, sealed)
+}
+
+#[tokio::test]
+async fn a_new_student_finds_one_welcome_in_home() {
+    use crate::core::tests::http::web::{SITE, browser};
+    use crate::routes::conversation::{home, read};
+    use axum::extract::Path;
+
+    let (state, sealed) = home_state(None).await;
+    let (_, first) = body(home(State(state.clone()), browser(SITE, &sealed)).await).await;
+    let _ = home(State(state.clone()), browser(SITE, &sealed)).await;
+    let id = first["id"].as_str().unwrap_or_default().to_owned();
+    let (_, turns) = body(read(State(state), browser(SITE, &sealed), Path(id)).await).await;
+    assert_eq!(turns.as_array().map(Vec::len), Some(1), "{turns}");
+    assert_eq!(turns[0]["role"], json!("assistant"));
+    assert_eq!(
+        turns[0]["text"],
+        json!("Hey, I'm Sparky. What are you studying?")
+    );
+}
+
+/// Asks message in home and returns the conversation the answer came back in, and the home id.
+async fn ask_home(state: &ChatState, sealed: &str, message: &str) -> (String, String) {
+    use crate::core::tests::http::web::{SITE, browser};
+    use crate::routes::conversation::home;
+
+    let (_, found) = body(home(State(state.clone()), browser(SITE, sealed)).await).await;
+    let home_id = found["id"].as_str().unwrap_or_default().to_owned();
+    let Ok(req) = serde_json::from_value::<ChatRequest>(json!({
+        "user_id": "111", "channel_id": "web", "message": message, "conversation_id": home_id
+    })) else {
+        unreachable!("a chat request")
+    };
+    let (status, answer) =
+        body(chat(State(state.clone()), browser(SITE, sealed), Json(req)).await).await;
+    assert_eq!(status, StatusCode::OK, "{answer}");
+    (
+        answer["conversation_id"]
+            .as_str()
+            .unwrap_or_default()
+            .to_owned(),
+        home_id,
+    )
+}
+
+#[tokio::test]
+async fn a_new_topic_asked_in_home_is_answered_in_a_thread_off_that_message() {
+    use crate::core::tests::http::web::{SITE, browser};
+    use crate::routes::conversation::{list, read};
+    use axum::extract::Path;
+
+    let (state, sealed) = home_state(Some("THREAD")).await;
+    let (answered_in, home_id) = ask_home(&state, &sealed, "does CSE 310 have open seats").await;
+    assert_ne!(answered_in, home_id, "the answer comes back in a thread");
+
+    let (_, home_turns) = body(
+        read(
+            State(state.clone()),
+            browser(SITE, &sealed),
+            Path(home_id.clone()),
+        )
+        .await,
+    )
+    .await;
+    let asked = &home_turns[1];
+    assert_eq!(asked["role"], json!("user"), "{home_turns}");
+    assert_eq!(asked["text"], json!("does CSE 310 have open seats"));
+    assert_eq!(
+        home_turns.as_array().map(Vec::len),
+        Some(2),
+        "home keeps the question only"
+    );
+
+    let (_, listed) = body(list(State(state.clone()), browser(SITE, &sealed)).await).await;
+    assert_eq!(listed[0]["id"], json!(answered_in), "{listed}");
+    assert_eq!(listed[0]["parent"]["conversation_id"], json!(home_id));
+    assert_eq!(listed[0]["parent"]["position"], asked["position"]);
+
+    let (_, thread) =
+        body(read(State(state), browser(SITE, &sealed), Path(answered_in)).await).await;
+    assert_eq!(thread[0]["text"], json!("does CSE 310 have open seats"));
+    assert_eq!(thread[1]["text"], json!("CSE 310 has 12 open seats."));
+}
+
+#[tokio::test]
+async fn a_reply_to_sparky_stays_in_home() {
+    let (state, sealed) = home_state(Some("HOME")).await;
+    let (answered_in, home_id) = ask_home(&state, &sealed, "computer science, junior").await;
+    assert_eq!(answered_in, home_id);
 }

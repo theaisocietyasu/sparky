@@ -185,6 +185,38 @@ describe("web chat", () => {
     expect(screen.getByRole("link", { name: "Back to home" })).toHaveAttribute("href", "/chat");
   });
 
+  it("follows a new topic asked in home into its thread and links it under the question", async () => {
+    let moved = false;
+    engine({
+      "/web/me": () => Response.json(ME),
+      "/web/home": () => Response.json({ id: "h1" }),
+      "/web/conversations": () =>
+        Response.json(moved ? [{ id: "t9", title: "does CSE 310 have seats", updated_at: "", parent: { conversation_id: "h1", position: 2 } }] : []),
+      "/web/conversations/h1": () =>
+        Response.json([
+          { position: 1, role: "assistant", text: "Hey, I'm Sparky. What are you studying?" },
+          ...(moved ? [{ position: 2, role: "user", text: "does CSE 310 have seats" }] : []),
+        ]),
+      "/chat/stream": () => {
+        moved = true;
+        return sse([["answer", answer({ conversation_id: "t9", text: "12 seats are open.", citations: [] })], ["done", {}]]);
+      },
+      "/web/conversations/t9": () =>
+        Response.json([
+          { position: 1, role: "user", text: "does CSE 310 have seats" },
+          { position: 2, role: "assistant", text: "12 seats are open." },
+        ]),
+    });
+    open("/chat");
+    expect(await screen.findByText("Hey, I'm Sparky. What are you studying?")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Message"), { target: { value: "does CSE 310 have seats" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => expect(window.location.pathname).toBe("/chat/t9"));
+    expect(await screen.findByText("12 seats are open.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("link", { name: "Back to home" }));
+    expect(await screen.findByRole("link", { name: /Thread: does CSE 310 have seats/ })).toHaveAttribute("href", "/chat/t9");
+  });
+
   it("lists reminders in settings and cancels one", async () => {
     let listed = [{ id: "r1", text: "Gym", due_at: "2026-11-06T16:00:00Z", repeat: "daily" }];
     const calls = engine({

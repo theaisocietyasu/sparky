@@ -1,4 +1,4 @@
-//! Router assembly: /chat, /conversation, /memories, /sandbox, /oauth, /canvas, /notifications, /web, /admin, and /health.
+//! Router assembly: /chat, /conversation, /memories, /sandbox, /oauth, /canvas, /notifications, /web, /admin, and /health. home holds the home chat rules.
 
 use axum::Router;
 use axum::extract::DefaultBodyLimit;
@@ -14,6 +14,7 @@ pub mod chat;
 pub mod conversation;
 pub mod failure;
 pub mod health;
+pub mod home;
 pub mod memories;
 pub mod notifications;
 pub mod oauth;

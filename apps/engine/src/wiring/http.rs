@@ -21,6 +21,7 @@ use crate::routes::admin::AdminState;
 use crate::routes::canvas::CanvasState;
 use crate::routes::chat::{ChatState, WebLists};
 use crate::routes::health::HealthState;
+use crate::routes::home::HomeRules;
 use crate::routes::memories::MemoryState;
 use crate::routes::notifications::NotificationState;
 use crate::routes::oauth::OAuthState;
@@ -39,6 +40,7 @@ pub(super) fn chat_state(
     conversations: Arc<dyn ConversationStore>,
     confirmations: Arc<dyn ConfirmationStore>,
     web: Option<WebAuth>,
+    home: HomeRules,
 ) -> ChatState {
     ChatState {
         confirmations: Some(confirmations),
@@ -60,6 +62,7 @@ pub(super) fn chat_state(
             turns: cfg.web.conversation_turns,
             title_chars: cfg.web.title_chars,
         },
+        home,
     }
 }
 
@@ -265,6 +268,7 @@ pub(super) fn http_router(
     agent: Agent,
     stores: Stores,
     sandbox: Option<Arc<ContainerSandbox>>,
+    home: HomeRules,
 ) -> anyhow::Result<axum::Router> {
     let web = web_auth(cfg)?;
     let admin = admin_state(
@@ -280,6 +284,7 @@ pub(super) fn http_router(
         stores.conversations,
         stores.confirmations,
         web.clone(),
+        home,
     );
     let memories = memory_state(
         cfg,
