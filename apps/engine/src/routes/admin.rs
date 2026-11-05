@@ -13,8 +13,8 @@ use crate::core::traits::admin::AdminStore;
 use crate::core::traits::knowledge::query::SourceQueries;
 use crate::core::traits::trace::TraceReader;
 use crate::core::types::admin::{
-    AdminChange, AdminLimits, ChangeKind, INSTRUCTIONS_KEY, InstructionsState, InstructionsUpdate,
-    NewChange, ToolState, ToolSwitch,
+    AdminChange, AdminGuardrails, AdminLimits, ChangeKind, INSTRUCTIONS_KEY, InstructionsState,
+    InstructionsUpdate, NewChange, ToolState, ToolSwitch,
 };
 use crate::core::types::store::StoreError;
 use crate::routes::auth::{Caller, caller};
@@ -48,6 +48,15 @@ pub struct AdminState {
     pub traces_limit: usize,
     /// The live query registry.
     pub queries: Option<Arc<dyn SourceQueries>>,
+    /// The guardrail and policy settings.
+    pub guardrails: AdminGuardrails,
+    /// Phoenix web address a trace links to. None leaves traces unlinked.
+    pub phoenix_ui_url: Option<String>,
+}
+
+/// The Phoenix page of trace_id under base.
+fn phoenix_link(base: &str, trace_id: &str) -> String {
+    format!("{}/redirects/traces/{trace_id}", base.trim_end_matches('/'))
 }
 
 /// Applies one recorded change to the running agent.
@@ -281,6 +290,14 @@ pub async fn limits(State(state): State<AdminState>, headers: HeaderMap) -> Resp
     Json(state.limits.clone()).into_response()
 }
 
+/// GET /admin/guardrails: what the guardrail refuses or hides, and what the policy allows.
+pub async fn guardrails(State(state): State<AdminState>, headers: HeaderMap) -> Response {
+    if let Err(refused) = state.actor(&headers) {
+        return refused;
+    }
+    Json(state.guardrails.clone()).into_response()
+}
+
 /// GET /admin/approvals: actions waiting on a student, without their arguments.
 pub async fn approvals(State(state): State<AdminState>, headers: HeaderMap) -> Response {
     if let Err(refused) = state.actor(&headers) {
@@ -330,7 +347,15 @@ pub async fn traces(State(state): State<AdminState>, headers: HeaderMap) -> Resp
     };
     let (tenant, limit) = (state.tenant.clone(), state.traces_limit);
     match tokio::task::spawn_blocking(move || reader.list(&tenant, limit)).await {
-        Ok(Ok(list)) => Json(list).into_response(),
+        Ok(Ok(mut list)) => {
+            if let Some(base) = state.phoenix_ui_url.as_deref() {
+                for summary in &mut list {
+                    summary.phoenix_url =
+                        summary.trace_id.as_deref().map(|id| phoenix_link(base, id));
+                }
+            }
+            Json(list).into_response()
+        }
         Ok(Err(e)) => {
             tracing::error!(error = %e, "traces not listed");
             (

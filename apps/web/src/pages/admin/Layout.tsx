@@ -1,4 +1,4 @@
-import { ArrowLeft, Database, Gauge, History, LayoutDashboard, ListChecks, ScrollText, ShieldAlert, Wrench } from "lucide-react";
+import { ArrowLeft, Database, Gauge, History, LayoutDashboard, ListChecks, ScrollText, ShieldAlert, ShieldCheck, Wrench } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { Suspense } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
@@ -13,6 +13,7 @@ const GROUPS: NavGroup[] = [
     items: [
       { to: "/admin/tools", label: "Tools", icon: Wrench },
       { to: "/admin/instructions", label: "Instructions", icon: ScrollText },
+      { to: "/admin/guardrails", label: "Guardrails", icon: ShieldCheck },
     ],
   },
   {

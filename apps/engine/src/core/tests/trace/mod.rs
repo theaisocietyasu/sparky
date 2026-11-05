@@ -72,6 +72,7 @@ fn jsonl_round_trips() {
             input: "hi".into(),
             tenant_id: "g".into(),
             user_id: "u".into(),
+            trace_id: None,
         },
     );
     sink.emit(
@@ -124,6 +125,7 @@ fn kind_matches_the_name_each_event_serialises_under() {
             input: String::new(),
             tenant_id: String::new(),
             user_id: String::new(),
+            trace_id: None,
         },
         TraceEvent::ContextAssembled {
             step: 1,

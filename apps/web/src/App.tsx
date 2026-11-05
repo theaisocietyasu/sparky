@@ -17,6 +17,7 @@ const Approvals = lazy(() => import("./pages/admin/Approvals"));
 const History = lazy(() => import("./pages/admin/History"));
 const Sources = lazy(() => import("./pages/admin/Sources"));
 const Limits = lazy(() => import("./pages/admin/Limits"));
+const Guardrails = lazy(() => import("./pages/admin/Guardrails"));
 
 const Blank = () => <div className="min-h-screen bg-canvas" />;
 
@@ -32,6 +33,7 @@ const App = () => (
             <Route index element={<Overview />} />
             <Route path="tools" element={<Tools />} />
             <Route path="instructions" element={<Instructions />} />
+            <Route path="guardrails" element={<Guardrails />} />
             <Route path="traces" element={<Traces />} />
             <Route path="traces/:id" element={<Trace />} />
             <Route path="approvals" element={<Approvals />} />

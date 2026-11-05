@@ -13,7 +13,7 @@ use crate::core::traits::safety::confirmation::ConfirmationStore;
 use crate::core::traits::tools::canvas::CanvasFeeds;
 use crate::core::traits::tools::sandbox::Sandbox;
 use crate::core::traits::trace::TraceReader;
-use crate::core::types::admin::AdminLimits;
+use crate::core::types::admin::{AdminGuardrails, AdminLimits};
 use crate::routes::Limits;
 use crate::routes::admin::AdminState;
 use crate::routes::canvas::CanvasState;
@@ -129,6 +129,33 @@ pub(super) fn admin_state(
             .then(|| Arc::new(JsonlTraces::new(&cfg.trace.dir)) as Arc<dyn TraceReader>),
         traces_limit: cfg.admin.traces_limit,
         queries,
+        guardrails: guardrails(cfg),
+        phoenix_ui_url: cfg
+            .telemetry
+            .phoenix_ui_url
+            .as_deref()
+            .map(str::trim)
+            .filter(|url| !url.is_empty())
+            .map(str::to_owned),
+    }
+}
+
+/// The guardrail and policy settings as GET /admin/guardrails shows them.
+fn guardrails(cfg: &Config) -> AdminGuardrails {
+    let g = &cfg.guardrail;
+    AdminGuardrails {
+        enabled: g.enabled,
+        denied_phrases: g.denied_phrases.clone(),
+        protected_terms: g.protected_terms.clone(),
+        redaction: g.redaction.clone(),
+        max_answer_chars: g.max_answer_chars,
+        replacement: g.replacement.clone(),
+        write_roles: cfg.policy.write_roles.clone(),
+        allow_authenticated_reads: cfg.policy.allow_authenticated_reads,
+        confirm_from: serde_json::to_value(cfg.policy.confirm_from)
+            .ok()
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or_default(),
     }
 }
 

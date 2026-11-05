@@ -303,7 +303,9 @@ retention_hours = 336          # pruned hourly; 0 keeps them forever
 
 # Spans export to Phoenix at phoenix_url plus /v1/traces. phoenix_url and phoenix_api_key
 # live in .env; an empty phoenix_url turns export off. project_name is the Phoenix project.
+# phoenix_ui_url, the Phoenix web address, links each admin trace to its page there.
 [telemetry]
+phoenix_ui_url = ""
 project_name = "sparky"
 sample_ratio = 1.0
 export_timeout_secs = 10

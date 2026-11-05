@@ -256,6 +256,8 @@ pub struct Telemetry {
     pub phoenix_url: Option<String>,
     /// Bearer token for a Phoenix that authenticates. Empty sends no Authorization header.
     pub phoenix_api_key: SecretString,
+    /// Phoenix web address the admin traces link to; unset or empty leaves them unlinked.
+    pub phoenix_ui_url: Option<String>,
     /// The Phoenix project exported spans land in.
     pub project_name: String,
     /// gen_ai.provider.name on model spans.
@@ -275,6 +277,7 @@ impl Default for Telemetry {
         Self {
             phoenix_url: None,
             phoenix_api_key: SecretString::from(""),
+            phoenix_ui_url: None,
             project_name: "sparky".into(),
             provider_name: "llama.cpp".into(),
             service_name: None,

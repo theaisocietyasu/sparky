@@ -30,6 +30,21 @@ export const setInstructions = (text: string | null) => call<Change>("PUT", "/ad
 export const history = () => call<Change[]>("GET", "/admin/history");
 export const rollback = (id: number) => call<Change>("POST", `/admin/rollback/${id}`);
 export const limits = () => call<Limits>("GET", "/admin/limits");
+
+/** What the guardrail refuses or hides, and what the policy allows. */
+export type Guardrails = {
+  enabled: boolean;
+  denied_phrases: string[];
+  protected_terms: string[];
+  redaction: string;
+  max_answer_chars: number;
+  replacement: string;
+  write_roles: string[];
+  allow_authenticated_reads: boolean;
+  confirm_from: string;
+};
+
+export const guardrails = () => call<Guardrails>("GET", "/admin/guardrails");
 export const approvals = () => call<Held[]>("GET", "/admin/approvals");
 export const deny = (token: string) => call<{ denied: boolean }>("POST", `/admin/approvals/${encodeURIComponent(token)}/deny`);
 
@@ -44,6 +59,10 @@ export type TraceSummary = {
   steps: number;
   tokens: number;
   duration_ms: number;
+  trace_id?: string | null;
+  phoenix_url?: string | null;
+  guardrail_blocks?: number;
+  guardrail_redactions?: number;
 };
 
 /** One recorded trace event. */

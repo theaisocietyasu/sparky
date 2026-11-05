@@ -26,7 +26,7 @@ just prod-logs engine
 `deploy/docker/runpod.Dockerfile` builds `ghcr.io/theaisocietyasu/sparkyai-runpod`: all of Sparky in one GPU pod. A RunPod pod cannot start containers, so supervisord (`deploy/runpod/supervisord.conf`) runs chat and embed `llama-server`, the engine, and the bot as processes. Knowledge search, live queries and linked accounts live on Platform; conversations, memories and confirmations are in the engine SQLite file on the volume. It differs from compose in two ways:
 
 - `run_sandbox` is off (`SPARKY_SANDBOX__ENABLED=false`).
-- Phoenix is not included; export stays off until `SPARKY_TELEMETRY__PHOENIX_URL` points at one.
+- Phoenix runs only with `SPARKY_RUN_PHOENIX=true`. Expose `6006/http` too. It signs in with `admin@localhost` and `admin` and asks for a new password at once, so sign in right after the first start. Its database and keys are in `/workspace/phoenix`, traces are kept `SPARKY_PHOENIX_RETENTION_DAYS` days (30), and the engine and the bot export to it with its admin key. The admin trace list links each request to its page there.
 
 Create the pod with the image, a volume at `/workspace` (the model cache), a host CUDA version of at least 12.8, and these environment variables: `SPARKY_DISCORD__TOKEN`, `SPARKY_DISCORD__GUILD_ID`, `SPARKY_ENGINE__SERVICE_TOKEN`, `SPARKY_PLATFORM__URL`, `SPARKY_PLATFORM__TOKEN`, `SPARKY_PLATFORM__MCP_URL`, `SPARKY_MEMORY__KEY`, `SPARKY_APP__ENV=production`, and `HF_TOKEN` (a read token; community hosts share an IP that the Hugging Face Hub rate-limits without one). Every service listens on `127.0.0.1`; the pod exposes no port. The first boot downloads the GGUFs into `/workspace/models`. The scopes the Platform token needs are listed in the `[platform]` section of `sparky.toml`.
 

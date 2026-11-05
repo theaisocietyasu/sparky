@@ -39,6 +39,29 @@ case "${SPARKY_POD_ROLE:-all}" in
         ;;
 esac
 
+# Phoenix with sign-in on, its database and keys on the volume. The keys are made once; the admin
+# key is the bearer token the engine and the bot export spans with. Off unless SPARKY_RUN_PHOENIX=true.
+export SPARKY_RUN_PHOENIX="${SPARKY_RUN_PHOENIX:-false}"
+if [ "$SPARKY_RUN_PHOENIX" = "true" ]; then
+    phoenix="$data/phoenix"
+    mkdir -p "$phoenix"
+    if [ ! -f "$phoenix/keys.env" ]; then
+        key() { head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n'; }
+        (umask 077 && printf 'PHOENIX_SECRET=%s\nPHOENIX_ADMIN_SECRET=%s\n' "$(key)" "$(key)" > "$phoenix/keys.env")
+    fi
+    set -a
+    # shellcheck disable=SC1091
+    . "$phoenix/keys.env"
+    set +a
+    ui="${SPARKY_TELEMETRY__PHOENIX_UI_URL:-https://${RUNPOD_POD_ID}-6006.proxy.runpod.net}"
+    export PHOENIX_WORKING_DIR="$phoenix" PHOENIX_ENABLE_AUTH=true PHOENIX_HOST=0.0.0.0 PHOENIX_PORT=6006 \
+        PHOENIX_USE_SECURE_COOKIES=true PHOENIX_CSRF_TRUSTED_ORIGINS="$ui" PHOENIX_TELEMETRY_ENABLED=false \
+        PHOENIX_DEFAULT_RETENTION_POLICY_DAYS="${SPARKY_PHOENIX_RETENTION_DAYS:-30}"
+    export SPARKY_TELEMETRY__PHOENIX_URL="${SPARKY_TELEMETRY__PHOENIX_URL:-http://127.0.0.1:6006}"
+    export SPARKY_TELEMETRY__PHOENIX_API_KEY="${SPARKY_TELEMETRY__PHOENIX_API_KEY:-$PHOENIX_ADMIN_SECRET}"
+    export SPARKY_TELEMETRY__PHOENIX_UI_URL="$ui"
+fi
+
 mkdir -p "$data/models" "$data/sparky/backups"
 export SPARKY_STORE__PATH="${SPARKY_STORE__PATH:-$data/sparky/sparky.db}"
 export SPARKY_STORE__BACKUP_DIR="${SPARKY_STORE__BACKUP_DIR:-$data/sparky/backups}"
