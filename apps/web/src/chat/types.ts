@@ -56,7 +56,12 @@ export type NudgeKind =
   | "follow_up"
   | "calendar"
   | "study"
-  | "week_plan";
+  | "week_plan"
+  | "after_due"
+  | "exam_week"
+  | "wins"
+  | "tips"
+  | "opportunity";
 
 /** A message for the student: a reminder that fired, or a check-in Sparky sent on its own. */
 export type Notice = {

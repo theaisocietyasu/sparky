@@ -12,6 +12,8 @@ use crate::core::types::store::StoreError;
 pub trait NudgeStore: Send + Sync {
     /// Students with a private conversation updated since, each once, at their latest tenant.
     async fn people(&self, since: DateTime<Utc>) -> Result<Vec<Person>, StoreError>;
+    /// When the student first started a conversation, home left out.
+    async fn first_seen(&self, who: &Person) -> Result<Option<DateTime<Utc>>, StoreError>;
     /// What the student set, or None when they set nothing.
     async fn prefs(&self, who: &Person) -> Result<Option<NudgePrefs>, StoreError>;
     /// Keeps what the student set.

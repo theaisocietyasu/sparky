@@ -548,7 +548,7 @@ flowchart LR
   T[tick] --> P[active students]
   P --> Q{quiet or capped?}
   Q -->|no| R[rules: deadlines and plans]
-  Q -->|no| A[background agent: events, calendar, study]
+  Q -->|no| A[background agent: events, openings, calendar, study]
   R --> S[(notifications, nudges_sent)]
   A --> S
   S --> W[web home chat]
@@ -565,8 +565,16 @@ The rules (`runtime/nudge/rules.rs`) need no model call. They read the `upcoming
 | `follow_up` | a task with no date said `follow_up_days` to `follow_up_max_days` ago |
 | `brief` | weekday mornings from `brief_hour`, when something is due in `brief_days` |
 | `week_plan` | Sunday from `week_plan_hour`, the week day by day |
+| `after_due` | a `big_work` item 1 to `after_due_hours` hours after it was due, in the daytime |
+| `exam_week` | once a week, when `exam_week_min` items with an `exam_words` word fall in the next 7 days |
+| `wins` | Friday from `wins_hour`, when at least `wins_min` items were due since Monday |
+| `tips` | one of `tips` a day, each once, in the first `tips_days` after the student's first chat |
 
-`event`, `calendar` and `study` run the agent through the `Background` trait: `Agent::background` is a copy with only `ReadPublic` and `ReadAuthenticated` tools, no conversation store and no confirmations, so nothing is kept or written. Each runs at most once a day (`calendar` once a week) from its configured hour, and the instruction (`nudges.event_prompt`, `calendar_prompt`, `study_prompt`) asks for `nudges.nothing` when nothing is worth saying. `event` runs only for a student Sparky knows something about.
+`after_due`, `exam_week` and `wins` pick one of their `*_lines` by the nudge key, so the same nudge always reads the same and the next one reads differently. In an exam week, `event` and `opportunity` do not run.
+
+`event`, `opportunity`, `calendar` and `study` run the agent through the `Background` trait: `Agent::background` is a copy with only `ReadPublic` and `ReadAuthenticated` tools, no conversation store and no confirmations, so nothing is kept or written. Each runs at most once a day (`calendar` and `opportunity` once a week, on `calendar_weekday` and `opportunity_weekday`) from its configured hour, and the instruction (`nudges.event_prompt`, `opportunity_prompt`, `calendar_prompt`, `study_prompt`) asks for `nudges.nothing` when nothing is worth saying. `event` and `opportunity` run only for a student Sparky knows something about. `opportunity` looks for internships, research positions and hackathons that fit them.
+
+Care is not a nudge: `prompt.proactive_rules` asks Sparky to answer a stressed student warmly, name ASU Counseling once in that chat, and suggest rest late at night.
 
 Every nudge carries keys in `nudges_sent`, so nothing is said twice; keys older than `nudges.keep_days` are dropped. A nudge is a `notifications` row with `kind` set, so home and the bot deliver it like a reminder. `GET` and `PUT /web/nudges` read and keep a student's quiet hours and switched off kinds; `POST /web/notifications/{id}/feedback` records whether a nudge was useful, and not useful switches its kind off.
 

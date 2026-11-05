@@ -7,8 +7,9 @@ use chrono::{DateTime, Utc};
 use sqlx::{Row, SqlitePool};
 use uuid::Uuid;
 
-use super::{Seal, database, home, stamp};
+use super::{Seal, database, home, parse_stamp, stamp};
 use crate::core::traits::nudge::NudgeStore;
+use crate::core::types::conversation::home_id;
 use crate::core::types::conversation::message::Notice;
 use crate::core::types::nudge::{Nudge, NudgeKind, NudgePrefs, Person};
 use crate::core::types::store::StoreError;
@@ -62,6 +63,19 @@ impl NudgeStore for SqliteNudges {
             });
         }
         Ok(out)
+    }
+
+    async fn first_seen(&self, who: &Person) -> Result<Option<DateTime<Utc>>, StoreError> {
+        let first: Option<String> = sqlx::query_scalar(
+            "SELECT min(created_at) FROM conversations WHERE tenant_id = ? AND user_id = ? AND id != ?",
+        )
+        .bind(&who.tenant)
+        .bind(&who.user)
+        .bind(home_id(&who.tenant, &who.user).to_string())
+        .fetch_one(&self.pool)
+        .await
+        .map_err(database)?;
+        first.as_deref().map(parse_stamp).transpose()
     }
 
     async fn prefs(&self, who: &Person) -> Result<Option<NudgePrefs>, StoreError> {

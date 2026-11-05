@@ -24,20 +24,35 @@ pub enum NudgeKind {
     Study,
     /// The week ahead, on Sunday evening.
     WeekPlan,
+    /// How a big assignment or exam went, after it was due.
+    AfterDue,
+    /// Several exams in the coming week: a plan, and fewer other nudges.
+    ExamWeek,
+    /// What the student got through this week, on Friday afternoon.
+    Wins,
+    /// One tip a day on what Sparky can do, in a student's first weeks.
+    Tips,
+    /// Internships, hackathons and other openings that fit the student.
+    Opportunity,
 }
 
 impl NudgeKind {
     /// Every kind, in the order Settings lists them.
-    pub const ALL: [Self; 9] = [
+    pub const ALL: [Self; 14] = [
         Self::Brief,
         Self::DueSoon,
         Self::StartEarly,
         Self::NewItem,
+        Self::AfterDue,
+        Self::ExamWeek,
         Self::Event,
+        Self::Opportunity,
         Self::FollowUp,
         Self::Calendar,
         Self::Study,
         Self::WeekPlan,
+        Self::Wins,
+        Self::Tips,
     ];
 
     /// Database and wire value.
@@ -52,6 +67,11 @@ impl NudgeKind {
             Self::Calendar => "calendar",
             Self::Study => "study",
             Self::WeekPlan => "week_plan",
+            Self::AfterDue => "after_due",
+            Self::ExamWeek => "exam_week",
+            Self::Wins => "wins",
+            Self::Tips => "tips",
+            Self::Opportunity => "opportunity",
         }
     }
 

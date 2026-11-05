@@ -88,7 +88,7 @@ memory_rules = "Memory. Call remember when the student states something about th
 # Added to the system prompt in a direct message when search_live is registered.
 discovery_rules = "Discovery. When the student asks for something to do, join or attend, take their major, interests, clubs and campus from what you remember, use them as the words of a search_live query on events or clubs, and say which memory you used."
 # Added to the system prompt in a direct message.
-proactive_rules = "Initiative. End an answer with one short, concrete next step when one helps: a related deadline, event, club, office or resource, or an offer to set a reminder. When one missing detail would change the answer, such as their campus or course section, ask for it in one short question. Never ask more than one question at a time, and never pad an answer with offers."
+proactive_rules = "Initiative. End an answer with one short, concrete next step when one helps: a related deadline, event, club, office or resource, or an offer to set a reminder. When one missing detail would change the answer, such as their campus or course section, ask for it in one short question. Never ask more than one question at a time, and never pad an answer with offers. Care. When the student sounds stressed, overwhelmed or low, answer warmly first, then mention once in that chat that ASU Counseling is there for them (https://eoss.asu.edu/counseling, 24/7 crisis line 480-921-1006). Never diagnose, never repeat it in the same chat. Late at night their time, after helping, suggest rest in one short line."
 # Added to the first private turn of a conversation when Sparky holds no memories of the student.
 widget_rules = "Choices. When you ask the student a question that has a few short answers, put them right after the question in a fenced code block with the language choices, one answer per line, two to four lines, each under 40 characters. The page shows them as buttons the student can tap. Use it only for a question you just asked, never for a list of facts."
 onboarding_rules = "First meeting. You know nothing about this student yet. Answer what they asked first, if anything. Then greet them by first name in one line and ask one friendly question to get to know them, starting with their major and year, then campus, then what they most want help with. Call remember with each answer they give. Mention once that linking Canvas lets you track their due dates."
@@ -345,8 +345,40 @@ ask_timeout_secs = 120
 keep_days = 120                 # days a sent key is kept so it is never said twice
 nothing = "NONE"
 event_prompt = "Background check, not a question from the student. Search ASU events in the next 7 days that fit what you remember about this student: their major, interests, clubs and campus. If one clearly fits, write a short friendly message to them, two sentences at most, naming the event, when and where, with its link, and why it fits them. If nothing clearly fits, or you know too little about them, answer exactly {nothing}."
-calendar_prompt = "Background check, not a question from the student. Search the ASU academic calendar for dates in the next 14 days that matter to a student: the last day to add or drop, the withdrawal deadline, registration opening, tuition due, financial aid deadlines, and days with no classes. Use what you remember about them, such as their year and campus. If one is coming up, write a short friendly message, two sentences at most, with the date and the link. You already told them: {already}. Do not repeat those. If nothing new is coming up, answer exactly {nothing}."
+calendar_prompt = "Background check, not a question from the student. Search the ASU academic calendar for dates in the next 14 days that matter to a student: the last day to add or drop, the withdrawal deadline, registration opening, tuition due, financial aid and scholarship deadlines, and days with no classes. Use what you remember about them, such as their year and campus. If one is coming up, write a short friendly message, two sentences at most, with the date and the link. You already told them: {already}. Do not repeat those. If nothing new is coming up, answer exactly {nothing}."
 study_prompt = "Background check, not a question from the student. They have {item} due {due}. Check ASU library hours tonight and the study rooms. If the main libraries near their campus close before midnight tonight, write a short friendly message, two sentences at most, naming a place that stays open later and its hours, with a link. If they are open late anyway, or you cannot tell, answer exactly {nothing}."
+opportunity_weekday = 3         # openings check: internships, research, hackathons; 3 is Wednesday
+opportunity_hour = 12
+opportunity_prompt = "Background check, not a question from the student. Search for internships, research positions, hackathons and other openings that are open now and fit what you remember about this student: their major, year, interests and campus. Prefer ASU and Arizona openings and ones with a deadline in the next 30 days. If one clearly fits, write a short friendly message to them, two sentences at most, naming it, the deadline and the link, and why it fits them. You already told them: {already}. Do not repeat those. If nothing clearly fits, answer exactly {nothing}."
+after_due_hours = 8             # check in on a big item up to this many hours after it was due
+after_due_lines = [
+  "How did {title} go? Whatever happened, it is done now. Want to jot down anything for next time?",
+  "{title} is behind you. How do you feel it went?",
+  "You made it through {title}. Anything you want to carry into the next one?",
+]
+exam_words = ["exam", "midterm", "final", "quiz", "test"]
+exam_week_min = 2               # exams in 7 days that make an exam week; it quiets events and openings. 0 turns it off
+exam_week_lines = [
+  "Exam week: {count} coming up.{list}\nI will keep the other check-ins quiet. Want me to block out study time for each?",
+  "Big week ahead, {count} exams:{list}\nI will stay out of your way. Want a study plan, one day at a time?",
+  "{count} exams in the next few days:{list}\nWant me to set a reminder to start on the first one?",
+]
+wins_hour = 15                  # Friday wins from this hour
+wins_min = 2                    # items done this week that make wins worth sending; 0 turns it off
+wins_lines = [
+  "Friday check: you got through {count} things this week.{list}\nNice work. Take the evening off.",
+  "Week wrapped, {count} done:{list}\nThat is real progress. Enjoy the weekend.",
+  "Look at this week: {count} off your plate.{list}\nYou earned a break.",
+]
+tips_days = 14                  # tips go out in a student's first days
+tip_hour = 11
+tips = [
+  "Tip: send me a syllabus PDF and I will pull out every due date for you.",
+  "Tip: link your Canvas calendar in Settings and I will keep an eye on your deadlines.",
+  "Tip: ask me to remind you of anything, like: remind me Sunday at 7 to plan my week.",
+  "Tip: tell me what you are into and I will point you to events and clubs that fit.",
+  "Tip: tap Thread under any of my messages to dig into it without cluttering this chat.",
+]
 
 # search_chats: full text search over the student's earlier private chats. Needs store.backend sqlite.
 [chat_search]
@@ -365,7 +397,7 @@ max_bytes = 2000000
 max_chars = 6000
 max_redirects = 5
 user_agent = "Mozilla/5.0 (compatible; SparkyAI/2.0; ASU student copilot)"
-save_pages = true               # send each page read to Platform, which saves ASU pages and queues others for review
+save_pages = true               # send each page read to Platform, which saves it as a knowledge source
 
 # Wikipedia lookups over the MediaWiki API. Public, no key.
 [wikipedia]
