@@ -32,6 +32,11 @@ impl Command {
 /// Starts telemetry outside the tokio runtime, runs the command, then drops the runtime first.
 fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    if let [name, rest @ ..] = args.as_slice()
+        && name == runtime::tools::sandbox::wasm::runner::SUBCOMMAND
+    {
+        std::process::exit(runtime::tools::sandbox::wasm::runner::main(rest));
+    }
     let command = Command::parse(&args)?;
     if let Err(e) = dotenvy::dotenv()
         && !e.not_found()

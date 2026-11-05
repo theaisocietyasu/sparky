@@ -21,7 +21,7 @@ This document describes the current shape of the system and its rules. Order of 
 | Observability | OpenTelemetry spans to Phoenix, product events as spans, JSONL traces and logs under `.sparky/` | profiles `phoenix`, `metrics` |
 | Config | `sparky.toml`, then `SPARKY_*` env vars | `sparky.toml`, `.env.example` |
 | Build, gate | `just` recipes, pre-commit hook, CI | `justfile`, `.githooks`, `.github/workflows` |
-| Deploy | Docker Compose, prod pulls GHCR images; one RunPod GPU pod under supervisord, without run_sandbox | `deploy/` |
+| Deploy | Docker Compose, prod pulls GHCR images; one RunPod pod under supervisord, with run_sandbox as WebAssembly | `deploy/` |
 
 ## Rules
 
@@ -42,7 +42,7 @@ This document describes the current shape of the system and its rules. Order of 
 apps/
   engine/         Rust bin. The agent, its HTTP surface, and the store adapters.
     src/core/       config (services, integrations, http, harness by domain), telemetry, types, traits, tests
-    src/runtime/    harness (loop, prompt, uploads, memory, safety, compaction, trace), model (Rig client, slot limit, server props), tools (knowledge/search with sources/, account for per-user Outlook and Gcal, papers, wiki, files, mcp, sandbox, shared http)
+    src/runtime/    harness (loop, prompt, uploads, memory, safety, compaction, trace), model (Rig client, slot limit, server props), tools (knowledge/search, account for per-user Outlook and Gcal, papers, wiki, files, mcp, sandbox, shared http)
     src/stores/     platform/: client, conversation, confirmation, memory, discovery, query, accounts, health over the Platform HTTP API
     src/routes/     chat (JSON and SSE), confirm, conversation, profile, oauth, sandbox, health, rate limit, auth, failure
     src/wiring/     builds every dependency from config and serves: platform stores, tools, agent, http, boot checks, system prompt
@@ -124,7 +124,7 @@ flowchart TD
     ROUTES["routes and wiring<br/>compose everything, own main"]
     HARNESS["runtime::harness<br/>agent: run, step, inputs, execute, conclude, task, uploads, read<br/>agent/call: thinking, relay, draft, thought, retry, spans<br/>agent/prompt: assemble, capability<br/>safety: guardrail, policy<br/>compact, tools, trace"]
     MODEL["runtime::model<br/>rig_openai: chat, embed, convert<br/>limit, props"]
-    TOOLS["runtime::tools<br/>knowledge/search: live, stored, sources/ one file per source<br/>account: outlook, gcal, grant<br/>papers, wiki, files, mcp, http<br/>sandbox: container, session, egress, output"]
+    TOOLS["runtime::tools<br/>knowledge/search: Platform search<br/>account: outlook, gcal, grant<br/>papers, wiki, files, mcp, http<br/>sandbox: container, session, egress, output, log, wasm"]
     STORES["stores<br/>platform: client, conversation, confirmation, memory, discovery, query, accounts, health"]
     CORE["core<br/>config, telemetry, types, traits, tests"]
 
@@ -383,6 +383,18 @@ Each sub-agent is a `runtime::harness::agent::task::Task`: its own instructions,
 
 **Runtime.** Under compose the runtime is the `sandboxd` service, a daemon of its own reached over `DOCKER_HOST`; on a developer host it is the local `docker`. It is probed once at boot: `sandbox.required` decides whether an unreachable one fails boot or leaves `run_sandbox` unregistered.
 
+**WebAssembly.** With `sandbox.runtime = "wasm"`, as on a RunPod pod where containers cannot start, `WasmSandbox` runs the command with no container.
+
+```mermaid
+flowchart LR
+  E[engine] -->|"engine sandbox-run, command on stdin"| C[child process]
+  C --> B["bash.webc + python, grep, sed, rg, coreutils"]
+  B -->|mapped /work| F["wasm_work/student hash"]
+  C -.->|compiled once| K[wasm_cache]
+```
+
+The engine starts itself as a child (`sandbox-run`), which loads every package in `sandbox.wasm_packages` (pinned by sha256 in `deploy/wasm/packages.txt`), compiles them with Cranelift into `sandbox.wasm_cache`, and runs `bash -c` with the student's folder mapped to `/work`. The guest sees no host file outside `/work` and has no network. The folder is named from a hash of the tenant and user and is kept between calls; one past `sandbox.workspace_mb` is refused until files are deleted, and `DELETE /sandbox/{name}` deletes it. A command past its budget has its child killed. Attached files are read in the engine (`converts` is false) and written to `/work` with a `.txt` copy of their text. At boot the engine runs python once in the background so the first student does not wait for compilation.
+
 A tool result longer than `agent.tool_result_to_file_chars` is written to the workspace and replaced by its head plus the path; `0` turns this off. The full result still reaches the trace, and a long live listing reaches the workspace whole.
 
 ### Resource limits
@@ -410,7 +422,7 @@ Before the first model call, `uploads.rs` decodes an inline file, or downloads o
 
 The prompt gets one `prompt.upload_line` per file, just before the question: name, size, paths, session, the first `agent.upload_preview_chars` of its text, and the best passages up to `agent.upload_match_chars`. A file with no text gets `prompt.upload_raw_line`; one that could not be downloaded or written gets `prompt.upload_failed_line`. Each emits `TraceEvent::FileAttached`. The file stays in the session until the session idles out.
 
-With no sandbox, as on a RunPod pod, `agent/read.rs` reads the file in the engine: pdf-extract for a PDF, UTF-8 for text, CSV, JSON and code. It ranks passages the same way, and the prompt gets `prompt.upload_inline_line`, which names no paths. Other types, and a PDF with no text layer, get `prompt.upload_failed_line` with the reason.
+With no sandbox, or one that cannot convert (the WebAssembly one), `agent/read.rs` reads the file in the engine: pdf-extract for a PDF, UTF-8 for text, CSV, JSON and code. It ranks passages the same way, and the prompt gets `prompt.upload_inline_line`, which names no paths. Other types, and a PDF with no text layer, get `prompt.upload_failed_line` with the reason.
 
 ## Compaction
 
@@ -705,7 +717,7 @@ A default belongs to exactly one settings struct; adapters declare no defaults o
 
 ## Deployment
 
-One service image, `sparkyai-rust` (engine and discord, selected by entrypoint). `sparkyai-sandbox` and `sparkyai-sandbox-proxy` are the images the engine starts for `run_sandbox`. `sparkyai-runpod` holds every service and both models for one RunPod GPU pod, where containers cannot start, so `run_sandbox` is off there. CD rebuilds only the images whose inputs changed. Platform runs outside this repo. `llama-server` runs as the compose services `chat` and `embed` under the `model` profile, configured in `deploy/inference`. Details are in `deploy/README.md`.
+One service image, `sparkyai-rust` (engine and discord, selected by entrypoint). `sparkyai-sandbox` and `sparkyai-sandbox-proxy` are the images the engine starts for `run_sandbox`. `sparkyai-runpod` holds every service and both models for one RunPod pod, where containers cannot start, so `run_sandbox` runs as WebAssembly there. CD rebuilds only the images whose inputs changed. Platform runs outside this repo. `llama-server` runs as the compose services `chat` and `embed` under the `model` profile, configured in `deploy/inference`. Details are in `deploy/README.md`.
 
 ## Open decisions
 

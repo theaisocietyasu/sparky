@@ -150,6 +150,8 @@ search = true
 
 # run_sandbox: a command in an isolated container. With egress on it reaches only the egress proxy.
 # required = true refuses to boot without a container runtime; false runs without run_sandbox.
+# runtime = "wasm" runs bash, python3 and the tools in deploy/wasm/packages.txt as WebAssembly in
+# a child of the engine: no container, no network, one folder per student kept under wasm_work.
 [sandbox]
 enabled = true
 required = false
@@ -175,6 +177,10 @@ egress_proxy_name = "sparky-sandbox-proxy"
 description = "Run a shell command in an isolated Linux environment. Reach for it whenever a search did not give you what you need, before you tell the user you could not find something, and for any file the user attached or any tool result too long to read whole. It has python3 with requests, bs4, lxml, pandas, numpy, pypdf, docx, openpyxl, xlrd, PIL, yaml and markdown; pdftotext, pdftoppm and tesseract for PDFs and scans; curl, wget, jq, rg, sqlite3, file, unzip and the usual text tools. It can fetch public web pages over HTTP and HTTPS, for example to read the ASU page a search pointed at. Files the user attached and long results from other tools are already in the workspace, and the prompt or the result names the path and session; read them here with rg, grep or python3."
 command_description = "The shell command to run."
 session_description = "Name a session to keep files in the workspace between calls. Reuse the same name to resume it. Results an earlier tool wrote to the workspace name the session they are in."
+wasm_packages = "/opt/sparky/wasm"   # the webc files, named namespace__name@version.webc
+wasm_cache = "data/sandbox/cache"     # compiled packages, kept so a restart does not compile again
+wasm_work = "data/sandbox/work"       # one folder per student, mapped to /work
+wasm_description = "Run a bash command in the student's own workspace, kept between calls. Use it to work something out rather than doing it in your head, and to read or change a file the user attached. It has python3 with the standard library, grep, sed, rg and the coreutils. There is no network."
 
 # The gate every model response passes. denied_phrases block an answer wherever they appear.
 # protected_terms are removed from an answer as whole words; the registered tool names with an

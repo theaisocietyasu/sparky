@@ -1,13 +1,12 @@
 //! Session bookkeeping: live containers, running commands, least recently used eviction, the reaper.
 
 use std::process::Stdio;
-use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};
 
 use tokio::process::Command;
 
 use crate::core::types::agent::context::RequestContext;
-use crate::core::types::tools::sandbox::{SandboxCommand, SandboxError};
+use crate::core::types::tools::sandbox::SandboxError;
 use crate::runtime::tools::sandbox::container::{
     ContainerSandbox, INSTANCE_LABEL, SESSION_PREFIX, held,
 };
@@ -37,70 +36,7 @@ impl Live {
     }
 }
 
-/// Holds one command in the running list until the call that started it is dropped.
-pub(super) struct Running {
-    sandbox: ContainerSandbox,
-    ticket: u64,
-    started: Instant,
-}
-
-impl Running {
-    /// Moves the finished command into the log and ends the guard.
-    pub(super) fn ended(self, exit_code: Option<i32>, duration_ms: u64) {
-        let Some(mut command) = self.sandbox.take_running(self.ticket) else {
-            return;
-        };
-        command.exit_code = exit_code;
-        command.duration_ms = Some(duration_ms);
-        self.sandbox.keep(command);
-    }
-}
-
-impl Drop for Running {
-    fn drop(&mut self) {
-        // A cancelled call ends here. It is recorded as ended with no exit status.
-        if let Some(mut command) = self.sandbox.take_running(self.ticket) {
-            command.duration_ms = Some(
-                self.started
-                    .elapsed()
-                    .as_millis()
-                    .try_into()
-                    .unwrap_or(u64::MAX),
-            );
-            self.sandbox.keep(command);
-        }
-    }
-}
-
 impl ContainerSandbox {
-    /// Records a command as started. The guard takes it out again however the call ends.
-    pub(super) fn command_started(&self, mut command: SandboxCommand) -> Running {
-        let ticket = self.ticket.fetch_add(1, Ordering::Relaxed);
-        command.id = ticket;
-        held(&self.running).push((ticket, command));
-        Running {
-            sandbox: self.clone(),
-            ticket,
-            started: Instant::now(),
-        }
-    }
-
-    /// Takes the command of ticket out of the running list, if it is still there.
-    pub(super) fn take_running(&self, ticket: u64) -> Option<SandboxCommand> {
-        let mut running = held(&self.running);
-        let at = running.iter().position(|(t, _)| *t == ticket)?;
-        Some(running.remove(at).1)
-    }
-
-    /// Puts an ended command in the log, dropping the oldest once the log is full.
-    pub(super) fn keep(&self, command: SandboxCommand) {
-        let mut recent = held(&self.recent);
-        while recent.len() >= self.limits.recent_commands {
-            recent.pop_front();
-        }
-        recent.push_back(command);
-    }
-
     /// Records a session as used now, starting its entry when this is the first time.
     pub(crate) fn note_used(&self, name: &str, session: &str, ran: bool) {
         let mut sessions = held(&self.sessions);

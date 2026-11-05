@@ -7,7 +7,7 @@ use chrono::FixedOffset;
 
 use secrecy::ExposeSecret;
 
-use crate::core::config::Config;
+use crate::core::config::{Config, WASM_RUNTIME};
 use crate::core::traits::conversation::ConversationStore;
 use crate::core::traits::knowledge::discovery::Discovery;
 use crate::core::traits::knowledge::query::SourceQueries;
@@ -16,6 +16,7 @@ use crate::core::traits::oauth::OAuthStore;
 use crate::core::traits::reminder::ReminderStore;
 use crate::core::traits::tools::Tool;
 use crate::core::traits::tools::canvas::CanvasFeeds;
+use crate::core::traits::tools::sandbox::Sandbox;
 use crate::core::traits::tools::upcoming::UpcomingSource;
 use crate::core::traits::trace::TraceSink;
 use crate::core::types::tools::sandbox::Limits as SandboxLimits;
@@ -26,7 +27,8 @@ use crate::runtime::tools::mcp::{self, McpLimits};
 use crate::runtime::tools::memory::{self, MemoryRules, MemoryTasks};
 use crate::runtime::tools::remind::{self, RemindRules};
 use crate::runtime::tools::sandbox::{
-    ContainerSandbox, SandboxTool, Wording as SandboxWording, reap_sessions,
+    ContainerSandbox, SandboxTool, WasmLimits, WasmSandbox, Wording as SandboxWording,
+    reap_sessions,
 };
 use crate::runtime::tools::upcoming::{UpcomingTool, Window as UpcomingWindow};
 use crate::runtime::tools::{Built, calculate, chats, page, papers, wiki};
@@ -56,7 +58,7 @@ pub(crate) struct Personal {
 pub(crate) async fn build_tools(
     cfg: &Config,
     queries: Arc<dyn SourceQueries>,
-    sandbox: Option<Arc<ContainerSandbox>>,
+    sandbox: Option<Arc<dyn Sandbox>>,
     oauth_store: Arc<dyn OAuthStore>,
     personal: Personal,
 ) -> anyhow::Result<(ToolSet, Vec<String>, Vec<Arc<dyn UpcomingSource>>)> {
@@ -305,9 +307,12 @@ async fn search_tool(
 }
 
 /// The sandbox, when it is enabled and its runtime answers. Starts the session sweeper.
-pub(super) async fn sandbox(cfg: &Config) -> anyhow::Result<Option<Arc<ContainerSandbox>>> {
+pub(super) async fn sandbox(cfg: &Config) -> anyhow::Result<Option<Arc<dyn Sandbox>>> {
     if !cfg.sandbox.enabled {
         return Ok(None);
+    }
+    if cfg.sandbox.runtime == WASM_RUNTIME {
+        return wasm_sandbox(cfg).await;
     }
     let sandbox = ContainerSandbox::new(SandboxLimits::from(&cfg.sandbox));
     if let Err(error) = sandbox.probe().await {
@@ -325,5 +330,22 @@ pub(super) async fn sandbox(cfg: &Config) -> anyhow::Result<Option<Arc<Container
     // Session containers a previous engine left running are nobody's to reap but this one's.
     sandbox.remove_orphans().await;
     tokio::spawn(reap_sessions(sandbox.clone(), every));
+    Ok(Some(Arc::new(sandbox)))
+}
+
+/// The wasm sandbox, when its packages are in place. The child it runs is this engine binary.
+async fn wasm_sandbox(cfg: &Config) -> anyhow::Result<Option<Arc<dyn Sandbox>>> {
+    let program = std::env::current_exe()?;
+    let sandbox = WasmSandbox::new(WasmLimits::from(&cfg.sandbox), program);
+    if let Err(error) = sandbox.probe().await {
+        if cfg.sandbox.required {
+            anyhow::bail!(
+                "sandbox.runtime is wasm but its packages are missing: {error}. \
+                 Put them in sandbox.wasm_packages, or set sandbox.required = false."
+            );
+        }
+        tracing::warn!(%error, "the wasm packages are missing; run_sandbox is not offered");
+        return Ok(None);
+    }
     Ok(Some(Arc::new(sandbox)))
 }

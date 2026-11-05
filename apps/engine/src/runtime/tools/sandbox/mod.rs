@@ -2,8 +2,10 @@
 
 pub(crate) mod container;
 mod egress;
+mod log;
 pub(crate) mod output;
 mod session;
+pub mod wasm;
 
 use std::sync::Arc;
 
@@ -19,6 +21,7 @@ use crate::runtime::tools::structured;
 
 pub use self::container::ContainerSandbox;
 pub use self::session::reap_sessions;
+pub use self::wasm::{WasmLimits, WasmSandbox};
 
 /// What the tool tells the model about itself.
 #[derive(Debug, Clone)]
@@ -33,8 +36,13 @@ pub struct Wording {
 
 impl From<&crate::core::config::SandboxSettings> for Wording {
     fn from(cfg: &crate::core::config::SandboxSettings) -> Self {
+        let description = if cfg.runtime == crate::core::config::WASM_RUNTIME {
+            &cfg.wasm_description
+        } else {
+            &cfg.description
+        };
         Self {
-            description: cfg.description.clone(),
+            description: description.clone(),
             command: cfg.command_description.clone(),
             session: cfg.session_description.clone(),
         }

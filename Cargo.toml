@@ -41,6 +41,11 @@ sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio",
 chacha20poly1305 = "0.10"
 base64 = "0.22"
 pdf-extract = "0.12"
+wasmer = { version = "7.5", default-features = false, features = ["sys", "cranelift", "compiler"] }
+wasmer-wasix = { version = "0.705", default-features = false, features = ["sys", "host-fs", "sys-default"] }
+wasmer-package = "0.705"
+wasmer-config = "0.705"
+semver = "1"
 
 # config
 figment = { version = "0.10", features = ["env", "toml"] }

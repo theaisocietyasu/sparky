@@ -25,7 +25,7 @@ just prod-logs engine
 
 `deploy/docker/runpod.Dockerfile` builds `ghcr.io/theaisocietyasu/sparkyai-runpod`: all of Sparky in one GPU pod. A RunPod pod cannot start containers, so supervisord (`deploy/runpod/supervisord.conf`) runs chat and embed `llama-server`, the engine, and the bot as processes. Knowledge search, live queries and linked accounts live on Platform; conversations, memories and confirmations are in the engine SQLite file on the volume. It differs from compose in two ways:
 
-- `run_sandbox` is off (`SPARKY_SANDBOX__ENABLED=false`).
+- `run_sandbox` runs as WebAssembly inside the engine (`SPARKY_SANDBOX__RUNTIME=wasm`, no network). The image carries the packages in `deploy/wasm/packages.txt`; compiled modules and student folders live in `/workspace/sandbox`. See [The sandbox](#the-sandbox).
 - Phoenix runs only with `SPARKY_RUN_PHOENIX=true`. Expose `6006/http` too. It signs in with `admin@localhost` and `admin` and asks for a new password at once, so sign in right after the first start. Its database and keys are in `/workspace/phoenix`, traces are kept `SPARKY_PHOENIX_RETENTION_DAYS` days (30), and the engine and the bot export to it with its admin key. The admin trace list links each request to its page there.
 
 Create the pod with the image, a volume at `/workspace` (the model cache), a host CUDA version of at least 12.8, and these environment variables: `SPARKY_DISCORD__TOKEN`, `SPARKY_DISCORD__GUILD_ID`, `SPARKY_ENGINE__SERVICE_TOKEN`, `SPARKY_PLATFORM__URL`, `SPARKY_PLATFORM__TOKEN`, `SPARKY_PLATFORM__MCP_URL`, `SPARKY_MEMORY__KEY`, `SPARKY_APP__ENV=production`, and `HF_TOKEN` (a read token; community hosts share an IP that the Hugging Face Hub rate-limits without one). Every service listens on `127.0.0.1`; the pod exposes no port. The first boot downloads the GGUFs into `/workspace/models`. The scopes the Platform token needs are listed in the `[platform]` section of `sparky.toml`.
@@ -152,6 +152,8 @@ A cookie counts when the request `Origin` is the site, or, with no `Origin`, whe
 Commands run in `ghcr.io/theaisocietyasu/sparkyai-sandbox` (`deploy/docker/sandbox.Dockerfile`) with a read-only root, dropped capabilities, a non-root user, and a `noexec` workspace, so `python3 script.py` runs but `./script` does not. With `sandbox.egress` off a container has no network; with it on, it reaches public HTTP and HTTPS only through `sparkyai-sandbox-proxy` (`deploy/sandbox/squid.conf`). `just sandbox-images` builds both images locally; `just sandbox-down` removes the containers the engine started.
 
 The runtime is probed at boot. `sandbox.required = true` refuses to start without one; `false` leaves `run_sandbox` unregistered.
+
+With `sandbox.runtime = "wasm"` no container runtime is needed. The engine runs bash, python3 (standard library only), grep, sed, rg and the coreutils as WebAssembly in a child of itself, with no network and one kept folder per student. `deploy/wasm/fetch.sh deploy/wasm/packages.txt <folder>` downloads the pinned packages and checks each sha256; point `sandbox.wasm_packages` at that folder. The first run compiles them (about a minute); later runs take about a second.
 
 ## Images
 

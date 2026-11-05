@@ -26,8 +26,24 @@ pub(super) struct Bounded {
 }
 
 /// Runs command and reads both streams, keeping at most cap bytes of each stream's head and tail.
-pub(super) async fn bounded_output(mut command: Command, cap: usize) -> std::io::Result<Bounded> {
+pub(super) async fn bounded_output(command: Command, cap: usize) -> std::io::Result<Bounded> {
+    bounded_input(command, cap, None).await
+}
+
+/// The same as bounded_output, with input written to standard input and then closed.
+pub(super) async fn bounded_input(
+    mut command: Command,
+    cap: usize,
+    input: Option<Vec<u8>>,
+) -> std::io::Result<Bounded> {
+    use tokio::io::AsyncWriteExt;
+
     let mut child = command.spawn()?;
+    if let (Some(input), Some(mut stdin)) = (input, child.stdin.take()) {
+        // A child that exits without reading its input is not a failure to start.
+        let _ = stdin.write_all(&input).await;
+        let _ = stdin.shutdown().await;
+    }
     let stdout = child.stdout.take();
     let stderr = child.stderr.take();
     let (out, err, status) = tokio::join!(

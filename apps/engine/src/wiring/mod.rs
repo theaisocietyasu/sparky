@@ -31,7 +31,6 @@ use crate::core::traits::reminder::ReminderStore;
 use crate::core::traits::safety::confirmation::ConfirmationStore;
 use crate::core::traits::tools::canvas::CanvasFeeds;
 use crate::core::traits::tools::files::FileSource;
-use crate::core::traits::tools::sandbox::Sandbox;
 use crate::core::traits::trace::TraceSink;
 use crate::runtime::harness::agent::prompt::capability;
 use crate::runtime::harness::agent::{Agent, AgentDeps, PromptText};
@@ -137,7 +136,7 @@ pub async fn serve(cfg: Config) -> anyhow::Result<()> {
         conversations: Some(Arc::clone(&stores.conversations)),
         memory: Some(Arc::clone(&stores.memory)),
         confirmations: Some(Arc::clone(&stores.confirmations)),
-        sandbox: sandbox.clone().map(|s| s as Arc<dyn Sandbox>),
+        sandbox: sandbox.clone(),
         files: Some(Arc::new(
             HttpFiles::new(cfg.agent.file_hosts.clone(), cfg.agent.max_file_bytes)
                 .map_err(|e| anyhow::anyhow!("attachments: {e}"))?,

@@ -1,7 +1,8 @@
 # syntax=docker/dockerfile:1.7
 # Sparky in one RunPod GPU pod: the chat and embed models, the engine and the bot. The stores
 # live on the platform. RunPod pods cannot run containers, so supervisord runs every service as
-# a process and run_sandbox stays off. The model cache lives under /workspace, the pod volume.
+# a process and run_sandbox runs WebAssembly inside the engine. The model cache, the compiled
+# packages and the student workspaces live under /workspace, the pod volume.
 ARG LLAMA_IMAGE=ghcr.io/ggml-org/llama.cpp:server-cuda
 ARG PHOENIX_VERSION=21.0.0
 
@@ -35,6 +36,8 @@ COPY --from=builder /app/target/release/discord /usr/local/bin/discord
 COPY sparky.toml /etc/sparky/sparky.toml
 COPY deploy/runpod/supervisord.conf /etc/sparky/supervisord.conf
 COPY deploy/runpod/start.sh /usr/local/bin/sparky-start
+COPY deploy/wasm /tmp/wasm
+RUN /tmp/wasm/fetch.sh /tmp/wasm/packages.txt /opt/sparky/wasm && rm -rf /tmp/wasm
 
 # Addresses inside the pod. Secrets come from the pod environment.
 # llama-server links its shared libraries from /app.
@@ -46,8 +49,14 @@ ENV SPARKY_CONFIG_FILE=/etc/sparky/sparky.toml \
     SPARKY_ENGINE__BASE_URL=http://127.0.0.1:8080 \
     SPARKY_MODEL__BASE_URL=http://127.0.0.1:8000/v1 \
     SPARKY_MODEL__API_KEY=local \
-    SPARKY_SANDBOX__ENABLED=false \
+    SPARKY_SANDBOX__ENABLED=true \
     SPARKY_SANDBOX__REQUIRED=false \
+    SPARKY_SANDBOX__RUNTIME=wasm \
+    SPARKY_SANDBOX__EGRESS=false \
+    SPARKY_SANDBOX__WASM_PACKAGES=/opt/sparky/wasm \
+    SPARKY_SANDBOX__WASM_CACHE=/workspace/sandbox/cache \
+    SPARKY_SANDBOX__WASM_WORK=/workspace/sandbox/work \
+    SPARKY_PROMPT__SANDBOX_RETRY_LINE= \
     SPARKY_CHAT_GGUF=unsloth/Qwen3.5-9B-GGUF:Q4_K_M \
     SPARKY_CHAT_CTX=16384 \
     SPARKY_CHAT_PARALLEL=2 \

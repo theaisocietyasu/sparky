@@ -50,6 +50,7 @@ jobs:
               - sparky.toml
               - deploy/docker/runpod.Dockerfile
               - deploy/runpod/**
+              - deploy/wasm/**
       - id: images
         env:
           ALL: ${{ github.event_name == 'workflow_dispatch' }}
