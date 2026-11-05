@@ -46,7 +46,7 @@ fn the_text_of_a_page_leaves_out_scripts_styles_and_tags() {
 
 #[tokio::test]
 async fn a_local_or_odd_link_is_refused() {
-    let built = tools(&ReadPage::default());
+    let built = tools(&ReadPage::default(), None);
     let Some(tool) = built.first() else {
         unreachable!("one tool")
     };

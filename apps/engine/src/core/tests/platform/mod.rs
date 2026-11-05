@@ -3,6 +3,7 @@
 mod config;
 mod confirmation;
 mod conversation;
+mod discovery;
 mod memory;
 mod oauth;
 mod query;

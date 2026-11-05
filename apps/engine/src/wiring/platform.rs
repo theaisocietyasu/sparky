@@ -6,10 +6,12 @@ use std::time::Duration;
 
 use super::Stores;
 use crate::core::config::Config;
+use crate::core::traits::knowledge::discovery::Discovery;
 use crate::core::traits::knowledge::retrieval::Embedder;
 use crate::stores::platform::{
-    PlatformAccounts, PlatformClient, PlatformConfirmations, PlatformConversations, PlatformMemory,
-    PlatformProbe, PlatformQueries, PlatformRetriever, SearchTuning,
+    PlatformAccounts, PlatformClient, PlatformConfirmations, PlatformConversations,
+    PlatformDiscovery, PlatformMemory, PlatformProbe, PlatformQueries, PlatformRetriever,
+    SearchTuning,
 };
 
 /// Every store over the platform. Config::validate guarantees the url and the token.
@@ -46,6 +48,10 @@ pub(super) fn stores(cfg: &Config, embedder: &Arc<dyn Embedder>) -> anyhow::Resu
         reminders: None,
         nudges: None,
         admin: None,
+        discovery: cfg
+            .read_page
+            .save_pages
+            .then(|| Arc::new(PlatformDiscovery::new(client.clone())) as Arc<dyn Discovery>),
         probes: vec![Arc::new(PlatformProbe::new(client))],
     })
 }
