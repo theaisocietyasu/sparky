@@ -58,3 +58,23 @@ pub struct ResetResponse {
     /// Conversations ended.
     pub ended: u64,
 }
+
+/// One open conversation as the web sidebar lists it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ConversationSummary {
+    /// Conversation id.
+    pub id: String,
+    /// The start of its first question.
+    pub title: String,
+    /// When it last changed, RFC 3339 UTC.
+    pub updated_at: String,
+}
+
+/// One question or answer of a conversation as the web shows it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Turn {
+    /// user or assistant.
+    pub role: String,
+    /// The text.
+    pub text: String,
+}

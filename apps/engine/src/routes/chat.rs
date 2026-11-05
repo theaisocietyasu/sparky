@@ -70,6 +70,19 @@ pub struct ChatState {
     pub rate_limit: RateLimiter,
     /// Reads web sessions. None while the web sign-in is off.
     pub web: Option<WebAuth>,
+    /// What the web conversation list and view show.
+    pub web_lists: WebLists,
+}
+
+/// Bounds of the web conversation list and view.
+#[derive(Debug, Clone, Copy)]
+pub struct WebLists {
+    /// Conversations listed.
+    pub conversations: usize,
+    /// Messages one conversation shows.
+    pub turns: usize,
+    /// Characters a title keeps.
+    pub title_chars: usize,
 }
 
 /// Rewrites a turn to run as the signed-in student in their private web chat.

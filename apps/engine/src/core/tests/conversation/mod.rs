@@ -53,6 +53,11 @@ pub(crate) fn state_with_web(
         service_token: SecretString::from("t"),
         rate_limit: RateLimiter::new(0),
         web,
+        web_lists: crate::routes::chat::WebLists {
+            conversations: 50,
+            turns: 200,
+            title_chars: 20,
+        },
     }
 }
 
@@ -482,4 +487,95 @@ async fn a_signed_in_browser_turn_runs_as_the_cookie_user_in_the_web_channel() {
     assert_eq!(theirs, json!({"ended": 0}));
     let (_, mine) = body(reset(State(state), headers(), Json(ended("111", "web"))).await).await;
     assert_eq!(mine, json!({"ended": 1}));
+}
+
+#[tokio::test]
+async fn a_signed_in_student_lists_reads_and_deletes_only_their_web_chats() {
+    use crate::core::tests::http::web::{SITE, auth, browser, session};
+    use crate::routes::conversation::{delete, list, read};
+    use crate::stores::sqlite::{SqliteStore, StoreOptions};
+    use axum::extract::Path;
+
+    let options = StoreOptions {
+        path: "sqlite::memory:".into(),
+        max_connections: 1,
+        busy_timeout: Duration::from_secs(1),
+    };
+    let Ok(sqlite) = SqliteStore::open(&options).await else {
+        unreachable!("an in-memory store opens")
+    };
+    let store: Arc<dyn ConversationStore> = Arc::new(sqlite.conversations());
+    let mine =
+        crate::core::types::agent::context::RequestContext::new("g", "111", Duration::from_secs(5))
+            .with_visibility(Visibility::Private);
+    assert!(store.ensure(&mine, "web").await.is_ok());
+    let turns = [
+        crate::core::types::conversation::message::Message::user("when   is my next exam and more"),
+        crate::core::types::conversation::message::Message::assistant("Friday"),
+    ];
+    assert!(store.append(&mine, &turns).await.is_ok());
+
+    let web = auth();
+    let Some(sealed) = web.seal(&session("111", &[], 3600)) else {
+        unreachable!("the session seals")
+    };
+    let Some(theirs) = web.seal(&session("999", &[], 3600)) else {
+        unreachable!("the session seals")
+    };
+    let mut state = state_with_web(Arc::new(Rooms::default()), Some(web));
+    state.conversations = Some(store);
+    let id = mine.conversation_id.to_string();
+
+    let (status, listed) = body(list(State(state.clone()), browser(SITE, &sealed)).await).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(listed[0]["id"], json!(id));
+    assert_eq!(listed[0]["title"], json!("when is my next exam"));
+    let (_, none) = body(list(State(state.clone()), browser(SITE, &theirs)).await).await;
+    assert_eq!(none, json!([]));
+
+    let (_, chat) = body(
+        read(
+            State(state.clone()),
+            browser(SITE, &sealed),
+            Path(id.clone()),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(
+        chat,
+        json!([
+            {"role": "user", "text": "when   is my next exam and more"},
+            {"role": "assistant", "text": "Friday"}
+        ])
+    );
+    for refused in [
+        read(
+            State(state.clone()),
+            browser(SITE, &theirs),
+            Path(id.clone()),
+        )
+        .await,
+        delete(
+            State(state.clone()),
+            browser(SITE, &theirs),
+            Path(id.clone()),
+        )
+        .await,
+        read(
+            State(state.clone()),
+            browser(SITE, &sealed),
+            Path("nope".into()),
+        )
+        .await,
+    ] {
+        assert_eq!(refused.status(), StatusCode::NOT_FOUND);
+    }
+    let anonymous = list(State(state.clone()), HeaderMap::new()).await;
+    assert_eq!(anonymous.status(), StatusCode::UNAUTHORIZED);
+
+    let gone = delete(State(state.clone()), browser(SITE, &sealed), Path(id)).await;
+    assert_eq!(gone.status(), StatusCode::OK);
+    let (_, empty) = body(list(State(state), browser(SITE, &sealed)).await).await;
+    assert_eq!(empty, json!([]));
 }

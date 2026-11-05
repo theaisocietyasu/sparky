@@ -23,3 +23,9 @@ export type Me = { user_id: string; name: string; roles: string[]; expires_at: n
 
 /** One remembered fact. */
 export type Memory = { number: number; id: string; kind: string; text: string; created_at: string; due?: string | null };
+
+/** One web chat in the sidebar. */
+export type ChatSummary = { id: string; title: string; updated_at: string };
+
+/** One stored message of a chat. */
+export type ChatTurn = { role: "user" | "assistant"; text: string };

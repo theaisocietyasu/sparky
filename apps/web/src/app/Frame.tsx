@@ -39,7 +39,7 @@ const Account = () => {
   );
 };
 
-const Links = ({ groups, label }: { groups: NavGroup[]; label: string }) => (
+const Links = ({ groups, label, children }: { groups: NavGroup[]; label: string; children?: ReactNode }) => (
   <nav aria-label={label} className="flex-1 overflow-y-auto px-3 py-2">
     {groups.map((g, i) => (
       <div key={g.title ?? i} className="mb-4">
@@ -64,21 +64,24 @@ const Links = ({ groups, label }: { groups: NavGroup[]; label: string }) => (
         </ul>
       </div>
     ))}
+    {children}
   </nav>
 );
 
-/** The app page frame: a sidebar with the brand, actions and links, and the page beside it. */
+/** The app page frame: a sidebar with the brand, actions, links and extra content, and the page beside it. */
 const Frame = ({
   label,
   badge,
   actions,
   groups,
+  extra,
   children,
 }: {
   label: string;
   badge?: string;
   actions?: ReactNode;
   groups: NavGroup[];
+  extra?: ReactNode;
   children: ReactNode;
 }) => {
   const [open, setOpen] = useState(false);
@@ -110,7 +113,9 @@ const Frame = ({
           </button>
         </div>
         {actions && <div className="px-3 pb-2">{actions}</div>}
-        <Links groups={groups} label={label} />
+        <Links groups={groups} label={label}>
+          {extra}
+        </Links>
         <Account />
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">

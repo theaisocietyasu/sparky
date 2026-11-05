@@ -8,8 +8,8 @@ use uuid::Uuid;
 use super::{database, stamp};
 use crate::core::traits::conversation::ConversationStore;
 use crate::core::types::agent::context::RequestContext;
-use crate::core::types::conversation::Stored;
 use crate::core::types::conversation::message::{Message, Role};
+use crate::core::types::conversation::{ConversationSummary, Stored};
 use crate::core::types::store::StoreError;
 
 /// The row role of a summary.
@@ -264,5 +264,63 @@ impl ConversationStore for SqliteConversations {
         .await
         .map_err(database)?;
         Ok(ended.rows_affected())
+    }
+
+    async fn list(
+        &self,
+        ctx: &RequestContext,
+        channel_id: &str,
+        limit: usize,
+    ) -> Result<Vec<ConversationSummary>, StoreError> {
+        let limit = i64::try_from(limit.max(1)).unwrap_or(i64::MAX);
+        let rows = sqlx::query(
+            "SELECT c.id, c.updated_at, (SELECT m.content FROM messages m \
+             WHERE m.conversation_id = c.id AND m.role = 'user' ORDER BY m.seq LIMIT 1) AS first \
+             FROM conversations c WHERE c.tenant_id = ? AND c.user_id = ? AND c.channel_id = ? \
+             AND c.ended_at IS NULL ORDER BY c.updated_at DESC LIMIT ?",
+        )
+        .bind(&ctx.tenant_id)
+        .bind(&ctx.user_id)
+        .bind(channel_id)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(database)?;
+        let mut out = Vec::new();
+        for row in rows {
+            let first: Option<String> = row.try_get("first").map_err(database)?;
+            let Some(first) = first else {
+                continue;
+            };
+            out.push(ConversationSummary {
+                id: row.try_get("id").map_err(database)?,
+                title: message(&first)?.content,
+                updated_at: row.try_get("updated_at").map_err(database)?,
+            });
+        }
+        Ok(out)
+    }
+
+    async fn delete(&self, ctx: &RequestContext) -> Result<bool, StoreError> {
+        if !self.owned(ctx).await? {
+            return Ok(false);
+        }
+        let id = ctx.conversation_id.to_string();
+        let mut tx = self.pool.begin().await.map_err(database)?;
+        sqlx::query("DELETE FROM messages WHERE conversation_id = ?")
+            .bind(&id)
+            .execute(&mut *tx)
+            .await
+            .map_err(database)?;
+        let gone =
+            sqlx::query("DELETE FROM conversations WHERE id = ? AND tenant_id = ? AND user_id = ?")
+                .bind(&id)
+                .bind(&ctx.tenant_id)
+                .bind(&ctx.user_id)
+                .execute(&mut *tx)
+                .await
+                .map_err(database)?;
+        tx.commit().await.map_err(database)?;
+        Ok(gone.rows_affected() > 0)
     }
 }

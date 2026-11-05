@@ -1,18 +1,20 @@
-import { Brain, LayoutDashboard, MessageSquare, SquarePen } from "lucide-react";
+import { Brain, LayoutDashboard, Link2, MessageSquare, SquarePen } from "lucide-react";
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
+import ChatList from "./ChatList";
 import Frame, { type NavGroup } from "./Frame";
 import { isModerator, useMe } from "./useMe";
 
-/** The frame of the student pages: chat and memories, and admin for a moderator. */
-const ChatFrame = ({ onNewChat, children }: { onNewChat?: () => void; children: ReactNode }) => {
+/** The frame of the student pages: chat, memories, connections and the chat list, and admin for a moderator. */
+const ChatFrame = ({ onNewChat, chats, children }: { onNewChat?: () => void; chats?: number; children: ReactNode }) => {
   const { me } = useMe();
   const navigate = useNavigate();
   const groups: NavGroup[] = [
     {
       items: [
-        { to: "/chat", label: "Chat", icon: MessageSquare },
+        { to: "/chat", label: "Chat", icon: MessageSquare, end: true },
         { to: "/memories", label: "Memories", icon: Brain },
+        { to: "/connections", label: "Connections", icon: Link2 },
         ...(isModerator(me) ? [{ to: "/admin", label: "Admin", icon: LayoutDashboard }] : []),
       ],
     },
@@ -28,7 +30,7 @@ const ChatFrame = ({ onNewChat, children }: { onNewChat?: () => void; children: 
     </button>
   );
   return (
-    <Frame label="Chat" groups={groups} actions={actions}>
+    <Frame label="Chat" groups={groups} actions={actions} extra={<ChatList version={chats} />}>
       {children}
     </Frame>
   );

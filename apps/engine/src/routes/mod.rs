@@ -125,6 +125,11 @@ pub fn router(states: States, limits: Limits, cors_origins: &[String]) -> Router
         .route("/chat/stream", post(chat::stream))
         .route("/confirm", post(chat::confirm))
         .route("/conversation/reset", post(conversation::reset))
+        .route("/web/conversations", get(conversation::list))
+        .route(
+            "/web/conversations/{id}",
+            get(conversation::read).delete(conversation::delete),
+        )
         .with_state(chat_state);
     let memories = Router::new()
         .route("/memories/list", post(memories::list))
@@ -140,7 +145,7 @@ pub fn router(states: States, limits: Limits, cors_origins: &[String]) -> Router
         .route("/oauth/{provider}/logout", post(oauth::disconnect))
         .with_state(oauth_state);
     let canvas = Router::new()
-        .route("/canvas/feed", post(canvas::save))
+        .route("/canvas/feed", post(canvas::save).get(canvas::status))
         .route("/canvas/feed/remove", post(canvas::remove))
         .with_state(canvas_state);
     let admin = Router::new()

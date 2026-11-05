@@ -1,5 +1,5 @@
 import { drainFrames } from "./sse";
-import type { Answer, Me, Memory, Progress } from "./types";
+import type { Answer, ChatSummary, ChatTurn, Me, Memory, Progress } from "./types";
 
 /** The engine origin the page talks to, or empty when the build has none. */
 export const engineUrl = () => (import.meta.env.VITE_ENGINE_URL ?? "").replace(/\/$/, "");
@@ -73,7 +73,7 @@ export const ask = async (
   onProgress: (p: Progress) => void,
   signal?: AbortSignal,
 ): Promise<Answer> => {
-  const body = { user_id: "", message, conversation_id: conversationId, continue_channel: conversationId === null };
+  const body = { user_id: "", message, conversation_id: conversationId, continue_channel: false };
   const res = await post("/chat/stream", body, signal);
   if (!res.ok || !res.body) throw await failure(res);
   const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
@@ -99,12 +99,6 @@ export const ask = async (
 export const confirm = async (token: string, approve: boolean, conversationId: string): Promise<Answer> =>
   json<Answer>(await post("/confirm", { token, approve, user_id: "", conversation_id: conversationId }));
 
-/** Ends the open web conversation so the next message starts a new one. */
-export const reset = async () => {
-  const res = await post("/conversation/reset", { user_id: "", channel_id: "web" });
-  if (!res.ok) throw await failure(res);
-};
-
 /** What Sparky remembers about the student, in recall order. */
 export const memories = async (): Promise<Memory[]> =>
   (await json<{ memories: Memory[] }>(await post("/memories/list", { user_id: "" }))).memories;
@@ -112,3 +106,27 @@ export const memories = async (): Promise<Memory[]> =>
 /** Forgets one memory by its number, or every memory when number is null. */
 export const forget = async (number: number | null): Promise<number> =>
   (await json<{ removed: number }>(await post("/memories/forget", { user_id: "", number }))).removed;
+
+/** The student's open web chats, newest first. */
+export const chats = (): Promise<ChatSummary[]> => call<ChatSummary[]>("GET", "/web/conversations");
+
+/** The questions and answers of one chat. */
+export const chatTurns = (id: string): Promise<ChatTurn[]> => call<ChatTurn[]>("GET", `/web/conversations/${encodeURIComponent(id)}`);
+
+/** Deletes one chat and its messages. */
+export const deleteChat = async (id: string) => {
+  await call<{ deleted: boolean }>("DELETE", `/web/conversations/${encodeURIComponent(id)}`);
+};
+
+/** Whether the student has linked a Canvas calendar feed. */
+export const canvasStatus = async (): Promise<boolean> => (await call<{ linked: boolean }>("GET", "/canvas/feed")).linked;
+
+/** Saves the Canvas calendar feed link. */
+export const saveCanvas = async (link: string) => {
+  await call<{ saved: boolean }>("POST", "/canvas/feed", { link });
+};
+
+/** Removes the Canvas calendar feed link. */
+export const removeCanvas = async () => {
+  await call<{ removed: boolean }>("POST", "/canvas/feed/remove", {});
+};

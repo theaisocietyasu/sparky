@@ -6,8 +6,8 @@ use async_trait::async_trait;
 use uuid::Uuid;
 
 use crate::core::types::agent::context::RequestContext;
-use crate::core::types::conversation::Stored;
 use crate::core::types::conversation::message::Message;
+use crate::core::types::conversation::{ConversationSummary, Stored};
 use crate::core::types::store::StoreError;
 
 /// Durable conversation history, scoped by tenant, user, and conversation.
@@ -36,4 +36,17 @@ pub trait ConversationStore: Send + Sync {
     ) -> Result<Option<Uuid>, StoreError>;
     /// Ends every open conversation of the caller in channel_id, any visibility; returns the count.
     async fn end(&self, ctx: &RequestContext, channel_id: &str) -> Result<u64, StoreError>;
+    /// The caller's open conversations in channel_id that hold a question, newest first.
+    async fn list(
+        &self,
+        _ctx: &RequestContext,
+        _channel_id: &str,
+        _limit: usize,
+    ) -> Result<Vec<ConversationSummary>, StoreError> {
+        Ok(Vec::new())
+    }
+    /// Deletes the request conversation and its messages when the caller owns it.
+    async fn delete(&self, _ctx: &RequestContext) -> Result<bool, StoreError> {
+        Ok(false)
+    }
 }
