@@ -1,9 +1,21 @@
-import { Brain, Trash2 } from "lucide-react";
+import { Brain, List, Network, Trash2 } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useCallback, useEffect, useState } from "react";
 import ChatFrame from "../app/ChatFrame";
 import { forget, memories as fetchMemories } from "../chat/client";
 import type { Memory } from "../chat/types";
+import MemoryMap from "./MemoryMap";
+
+type View = "map" | "list";
+const VIEW_KEY = "sparky.memories.view";
+
+const savedView = (): View => {
+  try {
+    return localStorage.getItem(VIEW_KEY) === "list" ? "list" : "map";
+  } catch {
+    return "map";
+  }
+};
 
 /** /memories: what Sparky remembers about the signed-in student, with forget per item and for all. */
 const Memories = () => {
@@ -11,6 +23,16 @@ const Memories = () => {
   const [items, setItems] = useState<Memory[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmAll, setConfirmAll] = useState(false);
+  const [view, setView] = useState<View>(savedView);
+
+  const show = (next: View) => {
+    setView(next);
+    try {
+      localStorage.setItem(VIEW_KEY, next);
+    } catch {
+      // The choice lasts for this visit only.
+    }
+  };
 
   const load = useCallback(() => {
     fetchMemories()
@@ -44,6 +66,25 @@ const Memories = () => {
             </div>
             {items && items.length > 0 && (
               <div className="flex gap-2">
+                <div role="group" aria-label="View" className="flex h-9 rounded-lg border border-edge p-0.5">
+                  {(
+                    [
+                      ["map", "Map", Network],
+                      ["list", "List", List],
+                    ] as const
+                  ).map(([key, label, Icon]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => show(key)}
+                      aria-pressed={view === key}
+                      className={`flex items-center gap-1.5 rounded-md px-2.5 text-sm ${view === key ? "bg-sunk font-medium" : "text-dim hover:text-fg"}`}
+                    >
+                      <Icon className="size-4" />
+                      {label}
+                    </button>
+                  ))}
+                </div>
                 {confirmAll ? (
                   <>
                     <button type="button" onClick={() => setConfirmAll(false)} className="h-9 rounded-lg border border-edge px-3 text-sm hover:bg-sunk">
@@ -80,7 +121,8 @@ const Memories = () => {
               <p className="mt-1 text-sm text-dim">Tell it in a chat, for example: remember that I study at Tempe.</p>
             </div>
           )}
-          {items && items.length > 0 && (
+          {items && items.length > 0 && view === "map" && <MemoryMap items={items} onForget={(n) => drop(n)} />}
+          {items && items.length > 0 && view === "list" && (
             <ol aria-label="Memories" className="mt-8 divide-y divide-edge overflow-hidden rounded-2xl border border-edge bg-raised">
               <AnimatePresence initial={false}>
                 {items.map((m) => (
