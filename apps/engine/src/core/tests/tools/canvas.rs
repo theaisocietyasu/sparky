@@ -287,3 +287,41 @@ async fn a_revoked_feed_asks_for_a_new_link() {
         "{out:?}"
     );
 }
+
+#[tokio::test]
+async fn a_feed_request_carries_the_user_agent() {
+    use crate::core::traits::tools::canvas::CanvasCalendar as _;
+    use crate::runtime::tools::account::canvas::client::FeedClient;
+
+    let Ok(listener) = tokio::net::TcpListener::bind("127.0.0.1:0").await else {
+        unreachable!("a local port binds")
+    };
+    let Ok(addr) = listener.local_addr() else {
+        unreachable!("the port has an address")
+    };
+    let app = axum::Router::new().fallback(|headers: axum::http::HeaderMap| async move {
+        let agent = headers
+            .get("user-agent")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or_default()
+            .to_owned();
+        if agent.is_empty() {
+            (axum::http::StatusCode::FORBIDDEN, String::new())
+        } else {
+            (axum::http::StatusCode::OK, agent)
+        }
+    });
+    tokio::spawn(async move {
+        let _ = axum::serve(listener, app).await;
+    });
+    let Ok(client) = FeedClient::new(std::time::Duration::from_secs(5), 1000, "SparkyAI/test")
+    else {
+        unreachable!("the client builds")
+    };
+    let link = SecretString::from(format!("http://{addr}/feeds/calendars/user_A.ics"));
+    let out = client.fetch(&link).await;
+    assert!(
+        matches!(&out, Ok(body) if body == "SparkyAI/test"),
+        "{out:?}"
+    );
+}

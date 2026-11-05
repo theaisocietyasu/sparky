@@ -45,6 +45,8 @@ pub struct Canvas {
     pub max_days: u32,
     /// Most items one call returns to the model.
     pub max_items: usize,
+    /// User-Agent header sent with each feed request.
+    pub user_agent: String,
 }
 
 impl Default for Canvas {
@@ -57,6 +59,7 @@ impl Default for Canvas {
             default_days: 14,
             max_days: 60,
             max_items: 25,
+            user_agent: "SparkyAI/1.0 (+https://github.com/theaisocietyasu/sparky)".into(),
         }
     }
 }

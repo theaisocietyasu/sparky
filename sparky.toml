@@ -250,6 +250,8 @@ max_bytes = 2000000            # largest feed read
 default_days = 14              # days ahead when the model gives none
 max_days = 60
 max_items = 25
+# Canvas sits behind CloudFront, which answers 403 to a request with no User-Agent.
+user_agent = "SparkyAI/1.0 (+https://github.com/theaisocietyasu/sparky)"
 
 # Discord sign-in for the web page. Off until enabled. SPARKY_WEB__DISCORD_CLIENT_ID,
 # SPARKY_WEB__DISCORD_CLIENT_SECRET, SPARKY_WEB__SESSION_KEY, SPARKY_WEB__PUBLIC_URL and

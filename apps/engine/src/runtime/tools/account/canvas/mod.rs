@@ -81,8 +81,9 @@ impl CanvasTool {
 fn failed(error: CanvasError) -> ToolError {
     match error {
         CanvasError::Refused(401 | 403 | 404) => ToolError::Failed(
-            "Canvas no longer accepts the saved calendar feed link. Send /canvas in a direct \
-             message with the current Calendar Feed link."
+            "Canvas no longer accepts the saved calendar feed link. Tell the student to link the \
+             current Calendar Feed link with /canvas in a Discord direct message or on the \
+             Connections page of the web chat, never by pasting it into the chat."
                 .to_owned(),
         ),
         other => ToolError::Failed(other.to_string()),
@@ -245,8 +246,12 @@ pub fn tools(
     utc_offset_hours: i32,
 ) -> Result<Built, String> {
     let calendar: Arc<dyn CanvasCalendar> = Arc::new(
-        FeedClient::new(Duration::from_secs(cfg.timeout_secs), cfg.max_bytes)
-            .map_err(|e| e.to_string())?,
+        FeedClient::new(
+            Duration::from_secs(cfg.timeout_secs),
+            cfg.max_bytes,
+            &cfg.user_agent,
+        )
+        .map_err(|e| e.to_string())?,
     );
     let offset = FixedOffset::east_opt(utc_offset_hours * 3600)
         .ok_or_else(|| format!("utc offset {utc_offset_hours} is out of range"))?;
