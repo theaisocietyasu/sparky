@@ -154,6 +154,29 @@ describe("web chat", () => {
     expect(JSON.parse(String(sent?.init?.body))).toMatchObject({ number: 1 });
   });
 
+  it("draws memories as a tree by kind and switches to the list", async () => {
+    engine({
+      "/web/me": () => Response.json(ME),
+      "/memories/list": () =>
+        Response.json({
+          memories: [
+            { number: 1, id: "a", kind: "fact", text: "Studies at Tempe", created_at: "2026-11-01" },
+            { number: 2, id: "b", kind: "fact", text: "Majors in CS", created_at: "2026-11-01" },
+            { number: 3, id: "c", kind: "task", text: "Essay", created_at: "2026-11-02", due: "2026-11-09" },
+          ],
+        }),
+    });
+    open("/memories");
+    const map = await screen.findByRole("list", { name: "Memory map" });
+    const facts = within(map).getByRole("list", { name: "Facts" });
+    expect(within(facts).getAllByRole("listitem")).toHaveLength(2);
+    expect(within(map).getByRole("list", { name: "Tasks" })).toHaveTextContent(/due 2026-11-09/);
+    fireEvent.click(screen.getByRole("button", { name: "List" }));
+    expect(screen.getByRole("list", { name: "Memories" })).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Memory map" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Map" }));
+  });
+
   it("lists chats, reopens one with its turns and deletes it", async () => {
     let listed = [{ id: "c9", title: "When is my exam", updated_at: "2026-11-05" }];
     const calls = engine({
