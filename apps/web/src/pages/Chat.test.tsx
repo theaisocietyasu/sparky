@@ -164,6 +164,31 @@ describe("web chat", () => {
     expect(calls.some((c) => c.url === `${ENGINE}/web/reminders/r1` && c.init?.method === "DELETE")).toBe(true);
   });
 
+  it("shows choices under the latest answer and sends the one tapped", async () => {
+    let asked = 0;
+    const calls = engine({
+      "/web/me": () => Response.json(ME),
+      "/chat/stream": () => {
+        asked += 1;
+        const text = asked === 1 ? "Which campus are you on?\n\n```choices\nTempe\nWest\n```" : "Got it, Tempe.";
+        return sse([
+          ["answer", answer({ text, citations: [] })],
+          ["done", {}],
+        ]);
+      },
+    });
+    open("/chat");
+    fireEvent.change(await screen.findByLabelText("Message"), { target: { value: "hi" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    const choices = within(await screen.findByRole("list", { name: "Choices" }));
+    expect(screen.queryByText(/```/)).toBeNull();
+    fireEvent.click(choices.getByRole("button", { name: "Tempe" }));
+    expect(await screen.findByText("Got it, Tempe.")).toBeInTheDocument();
+    const second = calls.filter((c) => c.url === `${ENGINE}/chat/stream`)[1];
+    expect(JSON.parse(String(second?.init?.body))).toMatchObject({ message: "Tempe" });
+    expect(screen.queryByRole("list", { name: "Choices" })).toBeNull();
+  });
+
   it("sends attached files inline and shows them on the turn", async () => {
     const calls = engine({
       "/web/me": () => Response.json(ME),

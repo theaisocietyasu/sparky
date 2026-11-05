@@ -274,7 +274,15 @@ const Chat = () => {
                     )}
                     {t.question && <p className="whitespace-pre-wrap rounded-3xl bg-shu px-4 py-2.5 text-[15px] leading-6 text-white">{t.question}</p>}
                   </div>
-                  {t.answer && <Reply answer={t.answer} busy={busy} revealFrom={t.reveal} onConfirm={(approve) => answerHeld(t, approve)} />}
+                  {t.answer && (
+                    <Reply
+                      answer={t.answer}
+                      busy={busy}
+                      revealFrom={t.reveal}
+                      onConfirm={(approve) => answerHeld(t, approve)}
+                      onChoose={t.id === turns[turns.length - 1]?.id ? (choice) => send(choice) : undefined}
+                    />
+                  )}
                   {t.error && (
                     <AssistantRow>
                       <div className="flex flex-wrap items-center gap-3">

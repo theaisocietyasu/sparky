@@ -226,6 +226,8 @@ pub struct Prompt {
     pub proactive_rules: String,
     /// How to meet a student Sparky knows nothing about. Added to the first private turn with no memories.
     pub onboarding_rules: String,
+    /// How to offer tap-to-answer choices. Added to a private turn from the web chat.
+    pub widget_rules: String,
     /// Heading above what the model may do.
     pub capabilities_header: String,
     /// Heading above the message of ours a reply answers.
@@ -264,6 +266,7 @@ impl Default for Prompt {
             discovery_rules: assemble::DISCOVERY_RULES.into(),
             proactive_rules: assemble::PROACTIVE_RULES.into(),
             onboarding_rules: assemble::ONBOARDING_RULES.into(),
+            widget_rules: assemble::WIDGET_RULES.into(),
             capabilities_header: assemble::CAPABILITIES_HEADER.into(),
             reply_header: assemble::REPLY_HEADER.into(),
             result_cut_line: assemble::RESULT_CUT_LINE.into(),
