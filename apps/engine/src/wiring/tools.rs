@@ -30,7 +30,7 @@ use crate::runtime::tools::sandbox::{
     ContainerSandbox, SandboxTool, Wording as SandboxWording, reap_sessions,
 };
 use crate::runtime::tools::upcoming::{UpcomingTool, Window as UpcomingWindow};
-use crate::runtime::tools::{Built, page, papers, wiki};
+use crate::runtime::tools::{Built, calculate, page, papers, wiki};
 
 /// Builds the tools and upcoming sources of one integration, or says why it could not.
 type Build<'a> = Box<dyn FnOnce() -> Result<Built, String> + 'a>;
@@ -181,7 +181,7 @@ fn integrations<'a>(
         memory,
     } = personal;
     let mut all: Vec<Integration<'a>> = Vec::new();
-    all.extend::<[Integration<'a>; 8]>([
+    all.extend::<[Integration<'a>; 9]>([
         (
             "memory",
             memory.is_some(),
@@ -240,6 +240,11 @@ fn integrations<'a>(
             "papers",
             cfg.papers.enabled,
             Box::new(move || papers::tools(&cfg.papers).map(Built::from)),
+        ),
+        (
+            "calculate",
+            cfg.calculate.enabled,
+            Box::new(move || calculate::tools(cfg.prompt.utc_offset_hours).map(Built::from)),
         ),
         (
             "read_page",
@@ -316,11 +321,13 @@ async fn search_tools(
         &sources,
         retriever,
         cfg.retrieval.top_k,
+        cfg.retrieval.stale_days,
         &StoredWording {
             tool: cfg.tools.knowledge_description.clone(),
             query: cfg.tools.query_description.clone(),
             source: cfg.tools.source_description.clone(),
             empty: cfg.tools.nothing_stored.clone(),
+            stale: cfg.tools.stale_note.clone(),
         },
     ));
     // search_live offers only the sources the platform publishes, and the fallback.

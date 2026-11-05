@@ -406,6 +406,7 @@ fn a_search_tool_left_with_no_wording_is_rejected() {
         "query_description",
         "source_description",
         "nothing_stored",
+        "stale_note",
     ] {
         let e = err(&format!("[tools]\n{setting} = \"   \"\n"));
         assert!(e.contains(setting), "{e}");

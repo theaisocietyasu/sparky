@@ -97,6 +97,9 @@ pub struct Config {
     /// Academic paper search.
     #[serde(default)]
     pub papers: Papers,
+    /// Arithmetic and date math.
+    #[serde(default)]
+    pub calculate: Calculate,
     /// Reading one public web page.
     #[serde(default)]
     pub read_page: ReadPage,
@@ -565,6 +568,7 @@ fn validate_tools(tools: &Tools) -> Result<(), ConfigError> {
         ("query_description", &tools.query_description),
         ("source_description", &tools.source_description),
         ("nothing_stored", &tools.nothing_stored),
+        ("stale_note", &tools.stale_note),
     ] {
         if text.trim().is_empty() {
             return Err(ConfigError::Invalid(format!(

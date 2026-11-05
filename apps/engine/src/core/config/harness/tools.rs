@@ -29,9 +29,13 @@ pub const SOURCE_DESCRIPTION: &str = "Narrows the search to one source. Leave it
 
 /// Default answer of search_knowledge when the index holds nothing for the query.
 pub const NOTHING_STORED: &str = "The knowledge base holds nothing for that query. If you named a source, search again \
-     without it. Otherwise search again with the subject named differently, or call \
-     search_live, or open the page yourself with run_sandbox. Say you do not have it only \
+     without it. Otherwise search again with the subject named differently, read the page \
+     with read_page when you know its url, or call search_live. Say you do not have it only \
      once all of that has been tried this turn.";
+
+/// Default note on a stored passage whose page is old.
+pub const STALE_NOTE: &str = "This copy is old. If the answer depends on details that change, read the url with \
+     read_page for the current page.";
 
 /// Which tools are registered and how the two search tools are worded.
 #[derive(Debug, Deserialize)]
@@ -53,6 +57,8 @@ pub struct Tools {
     pub source_description: String,
     /// What search_knowledge answers when the index holds nothing.
     pub nothing_stored: String,
+    /// Note on a stored passage older than retrieval.stale_days.
+    pub stale_note: String,
 }
 
 impl Default for Tools {
@@ -66,6 +72,7 @@ impl Default for Tools {
             query_description: QUERY_DESCRIPTION.into(),
             source_description: SOURCE_DESCRIPTION.into(),
             nothing_stored: NOTHING_STORED.into(),
+            stale_note: STALE_NOTE.into(),
         }
     }
 }

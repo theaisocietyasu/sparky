@@ -28,6 +28,7 @@ pub struct StoredSearch {
     categories: HashMap<&'static str, &'static str>,
     top_k: usize,
     empty: String,
+    stale: Stale,
     definition: ToolDefinition,
 }
 
@@ -42,6 +43,17 @@ pub struct Wording {
     pub source: String,
     /// What the tool answers when the index holds nothing for the query.
     pub empty: String,
+    /// Note on a passage whose page was fetched longer ago than stale_days.
+    pub stale: String,
+}
+
+/// When a stored passage counts as old, and the note it carries then.
+#[derive(Debug, Clone)]
+pub struct Stale {
+    /// Age past which a passage is marked.
+    pub after: chrono::Duration,
+    /// Note added after the fetch age of a marked passage that has a url.
+    pub note: String,
 }
 
 impl StoredSearch {
@@ -50,6 +62,7 @@ impl StoredSearch {
         sources: &[Box<dyn LiveSource>],
         retriever: Arc<dyn Retriever>,
         top_k: usize,
+        stale_days: u32,
         wording: &Wording,
     ) -> Self {
         let keys = source_keys(sources, true);
@@ -77,13 +90,17 @@ impl StoredSearch {
             categories,
             top_k,
             empty: wording.empty.clone(),
+            stale: Stale {
+                after: chrono::Duration::days(i64::from(stale_days)),
+                note: wording.stale.clone(),
+            },
             definition,
         }
     }
 }
 
-/// Retrieved passages as the model reads them, newest fetch date and page url on each.
-pub fn render(evidence: &[Evidence], now: chrono::DateTime<Utc>) -> String {
+/// Retrieved passages as the model reads them, fetch age and page url on each, old pages marked.
+pub fn render(evidence: &[Evidence], now: chrono::DateTime<Utc>, stale: &Stale) -> String {
     let mut out = String::new();
     for (i, e) in evidence.iter().enumerate() {
         let page = e
@@ -91,9 +108,14 @@ pub fn render(evidence: &[Evidence], now: chrono::DateTime<Utc>) -> String {
             .as_deref()
             .map(|url| format!(" - {url}"))
             .unwrap_or_default();
+        let note = if e.url.is_some() && now - e.fetched_at > stale.after {
+            format!(" {}", stale.note)
+        } else {
+            String::new()
+        };
         let _ = write!(
             out,
-            "[{}] {}{page} (stored copy, fetched {})\n{}\n\n",
+            "[{}] {}{page} (stored copy, fetched {}){note}\n{}\n\n",
             i + 1,
             e.title,
             age(e.fetched_at, now),
@@ -154,7 +176,7 @@ impl Tool for StoredSearch {
             });
         }
         Ok(ToolOutput {
-            content: render(&evidence, Utc::now()),
+            content: render(&evidence, Utc::now(), &self.stale),
             data: structured(&evidence),
             sources: Evidence::citations(&evidence),
         })

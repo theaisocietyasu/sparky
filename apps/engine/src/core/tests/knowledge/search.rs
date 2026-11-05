@@ -7,11 +7,12 @@ use serde_json::{Value, json};
 
 use crate::core::config::{
     KNOWLEDGE_DESCRIPTION, LIVE_DESCRIPTION, NOTHING_STORED, QUERY_DESCRIPTION, SOURCE_DESCRIPTION,
-    Tools,
+    STALE_NOTE, Tools,
 };
 use crate::core::tests::support::{FakeQueries, Stored, ctx};
 use crate::core::traits::knowledge::retrieval::Retriever;
 use crate::core::traits::tools::Tool;
+use crate::core::types::knowledge::evidence::Evidence;
 use crate::core::types::knowledge::query::{QueryParam, QuerySourceInfo};
 use crate::core::types::model::tokens::estimate;
 use crate::core::types::tools::SEARCH_LIVE;
@@ -30,7 +31,9 @@ use crate::runtime::tools::knowledge::search::sources::shuttles::Shuttles;
 use crate::runtime::tools::knowledge::search::sources::sports::Sports;
 use crate::runtime::tools::knowledge::search::sources::study_rooms::StudyRooms;
 use crate::runtime::tools::knowledge::search::sources::web::Web;
-use crate::runtime::tools::knowledge::search::stored::{StoredSearch, Wording as StoredWording};
+use crate::runtime::tools::knowledge::search::stored::{
+    Stale, StoredSearch, Wording as StoredWording, render,
+};
 use crate::runtime::tools::knowledge::search::{
     Accepts, Freshness, LiveSource, Param, arguments, catalog, conforms, dated, named, params_for,
     source_help, source_keys,
@@ -76,6 +79,7 @@ fn stored_wording() -> StoredWording {
         query: QUERY_DESCRIPTION.into(),
         source: SOURCE_DESCRIPTION.into(),
         empty: NOTHING_STORED.into(),
+        stale: STALE_NOTE.into(),
     }
 }
 
@@ -84,7 +88,7 @@ fn live_tool(queries: FakeQueries) -> LiveSearch {
 }
 
 fn stored_tool(retriever: Arc<dyn Retriever>) -> StoredSearch {
-    StoredSearch::new(&catalog(), retriever, 6, &stored_wording())
+    StoredSearch::new(&catalog(), retriever, 6, 14, &stored_wording())
 }
 
 fn enum_of(tool: &dyn Tool) -> Vec<String> {
@@ -773,5 +777,31 @@ fn the_wording_the_model_reads_defaults_to_the_settings_in_the_file() {
     assert!(
         cost < 120,
         "the query wording stays short enough to read every step, got {cost} tokens"
+    );
+}
+
+#[test]
+fn an_old_page_with_a_url_is_marked_for_a_fresh_read() {
+    let now = chrono::Utc::now();
+    let page = |days: i64, url: Option<&str>| Evidence {
+        source_id: uuid::Uuid::nil(),
+        chunk_id: uuid::Uuid::nil(),
+        key: "asu".into(),
+        title: "Parking permits".into(),
+        content: "Permits cost 780 dollars.".into(),
+        url: url.map(str::to_owned),
+        fetched_at: now - chrono::Duration::days(days),
+        score: 1.0,
+    };
+    let stale = Stale {
+        after: chrono::Duration::days(14),
+        note: STALE_NOTE.into(),
+    };
+    let url = Some("https://cfo.asu.edu/parking");
+    assert!(render(&[page(30, url)], now, &stale).contains(STALE_NOTE));
+    assert!(!render(&[page(3, url)], now, &stale).contains(STALE_NOTE));
+    assert!(
+        !render(&[page(30, None)], now, &stale).contains(STALE_NOTE),
+        "a page with no url cannot be read again"
     );
 }
