@@ -144,6 +144,7 @@ top_k = 6                      # chunks search_knowledge returns per call
 dense = true                   # send a query vector, so the platform runs its dense leg
 # Rows either side of a hit joined into one passage; overlapping windows merge. 0 returns the hit alone.
 window = 2
+stale_days = 14                # a stored page older than this is marked for a fresh read_page
 
 # ---------------------------------------------------------------- what may run
 # Risk classes in order: read_public, read_authenticated, prepare_write, external_write,
@@ -165,7 +166,8 @@ knowledge_description = "Search the stored knowledge base of ASU pages: programs
 live_description = "Fetch an ASU source or the open web right now. Use it when the answer has to be current, such as hours today, open seats, shuttle times, events, news or scores, or when the knowledge base holds nothing."
 query_description = "What to search for, in keywords. This string is the whole request: the tool reads nothing else from the conversation, so name the subject in full and write no pronoun and no bare word. Bad: hours. Good: Hayden Library hours Sunday. Bad: does it have space left. Good: CSE 310 Fall 2026 open seats."
 source_description = "Narrows the search to one source. Leave it out unless the question is plainly about that one source: a wrong source returns nothing even when the answer is stored."
-nothing_stored = "The knowledge base holds nothing for that query. If you named a source, search again without it. Otherwise search again with the subject named differently, or call search_live, or open the page yourself with run_sandbox. Say you do not have it only once all of that has been tried this turn."
+nothing_stored = "The knowledge base holds nothing for that query. If you named a source, search again without it. Otherwise search again with the subject named differently, read the page with read_page when you know its url, or call search_live. Say you do not have it only once all of that has been tried this turn."
+stale_note = "This copy is old. If the answer depends on details that change, read the url with read_page for the current page."
 
 # run_sandbox: a command in an isolated container. With egress on it reaches only the egress proxy.
 # required = true refuses to boot without a container runtime; false runs without run_sandbox.
@@ -317,7 +319,11 @@ base_url = "https://api.semanticscholar.org/graph/v1"
 timeout_secs = 20
 max_items = 5
 
-# Wikipedia lookups over the MediaWiki API. Public, no key.
+# Arithmetic and date math, worked out in the engine. Today is at prompt.utc_offset_hours.
+[calculate]
+enabled = true
+
+# One public web page by URL. Private and local addresses are refused.
 [read_page]
 enabled = true
 timeout_secs = 15
@@ -326,6 +332,7 @@ max_chars = 6000
 max_redirects = 5
 user_agent = "Mozilla/5.0 (compatible; SparkyAI/2.0; ASU student copilot)"
 
+# Wikipedia lookups over the MediaWiki API. Public, no key.
 [wikipedia]
 enabled = true
 base_url = "https://en.wikipedia.org/w/api.php"

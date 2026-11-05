@@ -1,6 +1,7 @@
 //! Built-in tools and MCP-backed tools. Each declares a RiskClass.
 
 pub mod account;
+pub mod calculate;
 pub mod files;
 pub mod http;
 pub mod knowledge;

@@ -173,6 +173,20 @@ impl Default for Papers {
     }
 }
 
+/// Arithmetic and date math the model hands off instead of working out itself.
+#[derive(Debug, Deserialize)]
+#[serde(default)]
+pub struct Calculate {
+    /// Whether the calculate tool is registered at boot.
+    pub enabled: bool,
+}
+
+impl Default for Calculate {
+    fn default() -> Self {
+        Self { enabled: true }
+    }
+}
+
 /// Reading one public web page by URL. Private and local addresses are refused.
 #[derive(Debug, Deserialize)]
 #[serde(default)]

@@ -108,6 +108,7 @@ fn action(tool: &str, arguments: &Value) -> Action {
             "Searched research papers",
             "the paper search",
         ),
+        "calculate" => simple("Working it out", "Worked it out", "the calculator"),
         "read_page" => simple("Reading the page", "Read the page", "the page"),
         "wikipedia_lookup" => simple(
             "Looking it up on Wikipedia",

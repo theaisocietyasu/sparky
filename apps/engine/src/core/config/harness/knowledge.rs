@@ -12,6 +12,8 @@ pub struct Retrieval {
     pub dense: bool,
     /// Rows either side of a hit read back with it. 0 hands back the hit alone.
     pub window: i32,
+    /// Days after which a stored page is marked as possibly out of date.
+    pub stale_days: u32,
 }
 
 impl Default for Retrieval {
@@ -20,6 +22,7 @@ impl Default for Retrieval {
             top_k: 6,
             dense: true,
             window: 2,
+            stale_days: 14,
         }
     }
 }

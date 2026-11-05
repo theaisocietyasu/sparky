@@ -1,5 +1,6 @@
 //! Tools: MCP risk mapping, the account tools, Canvas, integrations, and the sandbox.
 
+mod calculate;
 mod canvas;
 mod gcal;
 mod integrations;
