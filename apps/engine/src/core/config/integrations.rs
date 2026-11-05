@@ -89,6 +89,40 @@ impl Default for Upcoming {
     }
 }
 
+/// Reminders the student sets with the remind tool, and the notifications they become.
+#[derive(Debug, Deserialize)]
+#[serde(default)]
+pub struct Reminders {
+    /// Whether the remind tools, the notification routes and the reminder loop are on. Needs store.backend sqlite.
+    pub enabled: bool,
+    /// Seconds between checks for due reminders.
+    pub tick_secs: u64,
+    /// Most reminders one student keeps at once.
+    pub max_per_user: usize,
+    /// Longest reminder text, in characters.
+    pub max_chars: usize,
+    /// Most days ahead a reminder may be set.
+    pub max_days_ahead: u32,
+    /// Days a notification stays after it is made.
+    pub keep_days: u32,
+    /// Most notifications the web list or one bot poll returns.
+    pub list_limit: usize,
+}
+
+impl Default for Reminders {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            tick_secs: 30,
+            max_per_user: 50,
+            max_chars: 200,
+            max_days_ahead: 365,
+            keep_days: 30,
+            list_limit: 50,
+        }
+    }
+}
+
 /// Google Calendar read-only tool. Off by default; reads the caller's Google account linked on the platform.
 #[derive(Debug, Deserialize)]
 #[serde(default)]

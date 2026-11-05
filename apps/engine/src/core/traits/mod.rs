@@ -8,6 +8,7 @@ pub mod knowledge;
 pub mod memory;
 pub mod model;
 pub mod oauth;
+pub mod reminder;
 pub mod safety;
 pub mod tools;
 pub mod trace;

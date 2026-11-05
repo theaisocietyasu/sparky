@@ -8,6 +8,7 @@ mod conversation;
 mod import;
 mod memory;
 mod prune;
+mod reminder;
 mod seal;
 
 use std::time::Duration;

@@ -117,10 +117,11 @@ const Links = ({ groups, label, children }: { groups: NavGroup[]; label: string;
   </nav>
 );
 
-/** The app page frame: a sidebar with the brand, actions, links and extra content, and the page beside it. */
+/** The app page frame: a sidebar with the brand, its tools, actions, links and extra content, and the page beside it. */
 const Frame = ({
   label,
   badge,
+  tools,
   actions,
   groups,
   extra,
@@ -128,6 +129,7 @@ const Frame = ({
 }: {
   label: string;
   badge?: string;
+  tools?: ReactNode;
   actions?: ReactNode;
   groups: NavGroup[];
   extra?: ReactNode;
@@ -155,11 +157,14 @@ const Frame = ({
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="flex h-14 items-center justify-between px-4">
+        <div className="flex h-14 items-center justify-between gap-2 px-4">
           {brand}
-          <button type="button" aria-label="Close the menu" onClick={() => setOpen(false)} className="text-dim md:hidden">
-            <X className="size-5" />
-          </button>
+          <div className="flex items-center gap-1">
+            {tools}
+            <button type="button" aria-label="Close the menu" onClick={() => setOpen(false)} className="grid size-8 place-items-center text-dim md:hidden">
+              <X className="size-5" />
+            </button>
+          </div>
         </div>
         {actions && <div className="px-3 pb-2">{actions}</div>}
         <Links groups={groups} label={label}>

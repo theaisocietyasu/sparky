@@ -5,6 +5,7 @@ mod canvas;
 mod health;
 mod login;
 mod memories;
+mod notifications;
 mod rate_limit;
 mod sandbox;
 pub(crate) mod web;

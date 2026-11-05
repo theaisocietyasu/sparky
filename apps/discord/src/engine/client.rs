@@ -14,7 +14,8 @@ use tokio::sync::mpsc::UnboundedSender;
 use crate::core::types::{
     AuthorizeRequest, AuthorizeResponse, ChatRequest, ChatResponse, ConfirmRequest,
     DisconnectResponse, ERROR_BODY_CHARS, EngineError, ForgetRequest, ForgetResponse, MemoryList,
-    MemoryRequest, ResetRequest, ResetResponse, SaveFeedRequest, SaveFeedResponse, Update,
+    MemoryRequest, OutgoingList, ResetRequest, ResetResponse, SaveFeedRequest, SaveFeedResponse,
+    SentRequest, Update,
 };
 use crate::engine::sse::{decode, drain_frames, take_complete};
 
@@ -101,6 +102,36 @@ impl EngineClient {
         self.post("/canvas/feed/remove", req).await
     }
 
+    /// Notifications waiting to be sent as direct messages.
+    pub async fn outgoing(&self) -> Result<OutgoingList, EngineError> {
+        let response = self
+            .http
+            .get(format!("{}/notifications/outgoing", self.base_url))
+            .bearer_auth(self.token.expose_secret())
+            .send()
+            .await
+            .map_err(|e| EngineError::Transport(e.to_string()))?;
+        read(response).await
+    }
+
+    /// Tells the engine these notifications are done with.
+    pub async fn sent(&self, req: &SentRequest) -> Result<(), EngineError> {
+        let response = self
+            .request("/notifications/sent", req)
+            .send()
+            .await
+            .map_err(|e| EngineError::Transport(e.to_string()))?;
+        let status = response.status();
+        if status.is_success() {
+            return Ok(());
+        }
+        let body = response.text().await.unwrap_or_default();
+        Err(EngineError::Status {
+            status: status.as_u16(),
+            body: body.chars().take(ERROR_BODY_CHARS).collect(),
+        })
+    }
+
     /// A POST of a JSON body to path, with the service token and the current traceparent.
     fn request<B: Serialize + ?Sized>(&self, path: &str, body: &B) -> reqwest::RequestBuilder {
         let request = self
@@ -125,18 +156,7 @@ impl EngineClient {
             .send()
             .await
             .map_err(|e| EngineError::Transport(e.to_string()))?;
-        let status = response.status();
-        let body = response
-            .text()
-            .await
-            .map_err(|e| EngineError::Transport(e.to_string()))?;
-        if !status.is_success() {
-            return Err(EngineError::Status {
-                status: status.as_u16(),
-                body: body.chars().take(ERROR_BODY_CHARS).collect(),
-            });
-        }
-        serde_json::from_str(&body).map_err(|e| EngineError::Transport(format!("bad body: {e}")))
+        read(response).await
     }
 
     /// Runs one chat turn, reporting progress on tx. Sends exactly one Answer or Failed last.
@@ -193,6 +213,22 @@ impl EngineClient {
             )));
         }
     }
+}
+
+/// The JSON body of a reply, or the status and the start of the body when it failed.
+async fn read<R: DeserializeOwned>(response: reqwest::Response) -> Result<R, EngineError> {
+    let status = response.status();
+    let body = response
+        .text()
+        .await
+        .map_err(|e| EngineError::Transport(e.to_string()))?;
+    if !status.is_success() {
+        return Err(EngineError::Status {
+            status: status.as_u16(),
+            body: body.chars().take(ERROR_BODY_CHARS).collect(),
+        });
+    }
+    serde_json::from_str(&body).map_err(|e| EngineError::Transport(format!("bad body: {e}")))
 }
 
 /// W3C traceparent for the current span, if tracing is exporting.

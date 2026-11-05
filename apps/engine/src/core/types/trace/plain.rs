@@ -116,6 +116,7 @@ fn action(tool: &str, arguments: &Value) -> Action {
         "remember" => simple("Saving that", "Saved that", "your memories"),
         "forget_memory" => simple("Forgetting that", "Forgot that", "your memories"),
         "remind" => simple("Setting a reminder", "Set a reminder", "reminders"),
+        "cancel_reminder" => simple("Cancelling a reminder", "Cancelled a reminder", "reminders"),
         "run_sandbox" => simple("Working it out", "Worked it out", "the workspace"),
         other => {
             let words = other

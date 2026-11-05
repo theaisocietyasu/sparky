@@ -7,6 +7,7 @@ pub mod knowledge;
 pub mod mcp;
 pub mod memory;
 pub mod papers;
+pub mod remind;
 pub mod sandbox;
 pub mod upcoming;
 pub mod wiki;

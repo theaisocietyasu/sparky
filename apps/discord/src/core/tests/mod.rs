@@ -3,6 +3,7 @@
 mod access;
 mod analytics;
 mod engine;
+mod notify;
 mod render;
 mod support;
 mod telemetry;

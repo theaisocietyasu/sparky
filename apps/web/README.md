@@ -1,6 +1,6 @@
 # apps/web
 
-Public landing site, plus the web chat (`/chat`, `/chat/:id`), settings (`/settings/:section`: profile, connected accounts, memories, appearance; opened from the profile menu) and the admin pages (`/admin`). Vite, React, TypeScript, Tailwind 4. Self-hosted fonts. Runtime dependencies: React, React Router, motion, lenis, lucide-react, and react-markdown with remark-gfm for answers.
+Public landing site, plus the web chat (`/chat`, `/chat/:id`), settings (`/settings/:section`: profile, connected accounts, reminders, memories, appearance; opened from the profile menu), a notification bell in the sidebar and the admin pages (`/admin`). Vite, React, TypeScript, Tailwind 4. Self-hosted fonts. Runtime dependencies: React, React Router, motion, lenis, lucide-react, and react-markdown with remark-gfm for answers.
 
 ```bash
 just web          # dev server on :5173
