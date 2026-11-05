@@ -33,10 +33,10 @@ const Reminders = () => {
   };
 
   return (
-    <section aria-labelledby="settings-title">
-      <h2 id="settings-title" className="text-lg font-semibold tracking-tight">
+    <section aria-labelledby="reminders-title">
+      <h3 id="reminders-title" className="text-base font-semibold tracking-tight">
         Reminders
-      </h2>
+      </h3>
       <p className="mt-1 text-sm text-dim">Ask Sparky in a chat, for example: remind me to submit the lab at 9pm. It messages you on Discord and here.</p>
       {error && (
         <p role="alert" className="mt-4 text-sm text-bad">

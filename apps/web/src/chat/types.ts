@@ -39,5 +39,27 @@ export type Repeat = "once" | "daily" | "weekly";
 /** A reminder the student set in a chat. */
 export type Reminder = { id: string; text: string; due_at: string; repeat: Repeat };
 
-/** A message for the student, made when a reminder fires. */
-export type Notice = { id: string; text: string; created_at: string; read: boolean };
+/** What made a check-in Sparky sends on its own. */
+export type NudgeKind =
+  | "brief"
+  | "due_soon"
+  | "start_early"
+  | "new_item"
+  | "event"
+  | "follow_up"
+  | "calendar"
+  | "study"
+  | "week_plan";
+
+/** A message for the student: a reminder that fired, or a check-in Sparky sent on its own. */
+export type Notice = {
+  id: string;
+  text: string;
+  created_at: string;
+  read: boolean;
+  kind: "reminder" | NudgeKind;
+  helpful: boolean | null;
+};
+
+/** The student's quiet hours and the check-ins they switched off. */
+export type NudgePrefs = { quiet_start: number; quiet_end: number; off: NudgeKind[] };

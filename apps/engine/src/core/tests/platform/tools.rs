@@ -67,7 +67,7 @@ async fn registered(cfg: &Config, keys: &[&str]) -> Vec<ToolDefinition> {
     )
     .await;
     match built {
-        Ok((tools, _)) => tools.definitions(),
+        Ok((tools, _, _)) => tools.definitions(),
         Err(e) => unreachable!("the tools build: {e}"),
     }
 }

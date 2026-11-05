@@ -42,7 +42,7 @@ A change is not done until `just check` passes.
 Everything that runs is under `apps/`. Language is never a folder; ASU domain is never a folder.
 
 ```
-apps/engine/      Rust bin: the agent and HTTP surface. core/{config,telemetry,types,traits,tests}, runtime/{harness,model,tools}, stores (sqlite: the engine's own file; platform: the Platform HTTP API), routes. One concern per file; split a module that grows past that.
+apps/engine/      Rust bin: the agent and HTTP surface. core/{config,telemetry,types,traits,tests}, runtime/{harness,model,tools,nudge}, stores (sqlite: the engine's own file; platform: the Platform HTTP API), routes. One concern per file; split a module that grows past that.
 apps/discord/     Rust bin: serenity bot, HTTP client of engine, never links it. core/{config,telemetry,types,tests}, bot, engine, render, access, analytics. One span per interaction and per product event.
 apps/cli/         Rust bin sparky: developer console (ratatui). Drives just recipes and docker compose and tails their output. Links nothing in-repo. app/{control,keys,ui}, units/{catalog,health,logs,output,runner,sandbox}, core/{config,types,tests}.
 apps/web/         static site, web chat, memories and admin pages (Vite + React)
@@ -67,7 +67,7 @@ Two layers, lowest first: `sparky.toml` (committed), then `SPARKY_<SECTION>__<KE
 
 ## Rules
 
-- Inside `apps/engine`: `core` imports nothing else in the crate; `runtime::harness`, `runtime::model`, `runtime::tools`, and `stores` import only `core`, never each other; `routes`/`wiring` compose them. Checked in review. Between apps: `engine`, `discord`, and `cli` never depend on each other, enforced by `scripts/check-deps.sh`.
+- Inside `apps/engine`: `core` imports nothing else in the crate; `runtime::harness`, `runtime::model`, `runtime::tools`, `runtime::nudge`, and `stores` import only `core`, never each other; `routes`/`wiring` compose them. Checked in review. Between apps: `engine`, `discord`, and `cli` never depend on each other, enforced by `scripts/check-deps.sh`.
 - Workspace lints (`[workspace.lints]` in `Cargo.toml`): no `unwrap`/`expect`/`panic`/`todo!`/`unimplemented!`/`dbg!`/`println!`, no wildcard imports, docs on every public item.
 - A crate's public surface is its constructors and the `harness` traits it implements. Nothing reaches into another adapter.
 - No global mutable state. Per-request data goes in `RequestContext`.

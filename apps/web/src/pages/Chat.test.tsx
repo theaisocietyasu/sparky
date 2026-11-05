@@ -135,7 +135,10 @@ describe("web chat", () => {
     const calls = engine({
       "/web/me": () => Response.json(ME),
       "/web/notifications": () =>
-        Response.json({ notifications: [{ id: "n1", text: "Submit the lab", created_at: new Date().toISOString(), read: false }], unread: 1 }),
+        Response.json({
+          notifications: [{ id: "n1", text: "Submit the lab", created_at: new Date().toISOString(), read: false, kind: "reminder", helpful: null }],
+          unread: 1,
+        }),
       "/web/notifications/read": () => new Response(null, { status: 204 }),
     });
     open("/chat");
@@ -156,12 +159,54 @@ describe("web chat", () => {
         return new Response(null, { status: 204 });
       },
     });
-    open("/settings/reminders");
+    open("/settings/notifications");
     expect(await screen.findByText("Gym")).toBeInTheDocument();
     expect(screen.getByText(/repeats daily/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Cancel reminder Gym" }));
     expect(await screen.findByText("No reminders set")).toBeInTheDocument();
     expect(calls.some((c) => c.url === `${ENGINE}/web/reminders/r1` && c.init?.method === "DELETE")).toBe(true);
+  });
+
+  it("switches a check-in kind off from the bell and in settings", async () => {
+    const prefs = { quiet_start: 22, quiet_end: 8, off: [] as string[] };
+    const calls = engine({
+      "/web/me": () => Response.json(ME),
+      "/web/notifications": () =>
+        Response.json({
+          notifications: [{ id: "n2", text: "Hackathon Friday", created_at: new Date().toISOString(), read: true, kind: "event", helpful: null }],
+          unread: 0,
+        }),
+      "/web/notifications/n2/feedback": () => Response.json({ turned_off: "event" }),
+      "/web/nudges": () => Response.json(prefs),
+      "/web/reminders": () => Response.json({ reminders: [] }),
+    });
+    open("/chat");
+    fireEvent.click(await screen.findByRole("button", { name: "Notifications" }));
+    fireEvent.click(await within(screen.getByRole("dialog", { name: "Notifications" })).findByRole("button", { name: "Not useful" }));
+    expect(await screen.findByText(/No more events for you/)).toBeInTheDocument();
+    expect(calls.some((c) => c.url === `${ENGINE}/web/notifications/n2/feedback` && c.init?.method === "POST")).toBe(true);
+  });
+
+  it("saves check-in switches in settings", async () => {
+    let saved: unknown = null;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        const path = url.replace(ENGINE, "");
+        if (path === "/web/me") return Response.json(ME);
+        if (path === "/web/reminders") return Response.json({ reminders: [] });
+        if (path === "/web/nudges" && init?.method === "PUT") {
+          saved = JSON.parse(String(init.body));
+          return Response.json(saved);
+        }
+        if (path === "/web/nudges") return Response.json({ quiet_start: 22, quiet_end: 8, off: [] });
+        return new Response("missing", { status: 404 });
+      }),
+    );
+    open("/settings/notifications");
+    fireEvent.click(await screen.findByRole("switch", { name: "Morning brief" }));
+    await waitFor(() => expect(saved).toEqual({ quiet_start: 22, quiet_end: 8, off: ["brief"] }));
+    expect(screen.getByRole("switch", { name: "Morning brief" })).toHaveAttribute("aria-checked", "false");
   });
 
   it("shows choices under the latest answer and sends the one tapped", async () => {

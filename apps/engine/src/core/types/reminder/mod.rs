@@ -85,6 +85,10 @@ pub struct Notification {
     pub created_at: DateTime<Utc>,
     /// Whether the student has seen it on the web.
     pub read: bool,
+    /// What made it: reminder, or the kind of a nudge.
+    pub kind: String,
+    /// What the student said about it, when they said anything.
+    pub helpful: Option<bool>,
 }
 
 /// A notification the bot has not yet sent as a direct message.

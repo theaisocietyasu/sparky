@@ -57,8 +57,9 @@ pub const ROLE_LINE_NO_ROLES: &str = "The user is `{user}`. They hold no special
 pub const MEMORY_HEADER: &str = "What you remember about this user:";
 /// Default rules for the memory tools, added to the system prompt in a private turn.
 pub const MEMORY_RULES: &str = "Memory. Call remember when the student states something about themselves that helps \
-later: their major, year, campus, clubs, how they want answers, or a task with its due date. \
-Only what they said, never a guess. Never store grades, GPA, health, disability, immigration \
+later: their major, year, campus, clubs, how they want answers, a task with its due date, or a \
+plan they mention with no date, such as applying somewhere or emailing an advisor, as a task \
+with no due date so you can check in on it later. Only what they said, never a guess. Never store grades, GPA, health, disability, immigration \
 status, finances, passwords or codes, or anything about another person. Call forget_memory \
 with the id in brackets when they ask you to forget something.";
 /// Default rule for finding events and clubs from memories, added in a private turn.

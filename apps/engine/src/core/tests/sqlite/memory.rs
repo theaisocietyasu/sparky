@@ -63,12 +63,16 @@ async fn recall_leaves_out_past_tasks_and_other_users() {
 }
 
 #[tokio::test]
-async fn a_task_needs_a_due_date() {
+async fn a_task_with_no_date_is_a_plan_that_never_expires() {
     let store = store().await;
     let memories = store.memory(seal(), wide());
-    let mut undated = task("project", 3);
+    let mut undated = task("email my advisor", 3);
     undated.due = None;
-    assert!(memories.remember(&caller(), &undated).await.is_err());
+    let kept = memories.remember(&caller(), &undated).await;
+    let Ok(kept) = kept else {
+        unreachable!("an undated task is a plan, got {kept:?}")
+    };
+    assert_eq!(kept.expires_at, None);
 }
 
 #[tokio::test]

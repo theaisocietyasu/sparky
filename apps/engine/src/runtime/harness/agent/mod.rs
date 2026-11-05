@@ -36,7 +36,7 @@ use crate::core::types::conversation::message::{Message, Role, ToolCall};
 use crate::core::types::model::{ModelError, Usage};
 use crate::core::types::safety::policy::{ConfirmationRequest, PendingAction};
 use crate::core::types::tools::SANDBOX;
-use crate::core::types::tools::ToolRun;
+use crate::core::types::tools::{RiskClass, ToolRun};
 use crate::core::types::trace::{RunStatus, TraceEvent};
 use crate::runtime::harness::agent::run::{Inputs, Run};
 use crate::runtime::harness::tools::ToolSet;
@@ -46,6 +46,7 @@ pub use crate::runtime::harness::agent::prompt::PromptText;
 use crate::runtime::harness::agent::prompt::capability;
 
 /// The dependencies the loop drives. Every one is a trait with a test double.
+#[derive(Clone)]
 pub struct AgentDeps {
     /// The chat model.
     pub model: Arc<dyn ModelProvider>,
@@ -127,6 +128,30 @@ impl Agent {
             instructions: Arc::default(),
             prompt: Arc::new(PromptText::default()),
             mcp_names: Arc::from([]),
+        }
+    }
+
+    /// A copy for background runs: read-only tools, nothing kept, nothing waiting on approval.
+    pub fn background(&self) -> Self {
+        let mut deps = (*self.deps).clone();
+        let mut tools = ToolSet::new();
+        for tool in self.deps.tools.all() {
+            let definition = tool.definition();
+            let reads = matches!(
+                definition.risk,
+                RiskClass::ReadPublic | RiskClass::ReadAuthenticated
+            );
+            if reads && self.deps.tools.is_on(&definition.name) {
+                tools = tools.with(Arc::clone(tool));
+            }
+        }
+        deps.tools = tools;
+        deps.conversations = None;
+        deps.confirmations = None;
+        deps.files = None;
+        Self {
+            deps: Arc::new(deps),
+            ..self.clone()
         }
     }
 

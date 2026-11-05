@@ -8,6 +8,7 @@ pub mod http;
 pub mod knowledge;
 pub mod memory;
 pub mod model;
+pub mod nudge;
 pub mod reminder;
 pub mod safety;
 pub mod store;

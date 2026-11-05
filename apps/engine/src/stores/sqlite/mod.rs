@@ -1,6 +1,6 @@
-//! Adapters over one SQLite file: conversations, memories, pending actions, Canvas feed links, reminders and admin changes.
+//! Adapters over one SQLite file: conversations, memories, pending actions, Canvas feed links, reminders, nudges and admin changes.
 //!
-//! Every query binds tenant_id and user_id from the request; no query reads across users.
+//! Every query binds tenant_id and user_id from the request; only the background workers read across users.
 
 mod admin;
 mod backup;
@@ -10,6 +10,7 @@ mod conversation;
 mod health;
 mod import;
 mod memory;
+mod nudge;
 mod prune;
 mod reminder;
 mod seal;
@@ -36,6 +37,7 @@ pub use health::SqliteProbe;
 pub use import::ImportError;
 pub use import::{ImportCounts, Importer};
 pub use memory::{MemoryLimits, SqliteMemory};
+pub use nudge::SqliteNudges;
 pub use prune::{PrunePlan, run_prunes};
 #[cfg(test)]
 pub use prune::{Pruned, prune_once};
@@ -123,6 +125,11 @@ impl SqliteStore {
     /// Reminders and notifications in this file, sealed and opened with seal.
     pub fn reminders(&self, seal: Seal, limits: ReminderLimits) -> SqliteReminders {
         SqliteReminders::new(self.pool.clone(), seal, limits)
+    }
+
+    /// Nudges in this file, their text sealed with seal.
+    pub fn nudges(&self, seal: Seal) -> SqliteNudges {
+        SqliteNudges::new(self.pool.clone(), seal)
     }
 
     /// Admin changes and held actions in this file.

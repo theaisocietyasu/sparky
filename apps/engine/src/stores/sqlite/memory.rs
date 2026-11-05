@@ -212,9 +212,6 @@ impl MemoryStore for SqliteMemory {
                 end_of(due, self.limits.utc_offset_hours)
                     .ok_or_else(|| StoreError::Database(format!("due date {due}")))?,
             ),
-            (MemoryKind::Task, None) => {
-                return Err(StoreError::Database("a task needs a due date".into()));
-            }
             _ => None,
         };
         let mut tx = self.pool.begin().await.map_err(database)?;

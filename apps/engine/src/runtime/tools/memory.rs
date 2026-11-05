@@ -74,9 +74,8 @@ impl MemoryRules {
             return Err(format!("text about {term} is never stored"));
         }
         let due = match (args.kind, args.due.as_deref().map(str::trim)) {
-            (MemoryKind::Task, None | Some("")) => {
-                return Err("a task needs a due date, YYYY-MM-DD".into());
-            }
+            // A task with no date is a plan the student mentioned; it gets a follow up.
+            (MemoryKind::Task, None | Some("")) => None,
             (MemoryKind::Task, Some(day)) => {
                 let due = NaiveDate::parse_from_str(day, "%Y-%m-%d")
                     .map_err(|_| format!("due {day} is not a YYYY-MM-DD date"))?;
@@ -156,8 +155,9 @@ impl Tool for RememberTool {
             name: REMEMBER.to_owned(),
             description: "Keep one short line the student stated about themselves for later \
                           conversations: a fact (major, year, campus, clubs), a preference (how \
-                          they want answers), or a task with its due date. Only what they said, \
-                          never a guess."
+                          they want answers), or a task: something due, with its date, or \
+                          something they plan to do, with no date. Only what they said, never a \
+                          guess."
                 .to_owned(),
             parameters: json!({
                 "type": "object",
@@ -167,7 +167,7 @@ impl Tool for RememberTool {
                         "type": "string",
                         "description": format!("One line, at most {} characters.", self.rules.max_chars)
                     },
-                    "due": {"type": "string", "description": "YYYY-MM-DD. Required for a task."},
+                    "due": {"type": "string", "description": "YYYY-MM-DD, for a task that is due on a date."},
                     "sensitive": {"type": "boolean", "description": "Seal it at rest."}
                 },
                 "required": ["kind", "text"]
