@@ -281,6 +281,25 @@ pub const CALENDAR_PROMPT: &str = "Background check, not a question from the stu
 /// Default instruction for the late study check.
 pub const STUDY_PROMPT: &str = "Background check, not a question from the student. They have {item} due {due}. Check ASU library hours tonight and the study rooms. If the main libraries near their campus close before midnight tonight, write a short friendly message, two sentences at most, naming a place that stays open later and its hours, with a link. If they are open late anyway, or you cannot tell, answer exactly {nothing}.";
 
+/// Searching the student's earlier private chats. Needs store.backend sqlite.
+#[derive(Debug, Deserialize)]
+#[serde(default)]
+pub struct ChatSearch {
+    /// Whether the search_chats tool is registered at boot.
+    pub enabled: bool,
+    /// Most messages one search returns.
+    pub max_hits: usize,
+}
+
+impl Default for ChatSearch {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            max_hits: 6,
+        }
+    }
+}
+
 /// Arithmetic and date math the model hands off instead of working out itself.
 #[derive(Debug, Deserialize)]
 #[serde(default)]

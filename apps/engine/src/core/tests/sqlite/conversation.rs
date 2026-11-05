@@ -140,3 +140,57 @@ async fn list_shows_open_conversations_with_a_question_and_delete_removes_one() 
     assert!(matches!(store.load(&first, 10).await, Ok(v) if v.is_empty()));
     assert!(matches!(store.list(&second, "web", 10).await, Ok(v) if v.len() == 1));
 }
+
+#[tokio::test]
+async fn chat_search_finds_the_callers_other_private_chats_only() {
+    use crate::core::types::agent::context::RequestContext;
+    use std::time::Duration;
+    let store = store().await.conversations();
+    let mine = caller().with_visibility(Visibility::Private);
+    assert!(store.ensure(&mine, "dm").await.is_ok());
+    let said = [
+        Message::user("I want to apply to the Intel internship"),
+        Message::assistant("The Intel internship closes on Friday."),
+        Message::tool_result("c1", "search_live", "Intel careers page text"),
+    ];
+    assert!(store.append(&mine, &said).await.is_ok());
+    let public = caller().with_visibility(Visibility::Public);
+    assert!(store.ensure(&public, "general").await.is_ok());
+    assert!(
+        store
+            .append(&public, &[Message::user("Intel stock price")])
+            .await
+            .is_ok()
+    );
+    let theirs = other().with_visibility(Visibility::Private);
+    assert!(store.ensure(&theirs, "dm").await.is_ok());
+    assert!(
+        store
+            .append(&theirs, &[Message::user("Intel interview tips")])
+            .await
+            .is_ok()
+    );
+
+    let now = RequestContext::new("guild", "111", Duration::from_secs(5))
+        .with_visibility(Visibility::Private);
+    let Ok(hits) = store.search(&now, "intel internships", 10).await else {
+        unreachable!("search runs")
+    };
+    assert_eq!(hits.len(), 2, "{hits:?}");
+    assert!(
+        hits.iter()
+            .all(|h| h.conversation_id == mine.conversation_id.to_string())
+    );
+    assert!(
+        hits.iter()
+            .any(|h| h.role == "user" && h.snippet.contains("Intel internship"))
+    );
+    let Ok(same) = store.search(&mine, "intel", 10).await else {
+        unreachable!("search runs")
+    };
+    assert_eq!(same.len(), 0, "the chat in progress is already in history");
+    let Ok(none) = store.search(&now, "  ?! ", 10).await else {
+        unreachable!("search runs")
+    };
+    assert_eq!(none.len(), 0);
+}

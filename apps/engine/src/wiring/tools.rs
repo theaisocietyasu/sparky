@@ -8,6 +8,7 @@ use chrono::FixedOffset;
 use secrecy::ExposeSecret;
 
 use crate::core::config::Config;
+use crate::core::traits::conversation::ConversationStore;
 use crate::core::traits::knowledge::query::SourceQueries;
 use crate::core::traits::knowledge::retrieval::Retriever;
 use crate::core::traits::memory::MemoryStore;
@@ -30,7 +31,7 @@ use crate::runtime::tools::sandbox::{
     ContainerSandbox, SandboxTool, Wording as SandboxWording, reap_sessions,
 };
 use crate::runtime::tools::upcoming::{UpcomingTool, Window as UpcomingWindow};
-use crate::runtime::tools::{Built, calculate, page, papers, wiki};
+use crate::runtime::tools::{Built, calculate, chats, page, papers, wiki};
 
 /// Builds the tools and upcoming sources of one integration, or says why it could not.
 type Build<'a> = Box<dyn FnOnce() -> Result<Built, String> + 'a>;
@@ -47,6 +48,8 @@ pub(crate) struct Personal {
     pub reminders: Option<Arc<dyn ReminderStore>>,
     /// Memories and the trace their writes report on.
     pub memory: Option<(Arc<dyn MemoryStore>, Arc<dyn TraceSink>)>,
+    /// Conversations in the local file, for the chat search.
+    pub chats: Option<Arc<dyn ConversationStore>>,
 }
 
 /// Every tool the model may call, with tools.disabled removed at registration.
@@ -179,9 +182,10 @@ fn integrations<'a>(
         canvas: canvas_feeds,
         reminders,
         memory,
+        chats,
     } = personal;
     let mut all: Vec<Integration<'a>> = Vec::new();
-    all.extend::<[Integration<'a>; 9]>([
+    all.extend::<[Integration<'a>; 10]>([
         (
             "memory",
             memory.is_some(),
@@ -240,6 +244,15 @@ fn integrations<'a>(
             "papers",
             cfg.papers.enabled,
             Box::new(move || papers::tools(&cfg.papers).map(Built::from)),
+        ),
+        (
+            "search_chats",
+            cfg.chat_search.enabled && chats.is_some(),
+            Box::new(move || {
+                Ok(chats
+                    .map(|store| Built::from(chats::tools(store, cfg.chat_search.max_hits)))
+                    .unwrap_or_default())
+            }),
         ),
         (
             "calculate",

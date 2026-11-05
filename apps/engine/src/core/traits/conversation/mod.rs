@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::core::types::agent::context::RequestContext;
 use crate::core::types::conversation::message::Message;
-use crate::core::types::conversation::{ConversationSummary, Stored};
+use crate::core::types::conversation::{ChatHit, ConversationSummary, Stored};
 use crate::core::types::store::StoreError;
 
 /// Durable conversation history, scoped by tenant, user, and conversation.
@@ -43,6 +43,15 @@ pub trait ConversationStore: Send + Sync {
         _channel_id: &str,
         _limit: usize,
     ) -> Result<Vec<ConversationSummary>, StoreError> {
+        Ok(Vec::new())
+    }
+    /// The caller's private messages in other conversations that match query, best first.
+    async fn search(
+        &self,
+        _ctx: &RequestContext,
+        _query: &str,
+        _limit: usize,
+    ) -> Result<Vec<ChatHit>, StoreError> {
         Ok(Vec::new())
     }
     /// Deletes the request conversation and its messages when the caller owns it.

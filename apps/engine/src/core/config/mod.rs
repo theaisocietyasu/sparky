@@ -100,6 +100,9 @@ pub struct Config {
     /// Arithmetic and date math.
     #[serde(default)]
     pub calculate: Calculate,
+    /// Searching earlier private chats.
+    #[serde(default)]
+    pub chat_search: ChatSearch,
     /// Notifications Sparky sends on its own.
     #[serde(default)]
     pub nudges: Nudges,
