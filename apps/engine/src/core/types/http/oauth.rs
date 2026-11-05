@@ -2,11 +2,19 @@
 
 use serde::{Deserialize, Serialize};
 
-/// The caller a login belongs to, sent by the bot.
-#[derive(Deserialize)]
+/// The caller a login belongs to, sent by the bot. The web sends an empty body.
+#[derive(Deserialize, Default)]
 pub struct AuthorizeRequest {
-    /// The caller who started the login.
+    /// The caller who started the login. Ignored for a web session.
+    #[serde(default)]
     pub user: String,
+}
+
+/// Whether a web caller has an account linked for a provider.
+#[derive(Serialize)]
+pub struct LinkStatus {
+    /// True when a grant is stored.
+    pub linked: bool,
 }
 
 /// The login link the caller opens.

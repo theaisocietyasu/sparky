@@ -511,7 +511,7 @@ The bot polls `GET /notifications/outgoing` every `bot.notify_every_secs` with t
 
 ## Linked accounts and integrations
 
-Platform runs every per-user login and holds the grants. Canvas is the exception (see Canvas). `/login <service>` in Discord calls `POST /oauth/{provider}/authorize`, which returns the Platform login link the bot shows privately. The user signs in through the provider's own SSO; SparkyAI never sees a password. `/logout <service>` calls `POST /oauth/{provider}/logout`, which removes the Platform-linked grant. `Credentials` in `runtime::tools::account::grant` reads a caller's token for a provider from Platform, which refreshes an expired one.
+Platform runs every per-user login and holds the grants. Canvas is the exception (see Canvas). `/login <service>` in Discord calls `POST /oauth/{provider}/authorize`, which returns the Platform login link the bot shows privately. The user signs in through the provider's own SSO; SparkyAI never sees a password. `/logout <service>` calls `POST /oauth/{provider}/logout`, which removes the Platform-linked grant. The web Settings page calls the same routes with its session, plus `GET /oauth/{provider}/status`. A provider whose tool (`[gcal]`, `[outlook]`) is off answers 503. `Credentials` in `runtime::tools::account::grant` reads a caller's token for a provider from Platform, which refreshes an expired one.
 
 `runtime/tools/account/outlook` offers read-only Outlook tools over Microsoft Graph, off until `[outlook] enabled`: `outlook_calendar` and `outlook_mail`, both `ReadAuthenticated` and direct-message only, keyed to the `microsoft` provider. Reading ASU accounts needs ASU admin consent on the Platform Microsoft app.
 

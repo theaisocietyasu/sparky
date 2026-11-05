@@ -25,6 +25,8 @@ fn router() -> axum::Router {
         .with_state(OAuthState {
             store: Arc::new(HostedLogins),
             service_token: SecretString::from(TOKEN),
+            web: None,
+            providers: vec!["canvas".into(), "google".into()],
         })
 }
 
@@ -67,4 +69,10 @@ async fn a_hosted_login_can_be_disconnected_without_a_local_client() {
     let (status, body) = post("/oauth/canvas/logout").await;
     assert_eq!(status, StatusCode::OK);
     assert!(body.contains("true"), "{body}");
+}
+
+#[tokio::test]
+async fn a_provider_whose_tool_is_off_is_not_enabled() {
+    let (status, _) = post("/oauth/microsoft/authorize").await;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
 }
