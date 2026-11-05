@@ -22,6 +22,11 @@ pub struct Rules {
 }
 
 impl Rules {
+    /// Protects the tool names that hold an underscore; a one-word name is an ordinary word.
+    pub fn protect_tools(&mut self, names: &[String]) {
+        self.protect(names.iter().filter(|n| n.contains('_')).cloned());
+    }
+
     /// Adds terms to protect from answers, lowercased, keeping each once and ignoring empties.
     pub fn protect(&mut self, terms: impl IntoIterator<Item = String>) {
         for term in terms {

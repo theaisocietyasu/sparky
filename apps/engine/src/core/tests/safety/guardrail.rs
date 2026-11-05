@@ -289,3 +289,10 @@ async fn a_blocked_capability_branch_stops_before_the_tool_runs() {
         "the tool was never started"
     );
 }
+
+#[tokio::test]
+async fn a_one_word_tool_name_is_not_redacted() {
+    let mut rules = rules(&[], 0);
+    rules.protect_tools(&["remember".into(), "upcoming".into(), "search_live".into()]);
+    assert_eq!(rules.protected_terms, ["search_live"]);
+}
