@@ -12,7 +12,6 @@ mod export;
 mod health;
 mod memory;
 mod query;
-mod retrieval;
 
 pub use accounts::PlatformAccounts;
 pub use client::PlatformClient;
@@ -23,4 +22,3 @@ pub use export::PlatformExport;
 pub use health::PlatformProbe;
 pub use memory::PlatformMemory;
 pub use query::PlatformQueries;
-pub use retrieval::{PlatformRetriever, SearchTuning};

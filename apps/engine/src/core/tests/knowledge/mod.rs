@@ -1,3 +1,3 @@
-//! Knowledge: live source search.
+//! Knowledge: the Platform search tool.
 
 mod search;

@@ -37,7 +37,7 @@ just check         # the gate: every unit
 |---|---|
 | `just model` | `llama-server` on CUDA. Needs an NVIDIA GPU and the container toolkit. |
 | `just model-cpu` | the same GGUFs on the processor. Slow; fit for a smoke test. |
-| hosted | set `SPARKY_MODEL__BASE_URL` and `SPARKY_MODEL__API_KEY` in `.env` to any OpenAI-compatible endpoint, and the same pair under `SPARKY_EMBEDDING__` for embeddings. |
+| hosted | set `SPARKY_MODEL__BASE_URL` and `SPARKY_MODEL__API_KEY` in `.env` to any OpenAI-compatible endpoint. |
 
 Without one the engine still starts: `/health/live` answers, `/health/ready` reports `{"platform":true,"model":false}`, and `/chat` returns 502 `the model is unavailable`.
 

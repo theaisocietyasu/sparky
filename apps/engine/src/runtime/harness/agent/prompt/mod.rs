@@ -36,7 +36,7 @@ pub struct PromptText {
     pub upload_failed_line: String,
     /// What to remember and what never to store, for a private turn with the memory tools.
     pub memory_rules: String,
-    /// How to find events and clubs from memories, for a private turn with search_live.
+    /// How to find events and clubs from memories, for a private turn with search.
     pub discovery_rules: String,
     /// How to look ahead for the student, for a private turn.
     pub proactive_rules: String,

@@ -19,9 +19,6 @@ url = "https://platform.example.org"
 token = "plat_x"
 [memory]
 key = "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc="
-[embedding]
-base_url = "http://localhost:8001/v1"
-api_key = ""
 "#;
 
 #[test]
@@ -153,11 +150,6 @@ url = "https://platform.example.org"
 token = "plat_x"
 [memory]
 key = "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc="
-[embedding]
-base_url = "http://localhost:8001/v1"
-api_key = ""
-name = "e"
-dim = 1024
 "#;
     let cfg: Config = figment::Figment::new()
         .merge(Toml::string(base))
@@ -187,17 +179,9 @@ fn err(extra: &str) -> String {
 #[test]
 fn a_bare_config_is_valid_and_takes_every_default() {
     let cfg = ok("");
-    assert_eq!(cfg.retrieval.top_k, 6);
     assert_eq!(cfg.agent.chars_per_token, 4);
     assert!(cfg.trace.enabled);
     assert_eq!(cfg.policy.write_roles, vec!["MANAGE_GUILD".to_owned()]);
-}
-
-#[test]
-fn a_negative_retrieval_window_is_rejected() {
-    // 0 turns widening off; a negative value is a typo, and is not read as 0.
-    let e = err("[retrieval]\nwindow = -1\n");
-    assert!(e.contains("retrieval.window"), "{e}");
 }
 
 #[test]
@@ -398,29 +382,12 @@ fn a_leftover_profile_section_still_loads() {
 }
 
 #[test]
-fn a_search_tool_left_with_no_wording_is_rejected() {
-    // The descriptions are what the model reads before it writes a query, so none may be blank.
-    for setting in [
-        "knowledge_description",
-        "live_description",
-        "query_description",
-        "source_description",
-        "nothing_stored",
-        "stale_note",
-    ] {
-        let e = err(&format!("[tools]\n{setting} = \"   \"\n"));
-        assert!(e.contains(setting), "{e}");
-    }
-    assert!(
-        load("[tools]\nsearch = false\nquery_description = \"\"\n").is_ok(),
-        "wording nobody is shown is not checked"
+fn old_search_retrieval_and_embedding_settings_still_load() {
+    let cfg = ok(
+        "[tools]\nlive_default_source = \"web\"\nstale_note = \"x\"\n\
+                  [retrieval]\ndense = false\n[embedding]\nname = \"e\"\n",
     );
-}
-
-#[test]
-fn a_live_search_with_no_fallback_source_is_rejected() {
-    let e = err("[tools]\nlive_default_source = \"\"\n");
-    assert!(e.contains("live_default_source"), "{e}");
+    assert!(cfg.tools.search);
 }
 
 #[test]

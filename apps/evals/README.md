@@ -26,7 +26,7 @@ Every `*.jsonl` under `cases/` is loaded.
 - `personal.jsonl` is the direct-message memory set. A case sets `visibility`, and
   `new_conversation` sends the follow-up as a fresh conversation, so only a stored memory
   carries over. The deadline and discovery cases expect `upcoming` for what is due, a
-  `search_live` query shaped by a remembered interest, and the `/canvas` hint for a student
+  `search` query shaped by a remembered interest, and the `/canvas` hint for a student
   with no Canvas link. The last one passes only with `[canvas] enabled` in the eval profile.
 
 ## Suites

@@ -44,13 +44,9 @@ fn line(event: &TraceEvent) -> Option<String> {
 
 #[test]
 fn events_the_caller_should_see_carry_their_own_wording() {
-    let search = line(&started(
-        "search_knowledge",
-        json!({"query": "hayden hours"}),
-    ))
-    .unwrap_or_default();
+    let search = line(&started("search", json!({"query": "hayden hours"}))).unwrap_or_default();
     assert!(
-        search.contains("`search_knowledge`"),
+        search.contains("`search`"),
         "the line names the tool: {search}"
     );
     assert!(
@@ -58,7 +54,7 @@ fn events_the_caller_should_see_carry_their_own_wording() {
         "and what it was asked: {search}"
     );
     assert!(
-        search.contains("searching the knowledge base"),
+        search.contains("searching"),
         "in wording a student understands: {search}"
     );
 
@@ -86,24 +82,23 @@ fn events_the_caller_should_see_carry_their_own_wording() {
 #[test]
 fn a_finished_tool_call_carries_its_result_and_a_failed_one_its_error() {
     let ok = line(&finished(
-        "search_knowledge",
+        "search",
         Ok("three passages about Hayden".into()),
     ))
     .unwrap_or_default();
     assert!(ok.contains("three passages about Hayden"), "{ok}");
-    assert!(ok.contains("`search_knowledge`"), "{ok}");
+    assert!(ok.contains("`search`"), "{ok}");
 
-    let failed =
-        line(&finished("search_live", Err("upstream said 500".into()))).unwrap_or_default();
+    let failed = line(&finished("search", Err("upstream said 500".into()))).unwrap_or_default();
     assert!(failed.contains("upstream said 500"), "{failed}");
 
-    let empty = line(&finished("search_live", Ok(String::new()))).unwrap_or_default();
+    let empty = line(&finished("search", Ok(String::new()))).unwrap_or_default();
     assert!(empty.contains("nothing came back"), "{empty}");
 }
 
 #[test]
 fn detail_is_held_to_what_the_style_allows() {
-    let long = finished("search_knowledge", Ok("x".repeat(4_000)));
+    let long = finished("search", Ok("x".repeat(4_000)));
     let short = long
         .progress(ProgressStyle {
             detail_chars: 40,
@@ -190,8 +185,8 @@ fn the_thinking_line_resolves_into_the_thought_or_the_answer() {
 
 #[test]
 fn a_tool_result_replaces_the_line_its_own_start_wrote() {
-    let start = started("search_knowledge", json!({}));
-    let end = finished("search_knowledge", Ok("three passages".into()));
+    let start = started("search", json!({}));
+    let end = finished("search", Ok("three passages".into()));
     assert_eq!(start.slot(), end.slot(), "one line, twice written");
     assert_eq!(
         TraceEvent::ModelStarted { step: 2 }.slot(),
@@ -229,7 +224,7 @@ fn bookkeeping_events_stay_out_of_the_callers_way() {
 
 #[test]
 fn the_wire_form_reads_without_knowing_the_variant() {
-    let event = started("search_live", json!({"query": "CSE 310 open seats"}));
+    let event = started("search", json!({"query": "CSE 310 open seats"}));
     let Some(progress) = Progress::of(&event, ProgressStyle::default()) else {
         unreachable!("ToolStarted is user-visible")
     };
@@ -242,7 +237,7 @@ fn the_wire_form_reads_without_knowing_the_variant() {
         wire["text"]
             .as_str()
             .unwrap_or_default()
-            .contains("searching live"),
+            .contains("searching"),
         "{wire}"
     );
 }
@@ -254,7 +249,7 @@ async fn a_run_with_a_listener_records_and_reports_at_once() {
     let fanout = Fanout::new(sink.clone());
     let listening = ctx().listening_to(tx);
 
-    fanout.emit(&listening, started("search_knowledge", json!({})));
+    fanout.emit(&listening, started("search", json!({})));
     fanout.emit(
         &listening,
         TraceEvent::ContextAssembled {
@@ -270,7 +265,7 @@ async fn a_run_with_a_listener_records_and_reports_at_once() {
         .ok()
         .map(|p: Progress| p.text)
         .unwrap_or_default();
-    assert!(seen.contains("searching the knowledge base"), "{seen}");
+    assert!(seen.contains("searching"), "{seen}");
     assert!(rx.try_recv().is_err(), "only user-visible events are sent");
 }
 
@@ -304,20 +299,17 @@ fn plain_lines_hide_tool_names_arguments_and_results() {
     let started = TraceEvent::ToolStarted {
         step: 1,
         call_id: "c1".into(),
-        tool: "search_live".into(),
+        tool: "search".into(),
         arguments: serde_json::json!({"query": "MAT 343 tutoring", "source": "web"}),
     };
     assert_eq!(
         started.progress(plain).as_deref(),
         Some("\u{1f527} Searching the web for \u{201c}MAT 343 tutoring\u{201d}")
     );
-    let failed = finished(
-        "search_knowledge",
-        Err("platform did not answer within 10s".into()),
-    );
+    let failed = finished("search", Err("platform did not answer within 10s".into()));
     let line = failed.progress(plain).unwrap_or_default();
     assert_eq!(line, "\u{274c} Could not reach ASU pages");
-    let found = finished("search_knowledge", Ok("{\"results\": []}".into()));
+    let found = finished("search", Ok("{\"results\": []}".into()));
     assert_eq!(
         found.progress(plain).as_deref(),
         Some("\u{2705} Checked ASU pages")

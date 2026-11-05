@@ -20,11 +20,6 @@ base_url = "http://localhost:8000/v1"
 api_key = ""
 name = "m"
 max_tokens = 256
-[embedding]
-base_url = "http://localhost:8001/v1"
-api_key = ""
-name = "e"
-dim = 1024
 [memory]
 key = "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc="
 "#;
@@ -52,8 +47,6 @@ fn a_complete_platform_section_boots_with_its_defaults() {
         unreachable!("a complete platform section is valid")
     };
     assert_eq!(cfg.platform.timeout_secs, 10);
-    assert_eq!(cfg.platform.max_query_chars, 1000);
-    assert_eq!(cfg.platform.embedding_model, "");
 }
 
 #[test]
@@ -71,9 +64,6 @@ fn the_platform_needs_a_url_and_a_token() {
 fn settings_the_platform_cannot_serve_are_rejected() {
     let with = |more: &str| load(&format!("{ON}{more}"));
     assert!(with("timeout_secs = 0\n").is_err());
-    assert!(with("max_query_chars = 1001\n").is_err());
-    assert!(with("[retrieval]\ntop_k = 51\n").is_err_and(|e| e.contains("top_k")));
-    assert!(with("[retrieval]\nwindow = 6\n").is_err_and(|e| e.contains("window")));
     assert!(
         with("[agent]\nconfirmation_ttl_secs = 90000\n")
             .is_err_and(|e| e.contains("confirmation_ttl_secs"))
@@ -81,13 +71,13 @@ fn settings_the_platform_cannot_serve_are_rejected() {
 }
 
 #[test]
-fn platform_canvas_knowledge_and_batch_tools_are_skipped_unless_told_otherwise() {
+fn platform_tools_the_engine_serves_or_officers_use_are_skipped_unless_told_otherwise() {
     let Ok(cfg) = load(ON) else {
         unreachable!("a complete platform section is valid")
     };
     assert_eq!(
         cfg.platform.mcp_skip,
-        vec!["canvas.", "knowledge.", "batch"]
+        vec!["canvas.", "knowledge.", "batch", "search", "submodules."]
     );
     assert_eq!(cfg.platform.mcp_private, Vec::<String>::new());
     assert!(load(&format!("{ON}mcp_private = [\"\"]\n")).is_err_and(|e| e.contains("mcp_private")));

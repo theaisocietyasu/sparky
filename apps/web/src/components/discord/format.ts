@@ -44,7 +44,7 @@ const callArguments = (args: Args) => {
 
 /** What a tool is shown as while it runs. */
 const running = (tool: string) =>
-  tool === "search_knowledge" ? "searching the knowledge base" : tool === "search_live" ? "searching live" : "running";
+  tool === "search" ? "searching" : "running";
 
 /** The line of a model step that has not answered yet. */
 export const thinkingStep = () => "\u{1f914} thinking";
@@ -63,11 +63,10 @@ export const toolDone = (tool: string, args: Args, output: string) => {
   return shown ? `✅ ${head} → ${shown}` : `✅ ${head} — nothing came back`;
 };
 
-/** What search_live returns: the source label, its page, and when it was fetched. */
-export const liveResult = (label: string, url: string, age: string, text: string) =>
-  `Live result from ${label} (${url}, fetched ${age}):\n\n${text}`;
+/** What search returns when a source answered live: its key and the page it fetched. */
+export const liveResult = (source: string, url: string, text: string) => `Live result from ${source} (${url}):\n\n${text}`;
 
-/** What search_knowledge returns for one stored page. */
+/** What search returns for one stored page. */
 export const storedResult = (title: string, url: string, age: string, text: string) =>
   `[1] ${title} - ${url} (stored copy, fetched ${age})\n${text}`;
 

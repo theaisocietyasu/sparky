@@ -3,7 +3,7 @@
 use serde_json::Value;
 
 use crate::core::types::safety::policy::Decision;
-use crate::core::types::tools::{SEARCH_KNOWLEDGE, SEARCH_LIVE};
+use crate::core::types::tools::SEARCH;
 use crate::core::types::trace::TraceEvent;
 
 /// Characters of a search query a plain line quotes.
@@ -67,19 +67,12 @@ fn action(tool: &str, arguments: &Value) -> Action {
         place: place.to_owned(),
     };
     match tool {
-        SEARCH_KNOWLEDGE => Action {
-            running: match &query {
-                Some(q) => format!("Searching ASU pages for {q}"),
-                None => "Searching ASU pages".to_owned(),
-            },
-            done: "Checked ASU pages".to_owned(),
-            place: "ASU pages".to_owned(),
-        },
-        SEARCH_LIVE => {
+        SEARCH => {
             let source = text_arg(arguments, "source").unwrap_or_default();
             let place = live_place(&source);
             Action {
                 running: match (&query, source.as_str()) {
+                    (Some(q), "") => format!("Looking up {q}"),
                     (Some(q), "web") => format!("Searching the web for {q}"),
                     _ => format!("Checking {place}"),
                 },
@@ -149,7 +142,7 @@ fn live_place(source: &str) -> String {
         "study_rooms" => "study rooms".to_owned(),
         "dining" => "dining".to_owned(),
         "web" => "the web".to_owned(),
-        "" => "live ASU sources".to_owned(),
+        "" => "ASU pages".to_owned(),
         other => other.replace('_', " "),
     }
 }

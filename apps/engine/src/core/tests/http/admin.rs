@@ -329,8 +329,8 @@ async fn sources_list_the_live_registry_and_traces_off_is_not_implemented() {
     let mut state = state(Arc::new(Ledger::default()));
     state.queries = Some(Arc::new(FakeQueries::new(vec![QuerySourceInfo {
         key: "library_hours".into(),
+        description: "Library hours by day.".into(),
         params: Vec::new(),
-        indexed: true,
     }])));
     let (_, sources) = body(admin::sources(State(state.clone()), moderator()).await).await;
     assert_eq!(sources[0]["key"], "library_hours");

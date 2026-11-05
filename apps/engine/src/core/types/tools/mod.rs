@@ -12,11 +12,8 @@ use serde_json::Value;
 
 use crate::core::types::knowledge::evidence::Citation;
 
-/// Name of the tool that searches the stored index.
-pub const SEARCH_KNOWLEDGE: &str = "search_knowledge";
-
-/// Name of the tool that fetches a source now.
-pub const SEARCH_LIVE: &str = "search_live";
+/// Name of the tool that searches through Platform.
+pub const SEARCH: &str = "search";
 
 /// Name of the tool that writes a memory.
 pub const REMEMBER: &str = "remember";

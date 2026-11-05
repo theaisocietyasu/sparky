@@ -30,14 +30,14 @@ const QUESTION = "is the rec center open over spring break, and what's for dinne
 /** The three calls: the indexed calendar page, the new live source, and the MCP server. */
 const CALLS: ToolCall[] = [
   {
-    tool: "search_knowledge",
+    tool: "search",
     args: { query: "spring break 2027 dates" },
     output: storedResult("Academic Calendar", CAMPUS.page, "2 hours ago", "Spring 2027. Classes begin January 11. Spring break March 8 to 14."),
   },
   {
-    tool: "search_live",
+    tool: "search",
     args: { query: "rec center hours spring break", source: "rec_hours" },
-    output: liveResult(CAMPUS.recLabel, CAMPUS.rec, "just now", "Spring break, March 8 to 14: Rec center 8:00am to 6:00pm. Pool closed. Regular hours resume March 15."),
+    output: liveResult("rec_hours", CAMPUS.rec, "Spring break, March 8 to 14: Rec center 8:00am to 6:00pm. Pool closed. Regular hours resume March 15."),
   },
   {
     tool: MCP.tools[0],

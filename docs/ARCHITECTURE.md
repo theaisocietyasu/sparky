@@ -17,7 +17,7 @@ This document describes the current shape of the system and its rules. Order of 
 | Fine-tuning | lives outside this repo | [loupe](https://github.com/ashworks1706/loupe), a separate repo |
 | Evals | golden cases against the engine, baseline gate | `apps/evals` |
 | Chat model | Qwen3 GGUF on `llama-server` | compose service `chat`, profile `model` |
-| Embeddings | Qwen3-Embedding-0.6B, 1024 dimensions, on `llama-server` | compose service `embed`, profile `model` |
+| Embeddings for Platform | Qwen3-Embedding-0.6B, 1024 dimensions, on `llama-server`; the engine does not call it | compose service `embed`, profile `model` |
 | Observability | OpenTelemetry spans to Phoenix, product events as spans, JSONL traces and logs under `.sparky/` | profiles `phoenix`, `metrics` |
 | Config | `sparky.toml`, then `SPARKY_*` env vars | `sparky.toml`, `.env.example` |
 | Build, gate | `just` recipes, pre-commit hook, CI | `justfile`, `.githooks`, `.github/workflows` |
@@ -26,15 +26,15 @@ This document describes the current shape of the system and its rules. Order of 
 ## Rules
 
 - Open models only, served by `llama-server` behind an OpenAI-compatible HTTP API.
-- Facts come from retrieval or from a live source query, never from model weights.
-- The engine never fetches a page for the index. Platform crawls ASU pages, writes the retrieval index, and runs live queries.
+- Facts come from Platform search or a page the agent read, never from model weights.
+- The engine never fetches a page for the index. Platform crawls ASU pages, writes the index, and runs search.
 - The engine opens one SQLite file for its own conversations, memories and confirmations; every other store is the Platform HTTP API.
 - Every request carries its own `RequestContext`. There is no global mutable state.
 - Every replaceable dependency is a trait in `engine/src/core/traits` with a test double in `core/tests/support`.
 - The harness owns the loop, policy, context assembly, memory, and tracing. Provider JSON never leaves `runtime/model`.
-- Model output is never written back as retrieval evidence.
+- Model output is never written back as search evidence.
 - An action at or above `policy.confirm_from` is held for the caller's approval immediately before it runs.
-- Credentials, cookies, and authenticated page content never enter the retrieval index, memory, or traces.
+- Credentials, cookies, and authenticated page content never enter the search index, memory, or traces.
 
 ## Layout
 
@@ -43,7 +43,7 @@ apps/
   engine/         Rust bin. The agent, its HTTP surface, and the store adapters.
     src/core/       config (services, integrations, http, harness by domain), telemetry, types, traits, tests
     src/runtime/    harness (loop, prompt, uploads, memory, safety, compaction, trace), model (Rig client, slot limit, server props), tools (knowledge/search with sources/, account for per-user Outlook and Gcal, papers, wiki, files, mcp, sandbox, shared http)
-    src/stores/     platform/: client, conversation, confirmation, memory, profile, retrieval, query, accounts, health over the Platform HTTP API
+    src/stores/     platform/: client, conversation, confirmation, memory, discovery, query, accounts, health over the Platform HTTP API
     src/routes/     chat (JSON and SSE), confirm, conversation, profile, oauth, sandbox, health, rate limit, auth, failure
     src/wiring/     builds every dependency from config and serves: platform stores, tools, agent, http, boot checks, system prompt
   discord/        Rust bin. serenity bot and HTTP client of the engine. Never links it.
@@ -90,8 +90,7 @@ flowchart LR
     CLI -->|"just, docker compose"| apps
 
     ENG -->|"completions"| CHAT["llama-server chat"]
-    ENG -->|"embeddings"| EMB["llama-server embed"]
-    ENG <-->|"stores, knowledge, live queries, accounts"| PLAT["Platform HTTP API"]
+    ENG <-->|"stores, search, accounts"| PLAT["Platform HTTP API"]
     ENG -.->|"platform tools"| PMCP["Platform MCP"]
     ENG -.->|"optional"| MCP["MCP servers"]
     ENG -.->|"run_sandbox"| SBX["sandboxd<br/>sandbox containers"]
@@ -114,7 +113,7 @@ With `[web] enabled`, a browser signs in with Discord instead of holding the tok
 
 ### Admin surface
 
-`/admin/*` (`routes/admin.rs`) takes the bearer token or a web session whose roles hold the first `policy.write_roles` entry; any other session gets 403. `GET /admin/tools` lists every registered tool and whether it is offered, and `POST /admin/tools/{name}` with `{on}` switches one for the next turn: `ToolSet` keeps the switched-off names in a set its clones share, so `get` and the definitions leave the tool out. `GET` and `PUT /admin/instructions` read and replace the system instructions (`text: null` returns to `prompt.system`), at most `admin.max_instructions_chars`. Each write is a row in `admin_changes` (migration 0004) with the actor's user id; `GET /admin/history` lists the newest `admin.history_limit`, and `POST /admin/rollback/{id}` writes that row's value again. The newest row per kind and key is in force, and the engine applies them at boot. `GET /admin/limits` shows the settings that bound load, and `GET /admin/guardrails` the `[guardrail]` and `[policy]` settings. `GET /admin/approvals` lists held actions by user, tool and expiry without their arguments, and `POST /admin/approvals/{token}/deny` denies one. The store is `AdminStore` (`stores/sqlite/admin.rs`); with `store.backend = "platform"` the routes that need it answer 501. `GET /admin/traces` lists the newest `admin.traces_limit` traces of the tenant from `trace.dir` (request id, user, first 160 characters of the input, status, steps, tokens, duration, guardrail blocks and redactions, and the OpenTelemetry trace id with its Phoenix page when `telemetry.phoenix_ui_url` is set), and `GET /admin/traces/{id}` returns every record of one; the id must parse as a UUID, and each read is logged with the actor. Moderators see every turn, direct messages included; `ReadAuthenticated` tool results are masked on disk, so a trace never holds linked-account data. With `trace.enabled` off the trace routes answer 501. `GET /admin/sources` lists the live queries Platform offers. `apps/web` serves the pages at `/admin` (an overview from these routes), `/admin/{tools,instructions,guardrails,history,approvals,limits,traces,sources}` and `/admin/traces/{id}`.
+`/admin/*` (`routes/admin.rs`) takes the bearer token or a web session whose roles hold the first `policy.write_roles` entry; any other session gets 403. `GET /admin/tools` lists every registered tool and whether it is offered, and `POST /admin/tools/{name}` with `{on}` switches one for the next turn: `ToolSet` keeps the switched-off names in a set its clones share, so `get` and the definitions leave the tool out. `GET` and `PUT /admin/instructions` read and replace the system instructions (`text: null` returns to `prompt.system`), at most `admin.max_instructions_chars`. Each write is a row in `admin_changes` (migration 0004) with the actor's user id; `GET /admin/history` lists the newest `admin.history_limit`, and `POST /admin/rollback/{id}` writes that row's value again. The newest row per kind and key is in force, and the engine applies them at boot. `GET /admin/limits` shows the settings that bound load, and `GET /admin/guardrails` the `[guardrail]` and `[policy]` settings. `GET /admin/approvals` lists held actions by user, tool and expiry without their arguments, and `POST /admin/approvals/{token}/deny` denies one. The store is `AdminStore` (`stores/sqlite/admin.rs`); with `store.backend = "platform"` the routes that need it answer 501. `GET /admin/traces` lists the newest `admin.traces_limit` traces of the tenant from `trace.dir` (request id, user, first 160 characters of the input, status, steps, tokens, duration, guardrail blocks and redactions, and the OpenTelemetry trace id with its Phoenix page when `telemetry.phoenix_ui_url` is set), and `GET /admin/traces/{id}` returns every record of one; the id must parse as a UUID, and each read is logged with the actor. Moderators see every turn, direct messages included; `ReadAuthenticated` tool results are masked on disk, so a trace never holds linked-account data. With `trace.enabled` off the trace routes answer 501. `GET /admin/sources` lists the live sources Platform search can name. `apps/web` serves the pages at `/admin` (an overview from these routes), `/admin/{tools,instructions,guardrails,history,approvals,limits,traces,sources}` and `/admin/traces/{id}`.
 
 The console starts and stops the other units and tails their output. It does not start a process whose port is already served, and says so instead.
 
@@ -126,7 +125,7 @@ flowchart TD
     HARNESS["runtime::harness<br/>agent: run, step, inputs, execute, conclude, task, uploads, read<br/>agent/call: thinking, relay, draft, thought, retry, spans<br/>agent/prompt: assemble, capability<br/>safety: guardrail, policy<br/>compact, tools, trace"]
     MODEL["runtime::model<br/>rig_openai: chat, embed, convert<br/>limit, props"]
     TOOLS["runtime::tools<br/>knowledge/search: live, stored, sources/ one file per source<br/>account: outlook, gcal, grant<br/>papers, wiki, files, mcp, http<br/>sandbox: container, session, egress, output"]
-    STORES["stores<br/>platform: client, conversation, confirmation, memory, retrieval, query, accounts, health"]
+    STORES["stores<br/>platform: client, conversation, confirmation, memory, discovery, query, accounts, health"]
     CORE["core<br/>config, telemetry, types, traits, tests"]
 
     ROUTES --> HARNESS
@@ -155,16 +154,15 @@ Folders nest by domain, and the same domain names repeat across `core/types`, `c
 | `ConversationStore`, `MemoryStore`, `ConfirmationStore`, only with `store.backend = "platform"` | `/api/agents/members/{user_id}/...` |
 | the one-time import | `GET /api/agents/export/conversations` and `/memories` |
 | `Discovery`, with `read_page.save_pages` | `POST /api/knowledge/discovered`, the URL of a page read_page read |
-| `Retriever` | `POST /api/knowledge/search`, with the query vector from the engine `Embedder` when `retrieval.dense` is on |
-| `SourceQueries` | `GET /api/asu/queries`, `POST /api/asu/query`, run while the call waits, bounded by the request deadline |
+| `SourceQueries` | `GET /api/tools` for the search tool's description and schema, `POST /api/tools/search` while the call waits, bounded by the request deadline; `GET /api/asu/queries` for `/admin/sources` |
 | `OAuthStore` | `/api/accounts/members/{user_id}/{provider}/token` and `/login`; Platform runs the login and refreshes tokens |
 | readiness `Probe` | `GET /health` on Platform |
 
-The engine needs the chat and embedding servers and Platform. Platform takes the organization from the machine token (`Authorization: Bearer plat_...`), so `tenant_id` is not sent, and the member is `user_id`, which Platform requires to be a numeric Discord user id. One engine serves one guild, and its token belongs to the Platform organization of that guild. The token needs the scopes `agents:read`, `agents:write` (the import and `store.backend = "platform"`), `knowledge:read`, `knowledge:discover` (with `read_page.save_pages`), `accounts:link`, `accounts:token`, and `asu:read`.
+The engine needs the chat server and Platform. Platform takes the organization from the machine token (`Authorization: Bearer plat_...`), so `tenant_id` is not sent, and the member is `user_id`, which Platform requires to be a numeric Discord user id. One engine serves one guild, and its token belongs to the Platform organization of that guild. The token needs the scopes `agents:read`, `agents:write` (the import and `store.backend = "platform"`), `knowledge:read`, `knowledge:discover` (with `read_page.save_pages`), `accounts:link`, `accounts:token`, and `asu:read`.
 
 With `platform.mcp_url` set, the engine also registers the Platform MCP tools with the same token (`runtime/tools/mcp.rs`, `connect_platform`). Each tool is named `platform_<name>` with dots as underscores; `platform.mcp_tools` limits the list, and the token scopes decide which tools Platform offers. The risk comes from the MCP annotations: `readOnlyHint` is `ReadPublic`, `destructiveHint` is `Destructive`, and any other tool is `ExternalWrite`, so `Policy` requires `policy.write_roles` and a confirmation for every write. The Platform `confirm` argument is removed from the schema the model sees; the tool sends `confirm=true` after `Policy` confirmed the call.
 
-A Platform tool whose name starts with a prefix in `platform.mcp_skip` (default `canvas.`) is not registered; the engine serves Canvas itself (see Canvas). A Platform tool whose name starts with a prefix in `platform.mcp_private` (default empty) returns one member's own data. A read-only one is `ReadAuthenticated`, the tool refuses outside a direct message, and its `discord_id` argument is removed from the schema the model sees; the call sends the caller's `user_id` in its place, so a member reads only their own account (`mcp::Fill`).
+A Platform tool whose name starts with a prefix in `platform.mcp_skip` (default `canvas.`, `knowledge.`, `batch`, `search`, `submodules.`) is not registered: the engine serves Canvas itself (see Canvas) and search through its own tool (see Search), and the knowledge admin tools are for officers. A Platform tool whose name starts with a prefix in `platform.mcp_private` (default empty) returns one member's own data. A read-only one is `ReadAuthenticated`, the tool refuses outside a direct message, and its `discord_id` argument is removed from the schema the model sees; the call sends the caller's `user_id` in its place, so a member reads only their own account (`mcp::Fill`).
 
 ## Local store
 
@@ -176,7 +174,7 @@ What Platform serves beside the stores:
 
 | Part | Platform |
 |---|---|
-| ASU knowledge and live queries | the `asu` pack: crawling of ASU pages, SearXNG web search, and a shared Playwright browser for JS pages; `search_live` offers only the sources the Platform registry publishes, plus `tools.live_default_source` |
+| Search | the `search` tool: stored pages, the live sources of the `asu` pack, and SearXNG web search, with a shared Playwright browser for JS pages |
 | Sun Devil Central clubs and events behind an ASU sign-in | `platform_asu_clubs` and `platform_asu_events` (scope `asu:read`), over the organization's ASU sign-in |
 | `/login` and `/logout` | the Platform accounts link (`accounts:link`) and grant removal |
 | Outlook and Google Calendar | engine tools over tokens from Platform (`accounts:token`) |
@@ -198,19 +196,9 @@ pub struct RequestContext {
     pub progress: Option<UnboundedSender<Progress>>,
 }
 
-pub struct Evidence {
-    pub source_id: Uuid,
-    pub chunk_id: Uuid,
-    pub key: String,
-    pub title: String,
-    pub content: String,
-    pub url: Option<String>,
-    pub fetched_at: DateTime<Utc>,
-    pub score: f32,
-}
 ```
 
-Citations are built from the pages the tools returned (`Answer.sources`), never parsed out of generated text. A `Citation` has a `title` a client shows (the stored page title, or the site name from `LiveSource::label`) and a `key` naming the source, which is what a caller matches on.
+Citations are built from the pages the tools returned (`Answer.sources`), never parsed out of generated text. A `Citation` has a `title` a client shows (the stored page title, or the site of a live page) and a `key` naming the source (the page url, or the live source's key), which is what a caller matches on.
 
 ## Traits
 
@@ -231,20 +219,10 @@ pub trait Tool {
 }
 
 #[async_trait]
-pub trait Retriever {
-    async fn retrieve(&self, ctx: &RequestContext, query: &RetrievalQuery) -> Result<Vec<Evidence>, RetrievalError>;
-}
-
-#[async_trait]
-pub trait Embedder {
-    async fn embed(&self, texts: &[String]) -> Result<Vec<Vec<f32>>, RetrievalError>;
-    fn dim(&self) -> usize;
-}
-
-#[async_trait]
 pub trait SourceQueries {
     async fn sources(&self) -> Result<Vec<QuerySourceInfo>, QueryError>;
-    async fn run(&self, ctx: &RequestContext, request: &QueryRequest) -> Result<QueryOutcome, QueryError>;
+    async fn spec(&self) -> Result<SearchSpec, QueryError>;
+    async fn search(&self, ctx: &RequestContext, args: &Map<String, Value>) -> Result<SearchAnswer, QueryError>;
 }
 
 #[async_trait]
@@ -305,13 +283,9 @@ sequenceDiagram
         E->>M: streamed completion with tool schemas
         M-->>E: reasoning, text, tool calls
         E-->>B: SSE progress, thinking line, answer draft
-        opt search_knowledge call
-            E->>M: embed the query
-            E->>P: knowledge search
-        end
-        opt search_live call
-            E->>P: live query
-            P-->>E: result text
+        opt search call
+            E->>P: search
+            P-->>E: stored pages, a live page, or nothing
         end
     end
     E->>E: append the new turns to the SQLite file
@@ -321,7 +295,7 @@ sequenceDiagram
 
 1. `discord` posts an addressed message to the engine with the Discord identity, role names, the answering channel, its visibility, `continue_channel`, and the bot message a reply answers. A question is never a slash command; the remaining commands only read and clear memory.
 2. The engine checks the bearer token and the per-user rate limit, then builds a `RequestContext`. A given `conversation_id` must belong to the caller. Without one, `continue_channel` continues the caller's newest open conversation in that channel at that visibility; otherwise a new conversation starts.
-3. The loop loads inputs once: the last `agent.history_turns` turns, compacted if they overflow the history budget, and, in a private turn only, memories. A failed memory read is logged and the turn runs without it. Nothing is retrieved before the first model call: the model calls `search_knowledge` and `search_live` as the question needs, several in one step when it words the subject more than one way.
+3. The loop loads inputs once: the last `agent.history_turns` turns, compacted if they overflow the history budget, and, in a private turn only, memories. A failed memory read is logged and the turn runs without it. Nothing is looked up before the first model call: the model calls `search` as the question needs, several in one step when it words the subject more than one way.
 4. The loop runs steps until it stops. On `/chat/stream` each progress event goes out as an SSE frame. A turn about to answer after a tool failed, with `run_sandbox` registered and untried, is handed back once with `prompt.sandbox_retry_line`.
 5. Every exit appends what was said and builds the answer with citations, tool runs, memories (empty for a public answer), usage, and cost. Tool calls and results are not stored in history.
 6. An answer with status `AwaitingConfirmation` carries a token. `POST /confirm` with that token runs the held action and resumes the loop from its result.
@@ -394,7 +368,7 @@ Each sub-agent is a `runtime::harness::agent::task::Task`: its own instructions,
 
 | Kind | Executed by | Risk |
 |---|---|---|
-| `tool` | a built-in `Tool`: `search_knowledge`, `search_live`, `run_sandbox` | declared per tool |
+| `tool` | a built-in `Tool`: `search`, `run_sandbox` | declared per tool |
 | `mcp` | a remote MCP server | `risks` in the server entry, else derived from the tool name; a pin the server does not list fails boot |
 
 `tools.disabled` removes tools by name at registration. The engine refuses to boot when the capabilities section exceeds its budget, when the tool schemas take more than half of `agent.prompt_budget_tokens`, or when the prompt budget plus `agent.prompt_estimate_headroom` and `model.max_tokens_without_thinking` do not fit one `llama-server` slot.
@@ -442,7 +416,7 @@ With no sandbox, as on a RunPod pod, `agent/read.rs` reads the file in the engin
 
 Without compaction, history is trimmed to its budget by dropping the oldest turns. With `compaction.enabled`, compaction runs when the loaded history, a stored summary included, is over `agent.history_budget_tokens`. It keeps the newest turns within `compaction.keep_share` of that budget, moved forward to start on a user turn, and the Chat agent replaces everything older, the previous summary included, with one stored compacted turn. Boot rejects a `keep_share` whose kept turns plus `compaction.max_tokens` exceed the history budget. Assembly places a leading summary before trimming the turns after it. A failed compaction falls back to trimming.
 
-A compacted turn is stored with role `summary`. It is never retrieval evidence, and the turns it replaced stay stored. A summary records `covers`, the `seq` of the last message it replaces; loading history reads the newest summary and then up to `agent.history_turns` messages with a greater `seq`. The kept turns are stored before the summary, so they load again. A summary without `covers` covers every message before its own `seq`.
+A compacted turn is stored with role `summary`. It is never search evidence, and the turns it replaced stay stored. A summary records `covers`, the `seq` of the last message it replaces; loading history reads the newest summary and then up to `agent.history_turns` messages with a greater `seq`. The kept turns are stored before the summary, so they load again. A summary without `covers` covers every message before its own `seq`.
 
 The system prompt is not a stored message; it is rebuilt on every request and always comes first.
 
@@ -454,7 +428,7 @@ The system prompt is not a stored message; it is rebuilt on every request and al
 | Conversation | what was said, the question and the answer | Platform conversation messages |
 | Fact, preference, task | one short line a student stated about themselves | the engine store, written by `remember` |
 
-The model writes memories in the normal loop, so a turn costs no extra model call. `remember` takes a kind (`fact`, `preference`, or `task`: something due, with a date, or a plan with no date, which never expires), one line of at most `memory.max_chars`, and an optional sensitive flag. It refuses text with a term in `memory.refuse_terms` and seals text with a term in `memory.sensitive_terms`. `forget_memory` takes the short id the memory section shows. Both are `PrepareWrite`, private and sequential, and are registered when `memory.tools` is on and `store.backend` is `sqlite`. `prompt.memory_rules` tells the model what to keep and what never to store; it is added to the system prompt only in a private turn where the tools are registered. `prompt.discovery_rules` tells the model to use the student's memories (major, interests, clubs, campus) as the words of a `search_live` query on events or clubs when they ask for something to do or join, and to say which memory it used; it is added only in a private turn where `search_live` is registered. `prompt.proactive_rules` asks for one next step or one short question at the end of an answer, in every private turn. `prompt.onboarding_rules` is added while fewer than `prompt.onboarded_at` fact and preference memories describe the student: Sparky gets to know them one question at a time (major and year, campus, what they want help with, interests), saving each answer with `remember`, then suggests one concrete thing. `prompt.widget_rules` is added to a private turn from the web chat (`RequestContext.widgets`, set when the channel is `web`): a question with a few short answers ends with a fenced `choices` block, which the page takes out of the text and shows as buttons under the newest answer; tapping one sends it as the next message. Sparky also sends check-ins on its own; see Nudges.
+The model writes memories in the normal loop, so a turn costs no extra model call. `remember` takes a kind (`fact`, `preference`, or `task`: something due, with a date, or a plan with no date, which never expires), one line of at most `memory.max_chars`, and an optional sensitive flag. It refuses text with a term in `memory.refuse_terms` and seals text with a term in `memory.sensitive_terms`. `forget_memory` takes the short id the memory section shows. Both are `PrepareWrite`, private and sequential, and are registered when `memory.tools` is on and `store.backend` is `sqlite`. `prompt.memory_rules` tells the model what to keep and what never to store; it is added to the system prompt only in a private turn where the tools are registered. `prompt.discovery_rules` tells the model to use the student's memories (major, interests, clubs, campus) as the words of a `search` with source `events` or `clubs` when they ask for something to do or join, and to say which memory it used; it is added only in a private turn where `search` is registered. `prompt.proactive_rules` asks for one next step or one short question at the end of an answer, in every private turn. `prompt.onboarding_rules` is added while fewer than `prompt.onboarded_at` fact and preference memories describe the student: Sparky gets to know them one question at a time (major and year, campus, what they want help with, interests), saving each answer with `remember`, then suggests one concrete thing. `prompt.widget_rules` is added to a private turn from the web chat (`RequestContext.widgets`, set when the channel is `web`): a question with a few short answers ends with a fenced `choices` block, which the page takes out of the text and shows as buttons under the newest answer; tapping one sends it as the next message. Sparky also sends check-ins on its own; see Nudges.
 
 Recall reads every unexpired memory: tasks due within `memory.task_soon_days` first, soonest first, then the rest newest first. The prompt lists them as `[short id] kind: text (date)` until `agent.memory_budget_tokens` is spent. A task expires at the end of its due day in `prompt.utc_offset_hours`.
 
@@ -466,7 +440,7 @@ Students see their memories with `/memories` (`POST /memories/list`, numbered in
 
 | Class | Examples | Default behavior |
 |---|---|---|
-| `ReadPublic` | `search_knowledge`, `search_live` | run |
+| `ReadPublic` | `search` | run |
 | `ReadAuthenticated` | `canvas_deadlines`, `outlook_mail`, `google_calendar`, a page inside the user's own session | allowed in a direct message; elsewhere deny unless `policy.allow_authenticated_reads` |
 | `PrepareWrite` | `run_sandbox`, `remember`, `forget_memory`, a draft, a form filled without submitting | run |
 | `ExternalWrite` | post, create a ticket, book, submit | require a `policy.write_roles` role, then confirm |
@@ -587,65 +561,36 @@ Every nudge carries keys in `nudges_sent`, so nothing is said twice; keys older 
 
 `upcoming` (`runtime/tools/upcoming.rs`) lists what the caller has coming up in one call: remembered tasks, reminders, Canvas due dates, and Google and Outlook events, merged and sorted by date, at most `upcoming.max_items`, for the next `days` (default `upcoming.default_days`, at most `upcoming.max_days`). Each integration that has dated items adds an `UpcomingSource` (`core/traits/tools/upcoming.rs`) beside its tools; a source whose tool is in `tools.disabled` is left out, and the tool is registered only when `[upcoming] enabled` and at least one source is. The sources are read in parallel within the request deadline. A source that is not linked, fails, or runs out of time adds one line naming it. `upcoming` is `ReadAuthenticated` and `private`.
 
-Three public, no-auth tools sit beside the ASU sources: `search_papers` (Semantic Scholar), `wikipedia_lookup` (MediaWiki) and `read_page`. They are `ReadPublic`. `read_page` takes a URL and returns the page text; every hop must resolve to a public address on port 80 or 443, and the connection goes to the address that passed the check. With `read_page.save_pages` on, a page with text is sent to Platform as its URL only (`POST /api/knowledge/discovered`, `Discovery` trait, `stores/platform/discovery.rs`), in the background. Platform saves it as a crawled source and keeps it fresh, so the next search finds it in stored knowledge. `calculate` works out arithmetic and date math in the engine, with no network.
+Three public, no-auth tools sit beside search: `search_papers` (Semantic Scholar), `wikipedia_lookup` (MediaWiki) and `read_page`. They are `ReadPublic`. `read_page` takes a URL and returns the page text; every hop must resolve to a public address on port 80 or 443, and the connection goes to the address that passed the check. With `read_page.save_pages` on, a page with text is sent to Platform as its URL only (`POST /api/knowledge/discovered`, `Discovery` trait, `stores/platform/discovery.rs`), in the background. Platform saves it as a crawled source and keeps it fresh, so the next search finds it in stored knowledge. `calculate` works out arithmetic and date math in the engine, with no network.
 
-A `search_knowledge` result shows when its page was fetched. A page older than `retrieval.stale_days` carries `tools.stale_note`, which points the model to `read_page` for the current copy. The prompt orders the searches: stored knowledge first, `read_page` for a stale or linked page, `search_live` for current data, the open web last.
+A stored `search` result shows when its page was fetched, and Platform adds a note when a page is old, which points the model to `read_page` for the current copy.
 
 A turn stops gathering and answers from what it has once it reaches the last step, `agent.max_tool_calls`, or `agent.answer_reserve_secs` before the deadline. A step offered no tools never runs one.
 
 A confirmation is bound to a hash of the exact arguments, belongs to the caller who was asked, is single use, and expires after `agent.confirmation_ttl_secs`. Its summary names the tool, the arguments, and whether the action can be undone. The policy decision is recorded in the trace.
 
-## Knowledge
+## Search
 
-Platform crawls ASU pages, chunks and embeds them, and serves the retrieval index. The engine reads it when the model calls `search_knowledge`.
+`search(query, source?)` is Platform's tool (`asusoda/platform`, `modules/submodules/find.py`). At boot the engine reads its description and JSON schema from `GET /api/tools` and fails to boot if Platform does not offer it to the token. The model reads Platform's wording as is, so a new source on Platform reaches the model with no engine change. A call is `POST /api/tools/search` with the arguments the model sent, bounded by `query.timeout_secs` and the request deadline. Calls in one step run at the same time.
 
 ```mermaid
 flowchart TD
-    Q["question"] --> DENSE{"retrieval.dense?"}
-    DENSE -->|yes| EMB["embed with the engine Embedder"]
-    DENSE -->|no| REQ
-    EMB --> REQ["POST /api/knowledge/search<br/>query, vector, category,<br/>retrieval.top_k, retrieval.window"]
-    REQ --> HITS{"any hits?"}
-    HITS -->|"none in the category"| BROAD["the same search across every category"]
-    BROAD --> HITS2{"any hits?"}
-    HITS2 -->|no| EMPTY(["tools.nothing_stored"])
-    HITS2 -->|yes| EV
-    HITS -->|yes| EV["Evidence"]
+    Q["search(query, source?)"] --> S{"source?"}
+    S -->|none| ST["stored pages"]
+    ST -->|found| A1(["stored: passages, fetch dates"])
+    ST -->|nothing| WEB["web search"]
+    WEB -->|found| A2(["live: web results"])
+    WEB -->|failed| A3(["none: what to try next"])
+    S -->|"indexed source"| STC["stored pages of its category"]
+    STC -->|found| A1
+    STC -->|nothing| LIVE["the source, live"]
+    S -->|"live source"| LIVE
+    LIVE --> A4(["live: page text and url"])
 ```
 
-A call that names a source filters by that source's category; when that finds nothing, the query runs again across every category. When nothing matches at all, the tool returns `tools.nothing_stored`. Each hit comes back with the `retrieval.window` chunks either side of it joined into one passage; `retrieval.window = 0` hands each hit back alone. The query vector is sent with `platform.embedding_model`, or `embedding.name` when that is empty, so the engine and Platform must embed with the same model and dimension. A `Citation` is the source title and URL, not an offset.
+Platform turns the query into the parameters the source takes: a choice the query names, a date, a course code and term for the class search. A query missing a required detail is refused with what it has to say. A refusal reaches the model as `InvalidArguments`. The engine renders a stored answer with each page's url and fetch age, a live answer with its url, and cites each page in `Answer.sources`.
 
-## Live source queries
-
-A live query answers from a source now, with parameters the model picks: a term, subject and level of the class catalog, a scholarship search, study room slots on a date, the next shuttle at each stop, a building on the campus map, a web search, or this week's library hours.
-
-The engine offers two search tools: `search_knowledge(query, source?)` reads the stored index and `search_live(query, source?)` runs a live query on Platform. `source` is an optional filter; each variant carries a few words from `LiveSource::hint`. `search_knowledge` offers only the sources Platform indexes and maps the key to the category it filters on. `search_live` with no source uses `tools.live_default_source`, which is `web`.
-
-The query string is the whole request, and `tools.query_description` shows in a bad-then-good pair what a self-contained keyword query looks like. `search::params_for` turns the string into the source's parameters: the query fills the source's text parameter, a choice the query names fills a choice parameter, a `YYYY-MM-DD` fills a date, a required date falls back to today at `prompt.utc_offset_hours`, and `Courses::derived` reads the term out of the query or takes the one running today. A required parameter nothing filled comes back to the model naming what the query has to say. `LiveSource::narrow` cuts what a source's site cannot match out of the query first: `Courses` sends the class search the course code alone.
-
-```mermaid
-sequenceDiagram
-    participant M as model
-    participant T as engine search tool
-    participant P as Platform
-    participant W as source site or SearXNG
-
-    M->>T: search_live with a query and a source
-    T->>T: turn the query into the parameters the source takes
-    T->>P: POST /api/asu/query
-    P->>W: fetch the page or read the endpoints
-    P-->>T: result text
-    T-->>M: live result text and citation
-    Note over T,P: the call is bounded by query.timeout_secs and the request deadline
-```
-
-Each source is one engine file, `runtime/tools/knowledge/search/sources/<source>.rs`. It declares the hint, the citation label, the category, the parameters, what each accepts (text, one of fixed choices, any of fixed choices, a date, a flag), whether its answers are stored (`LiveSource::freshness`), and any extra check. The query is turned into parameters and checked there, so a bad call is corrected without a Platform call. The two tools live in `live.rs` and `stored.rs`.
-
-At boot the engine reads the Platform registry (`GET /api/asu/queries`) and fails to boot if it cannot. `search::conforms` logs a warning when a catalog source and the published one disagree on a parameter name, whether it is required, whether it takes a list, a choice, or whether it is stored. A source Platform does not publish is not offered to `search_live`. Platform checks every query's parameters again before running it.
-
-A Platform refusal (unknown source, missing parameter, unreadable page) reaches the model as `InvalidArguments` with the reason. A caller that is cancelled or runs out of time drops the call. The page is cited in `Answer.sources`.
-
-The `web` source is Platform's SearXNG search; it returns titles, links, dates, and snippets. `clubs` and the Sun Devil Central half of `events` are read over the organization's ASU sign-in on Platform and are never indexed. Not covered: X and Instagram posts, and anything behind an individual student's login (Workday jobs, personal MyASU data), which waits on the per-user sessions of Phase 8.
+`clubs` and the Sun Devil Central half of `events` are read over the organization's ASU sign-in on Platform and are never indexed. Not covered: X and Instagram posts, and anything behind an individual student's login (Workday jobs, personal MyASU data), which waits on the per-user sessions of Phase 8.
 
 ## Discord surface
 
@@ -675,7 +620,7 @@ A conversation belongs to one tenant, user, channel, and visibility. The bot hol
 | Data | Store |
 |---|---|
 | conversations, messages, memories, confirmations | the engine SQLite file (`store.path`) and its backups |
-| knowledge index, live query registry, linked account grants | Platform |
+| knowledge index, search sources, linked account grants | Platform |
 | local traces, console logs, eval reports | `.sparky/`, ignored |
 
 The engine keeps nothing else. Its schema is `apps/engine/migrations/`; the Platform schema lives in the Platform repo.
@@ -689,11 +634,11 @@ The engine keeps nothing else. Its schema is `apps/engine/migrations/`; the Plat
 | model call outlives the request deadline | run ends as `Deadline` |
 | tool argument error or Platform refusal | the reason becomes the tool result and the model corrects the call |
 | tool timeout | `ToolError::Timeout` fed back as the tool result |
-| live query outlives `query.timeout_secs` or the deadline | `QueryError::Timeout` fed back as the tool result |
+| a search outlives `query.timeout_secs` or the deadline | `QueryError::Timeout` fed back as the tool result |
 | model repeats an identical tool call | repeat refused, next step offers no tools, `Stalled` if it repeats again |
 | thinking spends the whole completion | the call is made again without thinking |
 | prompt would exceed the budget | history is trimmed and tool results are cut; boot checks keep tool schemas under half |
-| `search_knowledge` finds nothing | `tools.nothing_stored` sends the model to another search |
+| `search` finds nothing | Platform's note sends the model to another wording, another source, or `read_page` |
 | guardrail blocks a response | run ends as `Blocked` with `guardrail.replacement` |
 | guardrail finds a protected term in an answer | the term is replaced with `guardrail.redaction` and the answer proceeds |
 | confirmation denied, expired, or answered by someone else | nothing runs |
@@ -752,9 +697,9 @@ Two layers, lowest first: `sparky.toml`, then `SPARKY_<SECTION>__<KEY>` environm
 
 Rust reads the file with figment, `apps/evals` with tomllib through pydantic-settings. `SPARKY_CONFIG_FILE` points at a different file, such as an eval profile. A missing file is not an error.
 
-Sections in `sparky.toml`: `app`, `agent` (with `agent.thinking`), `prompt`, `model` (with `model.sampling`), `embedding`, `retrieval`, `policy`, `tools`, `sandbox`, `guardrail`, `compaction`, `query`, `mcp`, `outlook`, `gcal`, `canvas`, `upcoming`, `papers`, `wikipedia`, `trace`, `telemetry`, `analytics`, `http`, `web`, `admin`, `bot`, `platform`, `store`, `memory`, `cli`, `evals`. The `engine` and `discord` sections hold only env values: the service token and the guild id; `platform.url` and `platform.token` come from the environment too.
+Sections in `sparky.toml`: `app`, `agent` (with `agent.thinking`), `prompt`, `model` (with `model.sampling`), `policy`, `tools`, `sandbox`, `guardrail`, `compaction`, `query`, `mcp`, `outlook`, `gcal`, `canvas`, `upcoming`, `reminders`, `nudges`, `chat_search`, `calculate`, `read_page`, `papers`, `wikipedia`, `trace`, `telemetry`, `analytics`, `http`, `web`, `home`, `admin`, `bot`, `platform`, `store`, `memory`, `cli`, `evals`. The `engine` and `discord` sections hold only env values: the service token and the guild id; `platform.url` and `platform.token` come from the environment too.
 
-A default belongs to exactly one settings struct; adapters declare no defaults of their own. `Config::validate` rejects at boot any combination the engine cannot serve, for example both retrieval legs off, a section budget above the prompt budget, a sample ratio out of range, two MCP servers with the same name, a missing or malformed `SPARKY_PLATFORM__URL`, a missing `SPARKY_PLATFORM__TOKEN`, an empty `platform.mcp_private` or `platform.mcp_skip` prefix, a `[canvas]` window with `default_days` above `max_days`, a `[web]` sign-in without its Discord app, session key, https URLs, or its site in `http.cors_origins`, or with `retrieval.top_k`, `retrieval.window`, or `agent.confirmation_ttl_secs` past what the platform accepts. An unreadable `prompt.system_file` also stops the boot. Nothing is clamped at runtime.
+A default belongs to exactly one settings struct; adapters declare no defaults of their own. `Config::validate` rejects at boot any combination the engine cannot serve, for example a section budget above the prompt budget, a sample ratio out of range, two MCP servers with the same name, a missing or malformed `SPARKY_PLATFORM__URL`, a missing `SPARKY_PLATFORM__TOKEN`, an empty `platform.mcp_private` or `platform.mcp_skip` prefix, a `[canvas]` window with `default_days` above `max_days`, a `[web]` sign-in without its Discord app, session key, https URLs, or its site in `http.cors_origins`, or with `agent.confirmation_ttl_secs` past what the platform accepts. An unreadable `prompt.system_file` also stops the boot. Nothing is clamped at runtime.
 
 `prompt` holds the wording the harness writes around every section. `system_file` takes precedence over `system`, which takes precedence over the built-in prompt.
 

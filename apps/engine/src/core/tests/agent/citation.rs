@@ -4,9 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use chrono::Utc;
 use serde_json::{Value, json};
-use uuid::Uuid;
 
 use crate::core::tests::support::{agent, calls, text};
 use crate::core::traits::tools::Tool;
@@ -125,39 +123,32 @@ fn a_key_with_no_value_after_it_is_left_as_it_reads() {
 }
 
 #[test]
-fn citations_list_each_source_once_best_first() {
-    use crate::core::types::knowledge::evidence::Evidence;
+fn citations_list_each_page_once_best_first() {
+    use crate::core::types::knowledge::query::StoredPage;
+    use crate::runtime::tools::knowledge::search::stored_citations;
 
-    let chunk = |source: Uuid, title: &str, url: Option<&str>| Evidence {
-        source_id: source,
-        chunk_id: Uuid::new_v4(),
-        key: title.into(),
+    let page = |title: &str, url: Option<&str>| StoredPage {
         title: title.into(),
-        content: String::new(),
         url: url.map(str::to_owned),
-        fetched_at: Utc::now(),
-        score: 1.0,
+        fetched_at: None,
+        content: String::new(),
     };
-    let hours = Uuid::new_v4();
-    let events = Uuid::new_v4();
-    let note = Uuid::new_v4();
-    let evidence = vec![
-        chunk(hours, "library_hours", Some("https://lib.asu.edu/hours")),
-        chunk(events, "events", Some("https://asu.edu/events")),
-        chunk(hours, "library_hours", Some("https://lib.asu.edu/hours")),
-        chunk(note, "note", None),
-        chunk(hours, "library_hours", Some("https://lib.asu.edu/hours")),
-        chunk(note, "note", None),
+    let pages = vec![
+        page("library_hours", Some("https://lib.asu.edu/hours")),
+        page("events", Some("https://asu.edu/events")),
+        page("library_hours", Some("https://lib.asu.edu/hours")),
+        page("note", None),
+        page("note", None),
     ];
 
-    let lines = Evidence::citations(&evidence);
+    let lines = stored_citations(&pages);
 
     assert_eq!(lines.len(), 3, "{lines:?}");
     assert_eq!(lines[0].title, "library_hours");
     assert_eq!(lines[0].url.as_deref(), Some("https://lib.asu.edu/hours"));
     assert_eq!(lines[1].title, "events");
     assert_eq!(lines[2].title, "note");
-    assert_eq!(lines[2].url, None, "a source with no page of its own");
+    assert_eq!(lines[2].url, None, "a page with no url of its own");
 }
 
 /// A tool that reads every page it is given in one call.

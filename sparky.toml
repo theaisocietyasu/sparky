@@ -85,8 +85,8 @@ role_line_no_roles = "The user is `{user}`. They hold no special roles."
 memory_header = "What you remember about this user:"
 # Added to the system prompt in a direct message when the memory tools are registered.
 memory_rules = "Memory. Call remember when the student states something about themselves that helps later: their major, year, campus, clubs, how they want answers, a task with its due date, or a plan they mention with no date, such as applying somewhere or emailing an advisor, as a task with no due date so you can check in on it later. Only what they said, never a guess. Never store grades, GPA, health, disability, immigration status, finances, passwords or codes, or anything about another person. Call forget_memory with the id in brackets when they ask you to forget something."
-# Added to the system prompt in a direct message when search_live is registered.
-discovery_rules = "Discovery. When the student asks for something to do, join or attend, take their major, interests, clubs and campus from what you remember, use them as the words of a search_live query on events or clubs, and say which memory you used."
+# Added to the system prompt in a direct message when search is registered.
+discovery_rules = "Discovery. When the student asks for something to do, join or attend, take their major, interests, clubs and campus from what you remember, use them as the words of a search with source events or clubs, and say which memory you used."
 # Added to the system prompt in a direct message.
 proactive_rules = "Initiative. End an answer with one short, concrete next step when one helps: a related deadline, event, club, office or resource, or an offer to set a reminder. When one missing detail would change the answer, such as their campus or course section, ask for it in one short question. Never ask more than one question at a time, and never pad an answer with offers. Care. When the student sounds stressed, overwhelmed or low, answer warmly first, then mention once in that chat that ASU Counseling is there for them (https://eoss.asu.edu/counseling, 24/7 crisis line 480-921-1006). Never diagnose, never repeat it in the same chat. Late at night their time, after helping, suggest rest in one short line."
 # Added to the first private turn of a conversation when Sparky holds no memories of the student.
@@ -134,20 +134,6 @@ presence_penalty = 1.0
 # repeat_penalty = 1.05
 # seed = 42
 
-# base_url and api_key are per-machine and live in .env.
-[embedding]
-name = "Qwen/Qwen3-Embedding-0.6B-GGUF:Q8_0"
-dim = 1024
-
-# ---------------------------------------------------------------- retrieval
-# Dense and lexical legs fused by reciprocal rank fusion. Both off is rejected at boot.
-[retrieval]
-top_k = 6                      # chunks search_knowledge returns per call
-dense = true                   # send a query vector, so the platform runs its dense leg
-# Rows either side of a hit joined into one passage; overlapping windows merge. 0 returns the hit alone.
-window = 2
-stale_days = 14                # a stored page older than this is marked for a fresh read_page
-
 # ---------------------------------------------------------------- what may run
 # Risk classes in order: read_public, read_authenticated, prepare_write, external_write,
 # destructive, forbidden.
@@ -156,20 +142,11 @@ write_roles = ["MANAGE_GUILD"]
 allow_authenticated_reads = false
 confirm_from = "external_write"
 
-# search_knowledge reads the platform knowledge base; search_live runs a live query on the platform.
-# The descriptions are the tool text the model reads. The catalog appends per-source hints
-# to source_description.
+# search is Platform's tool: stored pages first, then the source a call names, then the web.
+# Its description and arguments come from Platform at boot.
 [tools]
 disabled = []
 search = true
-# Source search_live fetches when a call names none. Must be a source the engine offers.
-live_default_source = "web"
-knowledge_description = "Search the stored knowledge base of ASU pages: programs, policies, admissions, advising, buildings, services and offices, anything that changes rarely. Nothing is looked up before you are called, so search it for any such question. Send several searches with different wording in one step."
-live_description = "Fetch an ASU source or the open web right now. Use it when the answer has to be current, such as hours today, open seats, shuttle times, events, news or scores, or when the knowledge base holds nothing."
-query_description = "What to search for, in keywords. This string is the whole request: the tool reads nothing else from the conversation, so name the subject in full and write no pronoun and no bare word. Bad: hours. Good: Hayden Library hours Sunday. Bad: does it have space left. Good: CSE 310 Fall 2026 open seats."
-source_description = "Narrows the search to one source. Leave it out unless the question is plainly about that one source: a wrong source returns nothing even when the answer is stored."
-nothing_stored = "The knowledge base holds nothing for that query. If you named a source, search again without it. Otherwise search again with the subject named differently, read the page with read_page when you know its url, or call search_live. Say you do not have it only once all of that has been tried this turn."
-stale_note = "This copy is old. If the answer depends on details that change, read the url with read_page for the current page."
 
 # run_sandbox: a command in an isolated container. With egress on it reaches only the egress proxy.
 # required = true refuses to boot without a container runtime; false runs without run_sandbox.
@@ -220,7 +197,7 @@ temperature = 0.0
 timeout_secs = 30
 # instructions = "You compact a conversation..."
 
-# Live source queries on the platform. timeout_secs is the whole budget of one.
+# Platform search. timeout_secs is the whole budget of one call.
 [query]
 timeout_secs = 90
 
@@ -465,20 +442,18 @@ max_files = 4
 max_file_bytes = 2000000
 
 # ---------------------------------------------------------------- platform
-# Knowledge search, live queries and linked accounts come from the platform
-# HTTP API. So do the Sun Devil Central clubs and events, and the ASU knowledge. With
+# Search and linked accounts come from the platform HTTP API. So do the Sun Devil Central clubs and events, and the ASU knowledge. With
 # store.backend = "platform", conversations, memories and confirmations do too. url and token
 # live in .env and are required.
 # The token needs these scopes:
 #   agents:read, agents:write   the export the import reads; store.backend platform
-#   knowledge:read              knowledge search and the live queries
+#   knowledge:read              search and the source list on /admin/sources
+#   knowledge:discover          saving the pages read_page reads
 #   accounts:link               the /login link for a member
 #   accounts:token              the Outlook and Google tokens of a member
 #   asu:read                    platform_asu_clubs and platform_asu_events
 [platform]
-timeout_secs = 10              # one platform call; a live query uses what is left of the request
-embedding_model = ""           # sent with each query vector; empty sends embedding.name
-max_query_chars = 1000         # longest search query sent; the platform refuses longer
+timeout_secs = 10              # one platform call; a search uses what is left of the request
 # Platform tools over MCP, with the same token. Set SPARKY_PLATFORM__MCP_URL (for example
 # http://127.0.0.1:8001/mcp) to register them as platform_<name>. The token scopes decide which
 # tools exist. Read tools run for anyone; write tools need policy.write_roles and a confirmation.
@@ -488,8 +463,9 @@ mcp_tools = []                 # e.g. ["org.info", "events.list"]; empty registe
 # message, is ReadAuthenticated, and is sent the caller as discord_id in place of the model's value.
 mcp_private = []
 # Tool name prefixes never registered. The engine serves Canvas itself from the calendar feed;
-# the knowledge admin tools are for officers on Platform, and search_knowledge covers search.
-mcp_skip = ["canvas.", "knowledge.", "batch"]
+# the knowledge admin tools are for officers on Platform; the engine serves search itself, and
+# search covers the submodule queries.
+mcp_skip = ["canvas.", "knowledge.", "batch", "search", "submodules."]
 
 # ---------------------------------------------------------------- local store
 # Conversations, memories and pending confirmations live in one SQLite file that only the engine

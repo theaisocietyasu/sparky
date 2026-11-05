@@ -49,14 +49,14 @@ export const BETWEEN: Turn = {
   thought: "Two live reads at once: dining open now at the Memorial Union and library hours today.",
   calls: [
     {
-      tool: "search_live",
+      tool: "search",
       args: { query: "Memorial Union dining open now", source: LIVE.dining.key },
-      output: liveResult(LIVE.dining.label, LIVE.dining.url, "just now", "Memorial Union. Open now: Pitchforks, Panda Express, Chick-fil-A, until 3:00pm."),
+      output: liveResult(LIVE.dining.key, LIVE.dining.url, "Memorial Union. Open now: Pitchforks, Panda Express, Chick-fil-A, until 3:00pm."),
     },
     {
-      tool: "search_live",
+      tool: "search",
       args: { query: "library hours today", source: LIVE.libraryHours.key },
-      output: liveResult(LIVE.libraryHours.label, LIVE.libraryHours.url, "just now", "Hayden Library 7:00am to 12:00am. Noble Library 7:00am to 10:00pm."),
+      output: liveResult(LIVE.libraryHours.key, LIVE.libraryHours.url, "Hayden Library 7:00am to 12:00am. Noble Library 7:00am to 10:00pm."),
     },
   ],
   wrap: "Food, then a library, in the order of the afternoon.",
@@ -70,9 +70,9 @@ export const BOOK: Turn = {
   thought: "Find a Hayden group room free tomorrow from 6 to 8 PM, then book it. Booking needs approval.",
   calls: [
     {
-      tool: "search_live",
+      tool: "search",
       args: { query: "Hayden group room 4 people Oct 7 6pm to 8pm", source: LIVE.studyRooms.key },
-      output: liveResult(LIVE.studyRooms.label, LIVE.studyRooms.url, "just now", "Hayden Library group study rooms, capacity 4. Free Oct 7, 6:00pm to 8:00pm: C-21, C-24."),
+      output: liveResult(LIVE.studyRooms.key, LIVE.studyRooms.url, "Hayden Library group study rooms, capacity 4. Free Oct 7, 6:00pm to 8:00pm: C-21, C-24."),
     },
   ],
   wrap: "C-21 is free for the whole slot. Book it once approved.",

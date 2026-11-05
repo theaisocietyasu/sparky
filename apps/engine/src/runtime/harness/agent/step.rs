@@ -7,7 +7,7 @@ use crate::core::types::conversation::message::Message;
 use crate::core::types::model::{FinishReason, ModelError, ModelResponse};
 use crate::core::types::safety::guardrail::{Stage, Verdict};
 use crate::core::types::safety::redact::truncate;
-use crate::core::types::tools::{REMEMBER, SEARCH_LIVE};
+use crate::core::types::tools::{REMEMBER, SEARCH};
 use crate::core::types::trace::{RunStatus, TraceEvent};
 use crate::runtime::harness::agent::execute::HeldError;
 use crate::runtime::harness::agent::prompt::assemble;
@@ -139,8 +139,8 @@ impl Agent {
             templates.memory_rules = "";
             templates.onboarding_rules = "";
         }
-        // The discovery rule goes only where search_live is offered.
-        if self.deps.tools.get(SEARCH_LIVE).is_none() {
+        // The discovery rule goes only where search is offered.
+        if self.deps.tools.get(SEARCH).is_none() {
             templates.discovery_rules = "";
         }
         let system = self.instructions();

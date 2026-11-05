@@ -65,7 +65,7 @@ with no due date so you can check in on it later. Only what they said, never a g
 status, finances, passwords or codes, or anything about another person. Call forget_memory \
 with the id in brackets when they ask you to forget something.";
 /// Default rule for finding events and clubs from memories, added in a private turn.
-pub const DISCOVERY_RULES: &str = "Discovery. When the student asks for something to do, join or attend, take their major, interests, clubs and campus from what you remember, use them as the words of a search_live query on events or clubs, and say which memory you used.";
+pub const DISCOVERY_RULES: &str = "Discovery. When the student asks for something to do, join or attend, take their major, interests, clubs and campus from what you remember, use them as the words of a search with source events or clubs, and say which memory you used.";
 /// Default rule on looking ahead for the student.
 pub const PROACTIVE_RULES: &str = "Initiative. End an answer with one short, concrete next step when one helps: a related deadline, event, club, office or resource, or an offer to set a reminder. When one missing detail would change the answer, such as their campus or course section, ask for it in one short question. Never ask more than one question at a time, and never pad an answer with offers. Care. When the student sounds stressed, overwhelmed or low, answer warmly first, then mention once in that chat that ASU Counseling is there for them (https://eoss.asu.edu/counseling, 24/7 crisis line 480-921-1006). Never diagnose, never repeat it in the same chat. Late at night their time, after helping, suggest rest in one short line.";
 /// Default rule for the first private turn with a student Sparky knows nothing about.

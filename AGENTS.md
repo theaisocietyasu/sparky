@@ -55,7 +55,7 @@ Processes talk only via: discord to engine; engine to llama-server and the Platf
 
 ## Dependencies we build on
 
-- **Rig** (`rig-core`, crate name `rig_core`): the OpenAI-compatible client for chat and embeddings (`runtime/model/rig_openai/`) and the only inference path. Never `rig::Agent`; the loop is ours.
+- **Rig** (`rig-core`, crate name `rig_core`): the OpenAI-compatible client for chat (`runtime/model/rig_openai/`) and the only inference path. Never `rig::Agent`; the loop is ours.
 - **rmcp**: MCP. Never hand-roll MCP.
 - The rest of the harness (loop, policy, context assembly, memory, tracing, replay) is written here.
 
@@ -63,7 +63,7 @@ Processes talk only via: discord to engine; engine to llama-server and the Platf
 
 Two layers, lowest first: `sparky.toml` (committed), then `SPARKY_<SECTION>__<KEY>` env vars from `.env`, which win. Both load into `apps/engine/src/core/config/mod.rs`, `apps/discord/src/core/config.rs`, `apps/cli/src/core/config.rs` (Rust, figment) and `apps/evals/core/settings.py` (Python, tomllib through pydantic-settings). `SPARKY_CONFIG_FILE` points elsewhere.
 
-**Every tunable value goes in `sparky.toml`**, at its default, in the same change that adds it. That covers every harness knob: loop limits, prompt budgets and their wording, sampling, retrieval tuning, policy, which tools register, tracing, and the HTTP surface. `.env` holds only secrets, per-machine URLs, and what docker compose and the justfile read; a new secret goes in `.env.example` too. Secrets are `SecretString`; never log one. Reject a bad combination in `Config::validate` at boot; never clamp at runtime.
+**Every tunable value goes in `sparky.toml`**, at its default, in the same change that adds it. That covers every harness knob: loop limits, prompt budgets and their wording, sampling, policy, which tools register, tracing, and the HTTP surface. `.env` holds only secrets, per-machine URLs, and what docker compose and the justfile read; a new secret goes in `.env.example` too. Secrets are `SecretString`; never log one. Reject a bad combination in `Config::validate` at boot; never clamp at runtime.
 
 ## Rules
 
@@ -72,8 +72,8 @@ Two layers, lowest first: `sparky.toml` (committed), then `SPARKY_<SECTION>__<KE
 - A crate's public surface is its constructors and the `harness` traits it implements. Nothing reaches into another adapter.
 - No global mutable state. Per-request data goes in `RequestContext`.
 - Every replaceable dependency sits behind a trait in `engine/src/core/traits` with a test double in `core/tests/support`.
-- The engine never writes the retrieval index or fetches pages for it; Platform crawls, indexes, and runs live queries. `read_page` reads one public page the user or a result points at, and with `sandbox.egress` on, `run_sandbox` may read public pages through the egress proxy; nothing either reads is indexed.
-- Model output is never written back as retrieval evidence.
+- The engine never writes the retrieval index or fetches pages for it; Platform crawls, indexes, and runs search. `read_page` reads one public page the user or a result points at, and with `sandbox.egress` on, `run_sandbox` may read public pages through the egress proxy; nothing either reads is indexed.
+- Model output is never written back as search evidence.
 - Write-side tools go through `Policy`; consequential actions require confirmation.
 - Live progress is a `TraceEvent`: give a new variant a line in `TraceEvent::progress` (or `None`) and every watching client shows it. Clients render the `text` the engine sends, never their own copy of the enum.
 - Errors: `thiserror` enums per crate, no `anyhow` in library crates, no `unwrap` outside tests.

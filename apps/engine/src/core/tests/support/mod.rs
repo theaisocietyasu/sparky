@@ -26,7 +26,7 @@ use crate::runtime::harness::tools::ToolSet;
 pub use self::admin::Ledger;
 pub use self::conversation::{Recording, Rooms, Row, history_of, push_row};
 pub use self::health::Fixed;
-pub use self::knowledge::{FakeQueries, FixedEmbedder, Stored};
+pub use self::knowledge::FakeQueries;
 pub use self::memory::Recalling;
 pub use self::model::{Scripted, calls, only_thought, text};
 pub use self::oauth::{HostedLogins, Linked};

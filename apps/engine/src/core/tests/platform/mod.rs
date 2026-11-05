@@ -7,7 +7,6 @@ mod discovery;
 mod memory;
 mod oauth;
 mod query;
-mod retrieval;
 mod tools;
 
 use std::collections::{HashMap, VecDeque};

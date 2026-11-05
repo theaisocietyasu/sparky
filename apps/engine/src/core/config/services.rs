@@ -170,10 +170,6 @@ pub struct Platform {
     pub token: Option<SecretString>,
     /// Budget for one platform call. A live query uses what is left of the request instead.
     pub timeout_secs: u64,
-    /// Embedding model name sent with each query vector. Empty sends embedding.name.
-    pub embedding_model: String,
-    /// Longest knowledge search query sent; longer text is cut to this many characters.
-    pub max_query_chars: usize,
     /// Platform MCP endpoint, for example http://127.0.0.1:8001/mcp. Empty registers no platform tools.
     pub mcp_url: Option<String>,
     /// Platform tool names to register, such as org.info; empty registers every tool the token allows.
@@ -191,12 +187,16 @@ impl Default for Platform {
             url: None,
             token: None,
             timeout_secs: 10,
-            embedding_model: String::new(),
-            max_query_chars: 1000,
             mcp_url: None,
             mcp_tools: Vec::new(),
             mcp_private: Vec::new(),
-            mcp_skip: vec!["canvas.".into(), "knowledge.".into(), "batch".into()],
+            mcp_skip: vec![
+                "canvas.".into(),
+                "knowledge.".into(),
+                "batch".into(),
+                "search".into(),
+                "submodules.".into(),
+            ],
         }
     }
 }
@@ -233,19 +233,6 @@ pub fn validate_model(model: &Model) -> Result<(), ConfigError> {
 
 fn default_max_tokens_without_thinking() -> u32 {
     1_024
-}
-
-/// Embedding endpoint (OpenAI-compatible).
-#[derive(Debug, Deserialize)]
-pub struct Embedding {
-    /// Base URL, ending in /v1.
-    pub base_url: String,
-    /// API key for the endpoint.
-    pub api_key: SecretString,
-    /// Model name as served.
-    pub name: String,
-    /// Vector dimension; must match the chunks.embedding column.
-    pub dim: u32,
 }
 
 /// Trace export to Phoenix.

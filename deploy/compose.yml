@@ -11,7 +11,6 @@ services:
       - { path: ../.env, required: false }
     environment:
       SPARKY_MODEL__BASE_URL: http://chat:8000/v1
-      SPARKY_EMBEDDING__BASE_URL: http://embed:8001/v1
       SPARKY_TELEMETRY__PHOENIX_URL: ${SPARKY_PHOENIX_URL:-}
       # run_sandbox uses the sandboxd daemon.
       DOCKER_HOST: tcp://sandboxd:2375

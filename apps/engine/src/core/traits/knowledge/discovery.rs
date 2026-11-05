@@ -2,11 +2,11 @@
 
 use async_trait::async_trait;
 
-use crate::core::types::knowledge::retrieval::RetrievalError;
+use crate::core::types::knowledge::query::QueryError;
 
 /// Sends the URL of a page the agent read; the platform decides whether to save it.
 #[async_trait]
 pub trait Discovery: Send + Sync {
     /// Suggests url to the platform. Sends the URL only.
-    async fn suggest(&self, url: &str) -> Result<(), RetrievalError>;
+    async fn suggest(&self, url: &str) -> Result<(), QueryError>;
 }

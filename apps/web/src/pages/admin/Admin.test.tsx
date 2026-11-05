@@ -217,12 +217,12 @@ describe("admin pages", () => {
     engine({
       "GET /web/me": () => Response.json(MOD),
       "GET /admin/sources": () =>
-        Response.json([{ key: "library_hours", indexed: true, params: [{ name: "date", required: false }] }]),
+        Response.json([{ key: "library_hours", description: "Library hours by day.", params: [{ name: "date", required: false }] }]),
     });
     open("/admin/sources");
     expect(await screen.findByText("library_hours")).toBeInTheDocument();
     expect(screen.getByText("date")).toBeInTheDocument();
-    expect(screen.getByText("indexed")).toBeInTheDocument();
+    expect(screen.getByText("Library hours by day.")).toBeInTheDocument();
   });
 
   it("shows a short error instead of a proxy page", async () => {
