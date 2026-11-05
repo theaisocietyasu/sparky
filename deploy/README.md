@@ -147,13 +147,13 @@ A cookie counts when the request `Origin` is the site, or, with no `Origin`, whe
 
 ## The sandbox
 
-`run_sandbox` needs a container runtime. Compose provides `sandboxd`, a `docker:27-dind` daemon with no host port; the engine reaches it over `DOCKER_HOST=tcp://sandboxd:2375`, and the engine image carries only the client. On a developer host running `just engine`, the local `docker` serves.
+By default `run_sandbox` runs each command in a container. Compose provides `sandboxd`, a `docker:27-dind` daemon with no host port; the engine reaches it over `DOCKER_HOST=tcp://sandboxd:2375`, and the engine image carries only the client. On a developer host running `just engine`, the local `docker` serves.
 
 Commands run in `ghcr.io/theaisocietyasu/sparkyai-sandbox` (`deploy/docker/sandbox.Dockerfile`) with a read-only root, dropped capabilities, a non-root user, and a `noexec` workspace, so `python3 script.py` runs but `./script` does not. With `sandbox.egress` off a container has no network; with it on, it reaches public HTTP and HTTPS only through `sparkyai-sandbox-proxy` (`deploy/sandbox/squid.conf`). `just sandbox-images` builds both images locally; `just sandbox-down` removes the containers the engine started.
 
 The runtime is probed at boot. `sandbox.required = true` refuses to start without one; `false` leaves `run_sandbox` unregistered.
 
-With `sandbox.runtime = "wasm"` no container runtime is needed. The engine runs bash, python3 (standard library only), grep, sed, rg and the coreutils as WebAssembly in a child of itself, with no network and one kept folder per student. `deploy/wasm/fetch.sh deploy/wasm/packages.txt <folder>` downloads the pinned packages and checks each sha256; point `sandbox.wasm_packages` at that folder. The first run compiles them (about a minute); later runs take about a second.
+With `sandbox.runtime = "wasm"`, as on the RunPod pod, no container runtime is needed. The engine runs bash, python3 (standard library only), grep, sed, rg and the coreutils as WebAssembly in a child of itself, with no network and one kept folder per student. `deploy/wasm/fetch.sh deploy/wasm/packages.txt <folder>` downloads the pinned packages and checks each sha256; point `sandbox.wasm_packages` at that folder. The first run compiles them (about a minute); later runs take about a second.
 
 ## Images
 
