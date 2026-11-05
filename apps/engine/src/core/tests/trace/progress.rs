@@ -108,6 +108,7 @@ fn detail_is_held_to_what_the_style_allows() {
         .progress(ProgressStyle {
             detail_chars: 40,
             thought_chars: 40,
+            plain: false,
         })
         .unwrap_or_default();
     assert!(short.chars().count() < 140, "{short}");
@@ -292,4 +293,37 @@ async fn a_run_nobody_is_watching_still_traces() {
     );
 
     assert_eq!(sink.records().len(), 1);
+}
+
+#[test]
+fn plain_lines_hide_tool_names_arguments_and_results() {
+    let plain = ProgressStyle {
+        plain: true,
+        ..ProgressStyle::default()
+    };
+    let started = TraceEvent::ToolStarted {
+        step: 1,
+        call_id: "c1".into(),
+        tool: "search_live".into(),
+        arguments: serde_json::json!({"query": "MAT 343 tutoring", "source": "web"}),
+    };
+    assert_eq!(
+        started.progress(plain).as_deref(),
+        Some("\u{1f527} Searching the web for \u{201c}MAT 343 tutoring\u{201d}")
+    );
+    let failed = finished(
+        "search_knowledge",
+        Err("platform did not answer within 10s".into()),
+    );
+    let line = failed.progress(plain).unwrap_or_default();
+    assert_eq!(line, "\u{274c} Could not reach ASU pages");
+    let found = finished("search_knowledge", Ok("{\"results\": []}".into()));
+    assert_eq!(
+        found.progress(plain).as_deref(),
+        Some("\u{2705} Checked ASU pages")
+    );
+    assert_eq!(
+        TraceEvent::MemoryRecalled { count: 10 }.progress(plain),
+        None
+    );
 }

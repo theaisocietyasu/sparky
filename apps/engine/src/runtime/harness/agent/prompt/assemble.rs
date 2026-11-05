@@ -24,7 +24,20 @@ pub fn assemble(ctx: &RequestContext, s: &Sections<'_>, budget: Budget) -> Assem
             .replace("{roles}", &ctx.roles.join(", "))
     };
     let mut system = format!("{}\n\n{role_line}", s.system.trim());
-    for rules in [s.templates.memory_rules, s.templates.discovery_rules] {
+    // A student with no memories and no earlier turns in this conversation is met for the first time.
+    let first = s.memory.is_empty() && s.history.is_empty();
+    let onboarding = if first {
+        s.templates.onboarding_rules
+    } else {
+        ""
+    };
+    let private = [
+        s.templates.memory_rules,
+        s.templates.discovery_rules,
+        s.templates.proactive_rules,
+        onboarding,
+    ];
+    for rules in private {
         let rules = rules.trim();
         if ctx.visibility == Visibility::Private && !rules.is_empty() {
             system.push_str("\n\n");

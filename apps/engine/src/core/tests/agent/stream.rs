@@ -336,6 +336,7 @@ fn live_pieces_reach_the_watcher_as_draft_or_thinking_lines() {
     let style = ProgressStyle {
         detail_chars: 160,
         thought_chars: 12,
+        plain: false,
     };
     let reasoning = TraceEvent::ModelReasoning {
         step: 2,

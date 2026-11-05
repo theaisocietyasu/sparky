@@ -581,3 +581,33 @@ fn the_memory_and_discovery_rules_are_only_in_a_private_turn() {
     assert!(!text(&public).contains("DISCOVERY RULES"));
     assert!(text(&private).contains("DISCOVERY RULES"));
 }
+
+#[test]
+fn the_onboarding_rule_meets_only_a_student_with_no_memories_or_turns() {
+    let templates = Templates {
+        proactive_rules: "PROACTIVE RULES",
+        onboarding_rules: "ONBOARDING RULES",
+        ..Templates::default()
+    };
+    let private = ctx().with_visibility(crate::core::types::conversation::Visibility::Private);
+    let text = |out: crate::core::types::agent::assemble::Assembled| -> String {
+        out.messages.iter().map(|m| m.content.clone()).collect()
+    };
+    let first = Sections {
+        system: "s",
+        input: "hi",
+        templates,
+        ..Sections::default()
+    };
+    let shown = text(assemble(&private, &first, Budget::default()));
+    assert!(shown.contains("ONBOARDING RULES") && shown.contains("PROACTIVE RULES"));
+    assert!(!text(assemble(&ctx(), &first, Budget::default())).contains("ONBOARDING RULES"));
+
+    let known = [remembered(MemoryKind::Fact, "CS junior")];
+    let returning = Sections {
+        memory: &known,
+        ..first
+    };
+    let shown = text(assemble(&private, &returning, Budget::default()));
+    assert!(!shown.contains("ONBOARDING RULES") && shown.contains("PROACTIVE RULES"));
+}

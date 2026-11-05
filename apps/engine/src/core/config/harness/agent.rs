@@ -71,6 +71,8 @@ pub struct Agent {
     pub progress_detail_chars: usize,
     /// Characters of reasoning a thinking line carries.
     pub progress_thought_chars: usize,
+    /// Live progress in short everyday phrases, with no tool names, arguments or results.
+    pub progress_plain: bool,
     /// Stream the reasoning and the answer of model calls to the watcher as they are written.
     pub stream: bool,
     /// Longest run of answer text held back while waiting for the end of a sentence or line.
@@ -117,6 +119,7 @@ impl Default for Agent {
             tool_result_to_file_chars: 0,
             progress_detail_chars: progress::DETAIL_CHARS,
             progress_thought_chars: progress::THOUGHT_CHARS,
+            progress_plain: true,
             stream: true,
             stream_block_chars: 160,
             prompt_estimate_headroom: 0.3,
@@ -131,6 +134,7 @@ impl Agent {
         ProgressStyle {
             detail_chars: self.progress_detail_chars,
             thought_chars: self.progress_thought_chars,
+            plain: self.progress_plain,
         }
     }
 
@@ -218,6 +222,10 @@ pub struct Prompt {
     pub memory_rules: String,
     /// How to find events and clubs from memories. Added to the system prompt in a private turn.
     pub discovery_rules: String,
+    /// How to look ahead for the student. Added to the system prompt in a private turn.
+    pub proactive_rules: String,
+    /// How to meet a student Sparky knows nothing about. Added to the first private turn with no memories.
+    pub onboarding_rules: String,
     /// Heading above what the model may do.
     pub capabilities_header: String,
     /// Heading above the message of ours a reply answers.
@@ -254,6 +262,8 @@ impl Default for Prompt {
             memory_header: assemble::MEMORY_HEADER.into(),
             memory_rules: assemble::MEMORY_RULES.into(),
             discovery_rules: assemble::DISCOVERY_RULES.into(),
+            proactive_rules: assemble::PROACTIVE_RULES.into(),
+            onboarding_rules: assemble::ONBOARDING_RULES.into(),
             capabilities_header: assemble::CAPABILITIES_HEADER.into(),
             reply_header: assemble::REPLY_HEADER.into(),
             result_cut_line: assemble::RESULT_CUT_LINE.into(),
