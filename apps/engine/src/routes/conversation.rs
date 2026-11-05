@@ -1,5 +1,5 @@
 //! POST /conversation/reset ends the open conversations of one caller in one channel. The web
-//! session lists, reads and deletes its own web conversations.
+//! session finds its home conversation, and lists, reads and deletes its own web conversations.
 
 use axum::Json;
 use axum::extract::{Path, State};
@@ -8,7 +8,9 @@ use axum::response::{IntoResponse, Response};
 
 use crate::core::types::agent::context::RequestContext;
 use crate::core::types::conversation::message::Role;
-use crate::core::types::conversation::{ResetRequest, ResetResponse, Turn, Visibility};
+use crate::core::types::conversation::{
+    Home, ResetRequest, ResetResponse, Turn, Visibility, home_id,
+};
 use crate::routes::auth::{Caller, caller, too_many};
 use crate::routes::chat::ChatState;
 use crate::routes::failure::Failure;
@@ -139,6 +141,23 @@ pub async fn list(State(state): State<ChatState>, headers: HeaderMap) -> Respons
     }
 }
 
+/// GET /web/home: the id of the student's home conversation, made when missing.
+pub async fn home(State(state): State<ChatState>, headers: HeaderMap) -> Response {
+    let ctx = match web_context(&state, &headers, None) {
+        Ok(ctx) => ctx,
+        Err(refused) => return refused,
+    };
+    let id = home_id(&ctx.tenant_id, &ctx.user_id);
+    let ctx = ctx.with_conversation(id);
+    let Some(store) = &state.conversations else {
+        return StatusCode::NOT_IMPLEMENTED.into_response();
+    };
+    match store.ensure(&ctx, WEB_CHANNEL).await {
+        Ok(()) => Json(Home { id }).into_response(),
+        Err(e) => unavailable(&ctx, &e),
+    }
+}
+
 /// GET /web/conversations/{id}: the questions and answers of one of the student's conversations.
 pub async fn read(
     State(state): State<ChatState>,
@@ -169,8 +188,10 @@ pub async fn read(
                     };
                     let text = s.message.content.trim();
                     (!text.is_empty()).then(|| Turn {
+                        position: s.position,
                         role: role.to_owned(),
                         text: text.to_owned(),
+                        notice: s.message.notice.clone(),
                     })
                 })
                 .collect();

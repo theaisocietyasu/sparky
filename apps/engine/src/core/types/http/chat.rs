@@ -3,9 +3,9 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::core::types::conversation::Visibility;
 use crate::core::types::conversation::file::FileAttachment;
 use crate::core::types::conversation::image::Attachment;
+use crate::core::types::conversation::{Parent, Visibility};
 use crate::core::types::knowledge::evidence::Citation;
 use crate::core::types::safety::policy::ConfirmationRequest;
 use crate::core::types::tools::ToolRun;
@@ -39,6 +39,9 @@ pub struct ChatRequest {
     /// The message of ours this one replies to, when it replies to one.
     #[serde(default)]
     pub reply_to: Option<String>,
+    /// The message a new conversation is a thread of.
+    #[serde(default)]
+    pub parent: Option<Parent>,
     /// Images attached to the message.
     #[serde(default)]
     pub images: Vec<Attachment>,

@@ -20,7 +20,7 @@ cargo test -p engine -- --ignored   # tests that need a container runtime
 | `/canvas/feed`, `/canvas/feed/remove` | the caller's Canvas calendar feed link |
 | `GET /notifications/outgoing`, `POST /notifications/sent` | reminders and nudges the bot sends as DMs |
 | `/sandbox...` | sandbox containers and the `run_sandbox` switch |
-| `/web/...` | web sign-in, chats, reminders, notifications, nudge settings and nudge thumbs |
+| `/web/...` | web sign-in, home chat, chats and threads, reminders, notifications, nudge settings and nudge thumbs |
 | `/admin/...` | traces, tools, sources, limits, guardrails, instructions, approvals |
 | `GET /health/live`, `/health/ready` | up; `{"platform":bool,"model":bool}`, 503 until both are true |
 
@@ -51,7 +51,7 @@ Tools are `search_knowledge`, `search_live`, `read_page`, `calculate`, `search_c
 
 ## Nudges
 
-`runtime/nudge/` runs every `nudges.tick_secs`. For each student active in the last `nudges.active_days` it reads their dated items and memories, then sends what is due: morning brief, due soon, start early, new Canvas item, follow-up, Sunday plan, and from a background agent with read-only tools, event matches, the academic calendar and late study spots. Quiet hours, a daily cap, per-kind toggles and thumbs on each nudge limit them. Nudges go out as notifications: the bot DMs them and the web bell shows them.
+`runtime/nudge/` runs every `nudges.tick_secs`. For each student active in the last `nudges.active_days` it reads their dated items and memories, then sends what is due: morning brief, due soon, start early, new Canvas item, follow-up, Sunday plan, and from a background agent with read-only tools, event matches, the academic calendar and late study spots. Quiet hours, a daily cap, per-kind toggles and thumbs on each nudge limit them. Nudges and reminders go out as notifications: the bot DMs them, and each one is also a Sparky message in the student's home chat (`GET /web/home`), where the student can reply or start a thread off it.
 
 Details: Request lifecycle, Agent loop, Capabilities, and Live source queries in [docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md).
 

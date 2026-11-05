@@ -50,6 +50,18 @@ pub struct Message {
     /// Images attached to a user turn. Never stored: the links the edge issues expire.
     #[serde(skip)]
     pub images: Vec<Attachment>,
+    /// The notification an assistant turn Sparky sent on its own stands for.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub notice: Option<Notice>,
+}
+
+/// The notification behind a message Sparky sent on its own: a reminder or a nudge.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Notice {
+    /// Notification id, the one feedback names.
+    pub id: String,
+    /// reminder, or the kind of nudge.
+    pub kind: String,
 }
 
 impl Message {
@@ -82,6 +94,7 @@ impl Message {
             tool_call_id: None,
             tool_name: None,
             images: Vec::new(),
+            notice: None,
         }
     }
 
@@ -98,6 +111,7 @@ impl Message {
             tool_call_id: Some(call_id.into()),
             tool_name: Some(name.into()),
             images: Vec::new(),
+            notice: None,
         }
     }
 
@@ -109,6 +123,15 @@ impl Message {
             tool_call_id: None,
             tool_name: None,
             images: Vec::new(),
+            notice: None,
+        }
+    }
+
+    /// A message Sparky sent on its own, standing for a notification.
+    pub fn notice(content: impl Into<String>, notice: Notice) -> Self {
+        Self {
+            notice: Some(notice),
+            ..Self::plain(Role::Assistant, content)
         }
     }
 

@@ -5,8 +5,29 @@ pub mod image;
 pub mod message;
 
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
-use crate::core::types::conversation::message::Message;
+use crate::core::types::conversation::message::{Message, Notice};
+
+/// Channel id every web turn of a student shares.
+pub const WEB_CHANNEL: &str = "web";
+
+/// Namespace of home conversation ids.
+const HOME: Uuid = Uuid::from_u128(0x5a1c_e7d0_4f1b_4e2a_9c3d_8b7e_6f50_a1b2);
+
+/// The id of the one home conversation of a student. Sparky's own messages land there.
+pub fn home_id(tenant: &str, user: &str) -> Uuid {
+    Uuid::new_v5(&HOME, format!("{tenant}\n{user}").as_bytes())
+}
+
+/// The message a thread starts from: a conversation and a position in it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Parent {
+    /// Conversation the message is in.
+    pub conversation_id: Uuid,
+    /// Position of the message in it.
+    pub position: i64,
+}
 
 /// A message loaded from history and its position. A summary sits at the last message it replaces.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -68,6 +89,9 @@ pub struct ConversationSummary {
     pub title: String,
     /// When it last changed, RFC 3339 UTC.
     pub updated_at: String,
+    /// The message it is a thread of, when it is one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent: Option<Parent>,
 }
 
 /// One past message that matched a chat search.
@@ -88,8 +112,20 @@ pub struct ChatHit {
 /// One question or answer of a conversation as the web shows it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Turn {
+    /// Position in the conversation, the one a thread names.
+    pub position: i64,
     /// user or assistant.
     pub role: String,
     /// The text.
     pub text: String,
+    /// The notification a message Sparky sent on its own stands for.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub notice: Option<Notice>,
+}
+
+/// GET /web/home: the id of the home conversation of the student.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Home {
+    /// Conversation id.
+    pub id: Uuid,
 }

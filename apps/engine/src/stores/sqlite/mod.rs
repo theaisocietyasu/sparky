@@ -8,6 +8,7 @@ mod canvas;
 mod confirmation;
 mod conversation;
 mod health;
+mod home;
 mod import;
 mod memory;
 mod nudge;

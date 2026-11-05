@@ -7,8 +7,9 @@ use chrono::{DateTime, Utc};
 use sqlx::{Row, SqlitePool};
 use uuid::Uuid;
 
-use super::{Seal, database, stamp};
+use super::{Seal, database, home, stamp};
 use crate::core::traits::nudge::NudgeStore;
+use crate::core::types::conversation::message::Notice;
 use crate::core::types::nudge::{Nudge, NudgeKind, NudgePrefs, Person};
 use crate::core::types::store::StoreError;
 
@@ -184,13 +185,15 @@ impl NudgeStore for SqliteNudges {
         let Some((nonce, sealed)) = self.seal.seal(&nudge.text) else {
             return Err(StoreError::Database("the nudge could not be sealed".into()));
         };
-        let now = stamp(Utc::now());
+        let at = Utc::now();
+        let now = stamp(at);
+        let id = Uuid::new_v4().simple().to_string();
         let mut tx = self.pool.begin().await.map_err(database)?;
         sqlx::query(
             "INSERT INTO notifications (id, tenant_id, user_id, nonce, sealed, created_at, kind) \
              VALUES (?, ?, ?, ?, ?, ?, ?)",
         )
-        .bind(Uuid::new_v4().simple().to_string())
+        .bind(&id)
         .bind(&who.tenant)
         .bind(&who.user)
         .bind(nonce)
@@ -200,6 +203,11 @@ impl NudgeStore for SqliteNudges {
         .execute(&mut *tx)
         .await
         .map_err(database)?;
+        let notice = Notice {
+            id,
+            kind: nudge.kind.as_str().to_owned(),
+        };
+        home::deliver(&mut tx, &who.tenant, &who.user, notice, &nudge.text, at).await?;
         for key in &nudge.keys {
             sqlx::query(
                 "INSERT OR IGNORE INTO nudges_sent (tenant_id, user_id, key, kind, created_at) \

@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::core::types::agent::context::RequestContext;
 use crate::core::types::conversation::message::Message;
-use crate::core::types::conversation::{ChatHit, ConversationSummary, Stored};
+use crate::core::types::conversation::{ChatHit, ConversationSummary, Parent, Stored};
 use crate::core::types::store::StoreError;
 
 /// Durable conversation history, scoped by tenant, user, and conversation.
@@ -53,6 +53,10 @@ pub trait ConversationStore: Send + Sync {
         _limit: usize,
     ) -> Result<Vec<ChatHit>, StoreError> {
         Ok(Vec::new())
+    }
+    /// Makes the request conversation a thread of parent, when both are the caller's and it is none yet.
+    async fn link(&self, _ctx: &RequestContext, _parent: &Parent) -> Result<(), StoreError> {
+        Ok(())
     }
     /// Deletes the request conversation and its messages when the caller owns it.
     async fn delete(&self, _ctx: &RequestContext) -> Result<bool, StoreError> {

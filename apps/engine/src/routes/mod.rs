@@ -129,6 +129,7 @@ pub fn router(states: States, limits: Limits, cors_origins: &[String]) -> Router
         .route("/chat/stream", post(chat::stream))
         .route("/confirm", post(chat::confirm))
         .route("/conversation/reset", post(conversation::reset))
+        .route("/web/home", get(conversation::home))
         .route("/web/conversations", get(conversation::list))
         .route(
             "/web/conversations/{id}",

@@ -14,8 +14,7 @@ const NONCE_BYTES: usize = 24;
 /// Header a browser sets to say where a request comes from.
 const SEC_FETCH_SITE: &str = "sec-fetch-site";
 
-/// Channel id every web turn of a student shares, so one web conversation is kept per student.
-pub const WEB_CHANNEL: &str = "web";
+pub use crate::core::types::conversation::WEB_CHANNEL;
 
 /// What a route needs to read a web session.
 #[derive(Clone)]
