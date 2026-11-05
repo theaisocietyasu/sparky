@@ -12,41 +12,49 @@ cargo test -p engine -- --ignored   # tests that need a container runtime
 
 | Route | Does |
 |---|---|
-| `POST /chat` | one turn, answered whole |
-| `POST /chat/stream` | the same turn as server-sent events: progress, then the answer |
-| `POST /confirm` | approves or refuses an action the policy held, by token |
+| `POST /chat`, `/chat/stream` | one turn, whole or as server-sent events |
+| `POST /confirm` | approves or refuses an action the policy held |
 | `POST /conversation/reset` | ends the caller's conversations in a channel |
-| `POST /memories/list`, `/memories/forget` | the caller's memories, numbered, and removing one or all |
-| `POST /oauth/{provider}/authorize`, `/oauth/{provider}/logout`, `GET /oauth/{provider}/status` | the Platform login link for a provider, removal of the linked grant, and whether a web session has one |
-| `GET /sandbox`, `DELETE /sandbox/{name}`, `POST /sandbox/enabled` | sandbox containers and the `run_sandbox` switch |
-| `GET /health/live` | the process is up |
-| `GET /health/ready` | `{"platform":bool,"model":bool}`, 503 until both are true |
+| `POST /memories/list`, `/memories/forget` | the caller's memories |
+| `/oauth/{provider}/...` | Platform login link, unlink, status |
+| `/canvas/feed`, `/canvas/feed/remove` | the caller's Canvas calendar feed link |
+| `GET /notifications/outgoing`, `POST /notifications/sent` | reminders and nudges the bot sends as DMs |
+| `/sandbox...` | sandbox containers and the `run_sandbox` switch |
+| `/web/...` | web sign-in, chats, reminders, notifications, nudge settings and nudge thumbs |
+| `/admin/...` | traces, tools, sources, limits, guardrails, instructions, approvals |
+| `GET /health/live`, `/health/ready` | up; `{"platform":bool,"model":bool}`, 503 until both are true |
 
-Every route except health requires the bearer `SPARKY_ENGINE__SERVICE_TOKEN`. An unreachable model is not a crash: `/health/ready` reports `model:false` and `/chat` answers 502 `the model is unavailable`.
+Bot routes need the bearer `SPARKY_ENGINE__SERVICE_TOKEN`. `/web` and `/admin` use the web session. An unreachable model is not a crash: `/health/ready` reports `model:false` and `/chat` answers 502.
 
 ## Layout
 
 ```
 src/core/       config, telemetry, types, traits, tests. Imports nothing else in the crate.
 src/runtime/    harness (loop, prompt assembly, safety, compaction, tracing),
-                model (Rig client, slot limit), tools (search, account, memory, papers, wiki, mcp, sandbox)
-src/stores/     sqlite/: conversations, memories, confirmations, backups, prune, import;
+                model (Rig client, slot limit),
+                tools (knowledge, account, memory, remind, chats, calculate, page, papers, wiki, mcp, sandbox),
+                nudge (the background loop and its rules)
+src/stores/     sqlite/: conversations, memories, confirmations, reminders, nudges, canvas, backups, prune, import;
                 platform/: knowledge search, live queries, linked accounts, the export the
                 import reads, and the platform fallback store over the Platform HTTP API
 src/routes/     axum handlers
 src/wiring/     builds every adapter from config and composes them; the boot checks live here
 ```
 
-`runtime::harness`, `runtime::model`, `runtime::tools` and `stores` each import only `core`.
+`runtime::harness`, `runtime::model`, `runtime::tools`, `runtime::nudge` and `stores` each import only `core`.
 
 ## The loop
 
 `Agent::run` in `runtime/harness/agent/`. History and memory are loaded once before the first step; nothing is retrieved until the model calls a tool. A step calls the model, passes the response through the guardrail, authorizes the requested tool calls against `Policy`, runs the allowed ones, and continues. It stops on an answer, a confirmation, `agent.max_steps`, the request deadline, or cancellation.
 
-Tools are `search_knowledge`, `search_live`, `run_sandbox`, `search_papers`, `wikipedia_lookup`, the Outlook and Google Calendar tools when enabled, the Platform MCP tools, and any configured MCP servers. Each declares a `RiskClass`; anything at `policy.confirm_from` or above waits for the caller to approve.
+Tools are `search_knowledge`, `search_live`, `read_page`, `calculate`, `search_chats`, `remember`, `forget_memory`, `remind`, `cancel_reminder`, `upcoming`, `canvas_deadlines`, `run_sandbox`, `search_papers`, `wikipedia_lookup`, the Outlook and Google Calendar tools when enabled, the Platform MCP tools, and any configured MCP servers. Each declares a `RiskClass`; anything at `policy.confirm_from` or above waits for the caller to approve.
+
+## Nudges
+
+`runtime/nudge/` runs every `nudges.tick_secs`. For each student active in the last `nudges.active_days` it reads their dated items and memories, then sends what is due: morning brief, due soon, start early, new Canvas item, follow-up, Sunday plan, and from a background agent with read-only tools, event matches, the academic calendar and late study spots. Quiet hours, a daily cap, per-kind toggles and thumbs on each nudge limit them. Nudges go out as notifications: the bot DMs them and the web bell shows them.
 
 Details: Request lifecycle, Agent loop, Capabilities, and Live source queries in [docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md).
 
 ## Configuration
 
-`sparky.toml` sections `agent`, `prompt`, `model`, `embedding`, `retrieval`, `tools`, `policy`, `sandbox`, `guardrail`, `compaction`, `profile`, `query`, `mcp`, `outlook`, `gcal`, `papers`, `wikipedia`, `trace`, `http`, and `platform`. `.env` holds only secrets and per-machine URLs, including the required `SPARKY_PLATFORM__URL` and `SPARKY_PLATFORM__TOKEN`. `Config::validate` rejects a bad combination at boot. `wiring/` adds the checks that need a live dependency: the prompt against one model slot, the capabilities against their budget, the sources against what the Platform registry publishes, and the container runtime behind `run_sandbox`.
+`sparky.toml` sections `agent`, `prompt`, `model`, `embedding`, `retrieval`, `policy`, `tools`, `sandbox`, `guardrail`, `compaction`, `query`, `mcp`, `outlook`, `gcal`, `canvas`, `web`, `admin`, `upcoming`, `reminders`, `nudges`, `chat_search`, `calculate`, `read_page`, `papers`, `wikipedia`, `trace`, `telemetry`, `analytics`, `http`, `platform`, `store`, and `memory`. `.env` holds only secrets and per-machine URLs, including the required `SPARKY_PLATFORM__URL` and `SPARKY_PLATFORM__TOKEN`. `Config::validate` rejects a bad combination at boot. `wiring/` adds the checks that need a live dependency: the prompt against one model slot, the capabilities against their budget, the sources against what the Platform registry publishes, and the container runtime behind `run_sandbox`.
