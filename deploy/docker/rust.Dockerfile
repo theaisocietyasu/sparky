@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 # One image for the engine and the discord bot; the entrypoint selects the binary.
-FROM mirror.gcr.io/library/rust:1.95-bookworm AS chef
+FROM mirror.gcr.io/library/rust:1.96-bookworm AS chef
 RUN cargo install cargo-chef --locked
 WORKDIR /app
 
