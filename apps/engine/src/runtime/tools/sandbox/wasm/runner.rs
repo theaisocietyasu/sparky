@@ -174,7 +174,9 @@ async fn run_in(
     let stdout = ArcFile::new(Box::<BufferFile>::default());
     let stderr = ArcFile::new(Box::<BufferFile>::default());
     let (out, err) = (stdout.clone(), stderr.clone());
-    let script = command.to_owned();
+    // bash in WASIX does not read the environment it is given, so the script sets it.
+    let script =
+        format!("export HOME={GUEST_WORK} PYTHON_COLORS=0 NO_COLOR=1 TERM=dumb\n{command}");
     let host = work.to_path_buf();
     let rt = Arc::new(rt);
     let ended = tokio::task::spawn_blocking(move || {
@@ -185,11 +187,6 @@ async fn run_in(
                 host,
                 guest: GUEST_WORK.into(),
             }])
-            .with_envs([
-                ("HOME", GUEST_WORK),
-                ("PYTHON_COLORS", "0"),
-                ("NO_COLOR", "1"),
-            ])
             .with_current_dir(GUEST_WORK)
             .with_stdin(Box::<NullFile>::default())
             .with_stdout(Box::new(out) as Box<dyn VirtualFile + Send + Sync>)
