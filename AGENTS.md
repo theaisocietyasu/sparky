@@ -72,7 +72,7 @@ Two layers, lowest first: `sparky.toml` (committed), then `SPARKY_<SECTION>__<KE
 - A crate's public surface is its constructors and the `harness` traits it implements. Nothing reaches into another adapter.
 - No global mutable state. Per-request data goes in `RequestContext`.
 - Every replaceable dependency sits behind a trait in `engine/src/core/traits` with a test double in `core/tests/support`.
-- The engine never writes the retrieval index or fetches pages for it; Platform crawls, indexes, and runs live queries. With `sandbox.egress` on, `run_sandbox` may read public pages through the egress proxy; nothing it reads is indexed.
+- The engine never writes the retrieval index or fetches pages for it; Platform crawls, indexes, and runs live queries. `read_page` reads one public page the user or a result points at, and with `sandbox.egress` on, `run_sandbox` may read public pages through the egress proxy; nothing either reads is indexed.
 - Model output is never written back as retrieval evidence.
 - Write-side tools go through `Policy`; consequential actions require confirmation.
 - Live progress is a `TraceEvent`: give a new variant a line in `TraceEvent::progress` (or `None`) and every watching client shows it. Clients render the `text` the engine sends, never their own copy of the enum.

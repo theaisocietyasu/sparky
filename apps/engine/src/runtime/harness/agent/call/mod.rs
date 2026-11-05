@@ -58,8 +58,14 @@ impl Agent {
         thinking: ThinkingChoice,
     ) -> Result<(ModelResponse, Option<String>), ModelError> {
         let (ctx, step, answer_only) = (run.ctx, run.steps, run.force_answer);
+        // A call that may gather stops at the answer reserve; the answer call has all that is left.
+        let room = if answer_only {
+            ctx.remaining()
+        } else {
+            run.gather_room()
+        };
         let mut response = self
-            .call_model(ctx, step, messages, answer_only, thinking)
+            .call_model(ctx, step, messages, answer_only, thinking, room)
             .await?;
         run.usage.add(response.usage);
         let mut thought = lift_thought(&mut response);
@@ -72,8 +78,13 @@ impl Agent {
                 on: false,
                 reason: ThinkingReason::Retry,
             };
+            let room = if answer_only {
+                ctx.remaining()
+            } else {
+                run.gather_room()
+            };
             response = self
-                .call_model(ctx, step, messages, answer_only, plain)
+                .call_model(ctx, step, messages, answer_only, plain, room)
                 .await?;
             run.usage.add(response.usage);
             thought = lift_thought(&mut response);
@@ -157,7 +168,7 @@ impl Agent {
         )
     }
 
-    /// One model call with retries, under cancellation and the request deadline.
+    /// One model call with retries, under cancellation and within room of the request deadline.
     async fn call_model(
         &self,
         ctx: &RequestContext,
@@ -165,9 +176,11 @@ impl Agent {
         messages: &[Message],
         answer_only: bool,
         thinking: ThinkingChoice,
+        room: std::time::Duration,
     ) -> Result<ModelResponse, ModelError> {
         let deps = &self.deps;
         let mut attempt = 0u32;
+        let until = Instant::now() + room;
         loop {
             let request = ModelRequest {
                 messages: messages.to_vec(),
@@ -189,7 +202,7 @@ impl Agent {
             let span = self.model_span(ctx, step, attempt, &request, thinking.reason);
             let result = tokio::select! {
                 () = ctx.cancel.cancelled() => Err(ModelError::Cancelled),
-                outcome = tokio::time::timeout(ctx.remaining(), self.relay(ctx, step, request).instrument(span.clone())) => {
+                outcome = tokio::time::timeout(until.saturating_duration_since(Instant::now()), self.relay(ctx, step, request).instrument(span.clone())) => {
                     outcome.unwrap_or(Err(ModelError::Timeout))
                 }
             };

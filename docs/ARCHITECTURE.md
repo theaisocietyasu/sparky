@@ -519,7 +519,9 @@ Platform runs every per-user login and holds the grants. Canvas is the exception
 
 `upcoming` (`runtime/tools/upcoming.rs`) lists what the caller has coming up in one call: remembered tasks, reminders, Canvas due dates, and Google and Outlook events, merged and sorted by date, at most `upcoming.max_items`, for the next `days` (default `upcoming.default_days`, at most `upcoming.max_days`). Each integration that has dated items adds an `UpcomingSource` (`core/traits/tools/upcoming.rs`) beside its tools; a source whose tool is in `tools.disabled` is left out, and the tool is registered only when `[upcoming] enabled` and at least one source is. The sources are read in parallel within the request deadline. A source that is not linked, fails, or runs out of time adds one line naming it. `upcoming` is `ReadAuthenticated` and `private`.
 
-Two public, no-auth tools sit beside the ASU sources: `search_papers` (Semantic Scholar) and `wikipedia_lookup` (MediaWiki). They are `ReadPublic` and take a query; their parse functions are tested on canned bodies.
+Three public, no-auth tools sit beside the ASU sources: `search_papers` (Semantic Scholar), `wikipedia_lookup` (MediaWiki) and `read_page`. They are `ReadPublic`. `read_page` takes a URL and returns the page text; every hop must resolve to a public address on port 80 or 443, and the connection goes to the address that passed the check.
+
+A turn stops gathering and answers from what it has once it reaches the last step, `agent.max_tool_calls`, or `agent.answer_reserve_secs` before the deadline. A step offered no tools never runs one.
 
 A confirmation is bound to a hash of the exact arguments, belongs to the caller who was asked, is single use, and expires after `agent.confirmation_ttl_secs`. Its summary names the tool, the arguments, and whether the action can be undone. The policy decision is recorded in the trace.
 

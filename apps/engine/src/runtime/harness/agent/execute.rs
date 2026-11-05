@@ -95,14 +95,20 @@ impl Agent {
         let results: Vec<(Result<String, ToolError>, Vec<Citation>)> = if stateful {
             let mut out = Vec::with_capacity(fresh.len());
             for call in &fresh {
-                out.push(self.run_tool(ctx, step, call).await);
+                out.push(self.run_tool(ctx, step, call, run.gather_room()).await);
             }
             out
         } else {
-            join_all(fresh.iter().map(|call| self.run_tool(ctx, step, call))).await
+            let room = run.gather_room();
+            join_all(
+                fresh
+                    .iter()
+                    .map(|call| self.run_tool(ctx, step, call, room)),
+            )
+            .await
         };
         for (index, (call, (result, found))) in fresh.iter().zip(results).enumerate() {
-            run.tool_sources.extend(found);
+            run.cite(found);
             run.tool_runs.push(ToolRun {
                 tool: call.name.clone(),
                 ok: result.is_ok(),
@@ -219,12 +225,13 @@ impl Agent {
         Ok(runnable)
     }
 
-    /// Runs one tool call under its timeout, tracing it, and returns its text and citations.
+    /// Runs one tool call under its timeout and within room, tracing it, and returns its text and citations.
     pub(super) async fn run_tool(
         &self,
         ctx: &RequestContext,
         step: u32,
         call: &ToolCall,
+        room: Duration,
     ) -> (Result<String, ToolError>, Vec<Citation>) {
         let deps = &self.deps;
         let Some(tool) = deps.tools.get(&call.name) else {
@@ -242,12 +249,12 @@ impl Agent {
             },
         );
         let started = Instant::now();
-        // A declared tool timeout replaces the default; the request deadline caps both.
+        // A declared tool timeout replaces the default; the time left for gathering caps both.
         let declared = tool
             .definition()
             .timeout_secs
             .map_or(self.cfg.tool_timeout, Duration::from_secs);
-        let limit = declared.min(ctx.remaining());
+        let limit = declared.min(room);
         let risk = tool.definition().risk;
         let span = tracing::info_span!(
             "tool",

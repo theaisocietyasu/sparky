@@ -173,6 +173,37 @@ impl Default for Papers {
     }
 }
 
+/// Reading one public web page by URL. Private and local addresses are refused.
+#[derive(Debug, Deserialize)]
+#[serde(default)]
+pub struct ReadPage {
+    /// Whether the read_page tool is registered at boot.
+    pub enabled: bool,
+    /// Budget for one request.
+    pub timeout_secs: u64,
+    /// Most bytes of a page downloaded.
+    pub max_bytes: usize,
+    /// Most characters of page text returned to the model.
+    pub max_chars: usize,
+    /// Redirects followed, each checked to be public.
+    pub max_redirects: usize,
+    /// User agent sent with each request.
+    pub user_agent: String,
+}
+
+impl Default for ReadPage {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            timeout_secs: 15,
+            max_bytes: 2_000_000,
+            max_chars: 6_000,
+            max_redirects: 5,
+            user_agent: "Mozilla/5.0 (compatible; SparkyAI/2.0; ASU student copilot)".into(),
+        }
+    }
+}
+
 /// Wikipedia lookups over the MediaWiki API. No key; a public read.
 #[derive(Debug, Deserialize)]
 #[serde(default)]

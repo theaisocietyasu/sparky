@@ -10,6 +10,8 @@ max_steps = 12
 max_model_retries = 2
 request_timeout_secs = 110            # below the bot engine.request_timeout_secs of 120
 tool_timeout_secs = 20
+answer_reserve_secs = 25         # time kept for the final answer; gathering stops when less is left
+max_tool_calls = 10              # tool calls per turn before the next step must answer; 0 is no limit
 confirmation_ttl_secs = 600
 model_slots = 2                # match llama-server --parallel
 model_queue_wait_secs = 30
@@ -316,6 +318,14 @@ timeout_secs = 20
 max_items = 5
 
 # Wikipedia lookups over the MediaWiki API. Public, no key.
+[read_page]
+enabled = true
+timeout_secs = 15
+max_bytes = 2000000
+max_chars = 6000
+max_redirects = 5
+user_agent = "Mozilla/5.0 (compatible; SparkyAI/2.0; ASU student copilot)"
+
 [wikipedia]
 enabled = true
 base_url = "https://en.wikipedia.org/w/api.php"

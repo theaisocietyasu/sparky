@@ -22,6 +22,8 @@ pub(super) fn agent_config(cfg: &Config) -> AgentConfig {
         max_steps: cfg.agent.max_steps,
         max_model_retries: cfg.agent.max_model_retries,
         tool_timeout: Duration::from_secs(cfg.agent.tool_timeout_secs),
+        answer_reserve: Duration::from_secs(cfg.agent.answer_reserve_secs),
+        max_tool_calls: cfg.agent.max_tool_calls,
         confirmation_ttl: Duration::from_secs(cfg.agent.confirmation_ttl_secs),
         max_tokens: cfg.model.max_tokens,
         max_tokens_without_thinking: cfg.model.max_tokens_without_thinking,

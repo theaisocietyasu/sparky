@@ -95,6 +95,11 @@ impl Agent {
             return Ok(answered(&response, &content, run.force_answer));
         }
 
+        // A step offered no tools that still asks for some answers with its text instead.
+        if run.force_answer {
+            return Ok(answered(&response, &content, true));
+        }
+
         let runnable = match self.authorize_all(run, &response.tool_calls).await {
             Ok(calls) => calls,
             Err(HeldError::Store(error)) => {

@@ -19,6 +19,10 @@ pub struct Agent {
     pub request_timeout_secs: u64,
     /// Budget per tool call, unless the tool declares its own.
     pub tool_timeout_secs: u64,
+    /// Seconds of the request kept for the final answer. Gathering stops when less is left.
+    pub answer_reserve_secs: u64,
+    /// Tool calls per request before the next step must answer. 0 removes the limit.
+    pub max_tool_calls: usize,
     /// How long a held action waits for caller approval.
     pub confirmation_ttl_secs: u64,
     /// Model calls in flight at once. Match llama-server --parallel. 0 removes the limit.
@@ -90,6 +94,8 @@ impl Default for Agent {
             max_model_retries: 2,
             request_timeout_secs: 90,
             tool_timeout_secs: 20,
+            answer_reserve_secs: 25,
+            max_tool_calls: 10,
             confirmation_ttl_secs: 600,
             model_slots: 2,
             model_queue_wait_secs: 30,
@@ -187,6 +193,9 @@ pub fn validate_agent(agent: &Agent) -> Result<(), ConfigError> {
     }
     if agent.max_steps == 0 {
         return invalid("agent.max_steps must be at least 1");
+    }
+    if agent.answer_reserve_secs >= agent.request_timeout_secs {
+        return invalid("agent.answer_reserve_secs must be below agent.request_timeout_secs");
     }
     if !(0.0..=2.0).contains(&agent.prompt_estimate_headroom) {
         return invalid("agent.prompt_estimate_headroom must be between 0 and 2");

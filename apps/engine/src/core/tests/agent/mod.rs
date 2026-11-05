@@ -166,12 +166,42 @@ async fn write_with_role_stops_for_confirmation() {
 }
 
 #[tokio::test]
-async fn step_limit_stops_the_loop() {
+async fn the_last_step_answers_from_what_the_tools_found() {
+    let tools = ToolSet::new().with(Arc::new(Echo(RiskClass::ReadPublic)));
+    let model = Scripted::new(vec![
+        Ok(calls(vec![("c0", "echo", json!(0))])),
+        Ok(calls(vec![("c1", "echo", json!(1))])),
+        Ok(text("from what I found")),
+    ]);
+    let sent = model.sent();
+    let (agent, _) = agent(
+        model,
+        tools,
+        AgentConfig {
+            max_steps: 3,
+            ..AgentConfig::default()
+        },
+    );
+    let out = agent.run(&ctx(), "loop").await.ok();
+    assert_eq!(
+        out.as_ref().map(|answer| answer.text.as_str()),
+        Some("from what I found")
+    );
+    assert_eq!(out.as_ref().map(|answer| answer.steps), Some(3));
+    let requests = sent.lock().map(|r| r.clone()).unwrap_or_default();
+    assert!(
+        requests.last().is_some_and(|r| r.tools.is_empty()),
+        "the last step is offered no tools"
+    );
+}
+
+#[tokio::test]
+async fn a_step_offered_no_tools_never_runs_one() {
     let tools = ToolSet::new().with(Arc::new(Echo(RiskClass::ReadPublic)));
     let script: Vec<_> = (0..10)
         .map(|i| Ok(calls(vec![(&format!("c{i}"), "echo", json!(i))])))
         .collect();
-    let (agent, _) = agent(
+    let (agent, sink) = agent(
         Scripted::new(script),
         tools,
         AgentConfig {
@@ -182,9 +212,68 @@ async fn step_limit_stops_the_loop() {
     let out = agent.run(&ctx(), "loop").await.ok();
     assert_eq!(
         out.as_ref().map(|answer| answer.status.clone()),
-        Some(RunStatus::StepLimit)
+        Some(RunStatus::Stalled)
     );
-    assert_eq!(out.as_ref().map(|answer| answer.steps), Some(3));
+    let executed = sink
+        .records()
+        .iter()
+        .filter(|record| matches!(record.event, TraceEvent::ToolCall { .. }))
+        .count();
+    assert_eq!(executed, 2, "the answer step runs nothing");
+}
+
+#[tokio::test]
+async fn the_tool_call_cap_makes_the_next_step_answer() {
+    let tools = ToolSet::new().with(Arc::new(Echo(RiskClass::ReadPublic)));
+    let model = Scripted::new(vec![
+        Ok(calls(vec![
+            ("a", "echo", json!(1)),
+            ("b", "echo", json!(2)),
+            ("c", "echo", json!(3)),
+        ])),
+        Ok(text("enough")),
+    ]);
+    let sent = model.sent();
+    let (agent, _) = agent(
+        model,
+        tools,
+        AgentConfig {
+            max_tool_calls: 3,
+            ..AgentConfig::default()
+        },
+    );
+    let out = agent.run(&ctx(), "go").await.ok();
+    assert_eq!(out.map(|answer| answer.text), Some("enough".into()));
+    let requests = sent.lock().map(|r| r.clone()).unwrap_or_default();
+    assert!(requests.last().is_some_and(|r| r.tools.is_empty()));
+}
+
+#[tokio::test]
+async fn a_slow_tool_leaves_time_to_answer() {
+    let tools = ToolSet::new().with(Arc::new(Slow));
+    let (agent, _) = agent(
+        Scripted::new(vec![
+            Ok(calls(vec![("c1", "slow", json!({}))])),
+            Ok(text("what I have")),
+        ]),
+        tools,
+        AgentConfig {
+            tool_timeout: Duration::from_secs(60),
+            answer_reserve: Duration::from_secs(60),
+            ..AgentConfig::default()
+        },
+    );
+    let context = crate::core::types::agent::context::RequestContext::new(
+        "g",
+        "u",
+        Duration::from_millis(400),
+    );
+    let out = agent.run(&context, "go").await.ok();
+    assert_eq!(
+        out.as_ref().map(|answer| answer.status.clone()),
+        Some(RunStatus::Answered)
+    );
+    assert_eq!(out.map(|answer| answer.text), Some("what I have".into()));
 }
 
 #[tokio::test]
@@ -446,7 +535,7 @@ async fn a_run_that_hits_the_step_limit_still_answers_and_keeps_its_turns() {
 
     assert_eq!(
         out.as_ref().map(|a| a.status.clone()),
-        Some(RunStatus::StepLimit)
+        Some(RunStatus::Stalled)
     );
     assert!(
         out.is_some_and(|a| !a.text.trim().is_empty()),
