@@ -1,9 +1,10 @@
 import { RotateCcw } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import ChatFrame from "../app/ChatFrame";
 import { useMe } from "../app/useMe";
-import { ask, confirm, EngineError, reset } from "../chat/client";
+import { ask, chatTurns, confirm, EngineError } from "../chat/client";
 import { applyProgress, type Line } from "../chat/lines";
 import type { Answer } from "../chat/types";
 import Composer from "../components/chat/Composer";
@@ -44,9 +45,26 @@ const shared = (a: string, b: string) => {
   return i;
 };
 
-/** /chat: the web chat for a signed-in student. */
+/** Pairs stored messages into exchanges. An answer with no question before it is dropped. */
+const exchanges = (id: string, stored: { role: string; text: string }[]): Turn[] => {
+  const out: Turn[] = [];
+  for (const m of stored) {
+    if (m.role === "user") out.push({ id: out.length + 1, question: m.text, answer: null, error: null });
+    else {
+      const last = out[out.length - 1];
+      if (last && !last.answer) last.answer = { request_id: "", conversation_id: id, text: m.text, status: "answered" };
+    }
+  }
+  return out;
+};
+
+/** /chat and /chat/:id: the web chat for a signed-in student, new or reopened. */
 const Chat = () => {
   const { me } = useMe();
+  const { id: opened } = useParams();
+  const navigate = useNavigate();
+  const [chats, setChats] = useState(0);
+  const [shown, setShown] = useState<string | null>(null);
   const still = useReducedMotion() ?? false;
   const [turns, setTurns] = useState<Turn[]>([]);
   const [live, setLive] = useState<Live>(IDLE);
@@ -70,12 +88,40 @@ const Chat = () => {
     if (el && pinned.current) el.scrollTop = el.scrollHeight;
   });
 
+  // Loads a reopened chat; a chat this page just started is already on screen.
+  useEffect(() => {
+    const id = opened ?? null;
+    if (id === conversation.current) return;
+    abort.current?.abort();
+    conversation.current = id;
+    setTurns([]);
+    if (!id) return;
+    let live = true;
+    chatTurns(id)
+      .then((stored) => {
+        if (!live) return;
+        const loaded = exchanges(id, stored);
+        counter.current = loaded.length;
+        pinned.current = true;
+        setTurns(loaded);
+      })
+      .catch(() => live && navigate("/chat", { replace: true }))
+      .finally(() => live && setShown(id));
+    return () => {
+      live = false;
+    };
+  }, [opened, navigate]);
+
   const onShown = useCallback((shown: string) => {
     drafted.current = shown;
   }, []);
 
   const settle = (id: number, answer: Answer | null, error: string | null, reveal?: number) => {
-    if (answer) conversation.current = answer.conversation_id;
+    if (answer && answer.conversation_id !== conversation.current) {
+      conversation.current = answer.conversation_id;
+      navigate(`/chat/${answer.conversation_id}`, { replace: true });
+      setChats((v) => v + 1);
+    }
     setTurns((all) => all.map((t) => (t.id === id ? { ...t, answer, error, reveal } : t)));
   };
 
@@ -123,18 +169,15 @@ const Chat = () => {
     }
   };
 
-  const startOver = async () => {
+  const startOver = () => {
     abort.current?.abort();
-    try {
-      await reset();
-    } catch {
-      // A failed reset leaves the old conversation open; the next turn still runs.
-    }
     conversation.current = null;
     setTurns([]);
+    navigate("/chat");
   };
 
-  const empty = turns.length === 0;
+  const loading = Boolean(opened) && opened !== shown && turns.length === 0;
+  const empty = turns.length === 0 && !loading;
   const enter = still ? false : { opacity: 0, y: 8 };
   const composer = (
     <motion.div layoutId="composer" layout={!still} transition={{ type: "spring", stiffness: 380, damping: 36 }}>
@@ -143,7 +186,7 @@ const Chat = () => {
   );
 
   return (
-    <ChatFrame onNewChat={startOver}>
+    <ChatFrame onNewChat={startOver} chats={chats}>
       {empty ? (
         <main className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-4 pb-16">
           <motion.div initial={enter} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: "easeOut" }} className="w-full max-w-2xl">

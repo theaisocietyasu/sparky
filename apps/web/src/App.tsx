@@ -7,6 +7,7 @@ import NotFound from "./pages/NotFound";
 const Signed = lazy(() => import("./app/session"));
 const Chat = lazy(() => import("./pages/Chat"));
 const Memories = lazy(() => import("./pages/Memories"));
+const Connections = lazy(() => import("./pages/Connections"));
 const AdminLayout = lazy(() => import("./pages/admin/Layout"));
 const Overview = lazy(() => import("./pages/admin/Overview"));
 const Tools = lazy(() => import("./pages/admin/Tools"));
@@ -27,8 +28,9 @@ const App = () => (
       <Routes>
         <Route path="/" element={<Home />} />
         <Route element={<Signed />}>
-          <Route path="/chat" element={<Chat />} />
+          <Route path="/chat/:id?" element={<Chat />} />
           <Route path="/memories" element={<Memories />} />
+          <Route path="/connections" element={<Connections />} />
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<Overview />} />
             <Route path="tools" element={<Tools />} />

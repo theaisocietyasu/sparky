@@ -1,12 +1,14 @@
-//! POST /conversation/reset: ends the open conversations of one caller in one channel.
+//! POST /conversation/reset ends the open conversations of one caller in one channel. The web
+//! session lists, reads and deletes its own web conversations.
 
 use axum::Json;
-use axum::extract::State;
+use axum::extract::{Path, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 
 use crate::core::types::agent::context::RequestContext;
-use crate::core::types::conversation::{ResetRequest, ResetResponse};
+use crate::core::types::conversation::message::Role;
+use crate::core::types::conversation::{ResetRequest, ResetResponse, Turn, Visibility};
 use crate::routes::auth::{Caller, caller, too_many};
 use crate::routes::chat::ChatState;
 use crate::routes::failure::Failure;
@@ -59,5 +61,141 @@ pub async fn reset(
             )
             .into_response()
         }
+    }
+}
+
+/// The web session's context for conversation id, or the refusal.
+fn web_context(
+    state: &ChatState,
+    headers: &HeaderMap,
+    id: Option<&str>,
+) -> Result<RequestContext, Response> {
+    let Some(session) = state.web.as_ref().and_then(|w| w.session(headers)) else {
+        return Err((StatusCode::UNAUTHORIZED, "sign in first").into_response());
+    };
+    if !state.rate_limit.allow(&session.user_id) {
+        return Err(too_many(&session.user_id));
+    }
+    if state.conversations.is_none() {
+        return Err((
+            StatusCode::NOT_IMPLEMENTED,
+            "this engine keeps no conversations",
+        )
+            .into_response());
+    }
+    let ctx = RequestContext::new(
+        state.default_tenant.clone(),
+        session.user_id,
+        state.request_budget,
+    )
+    .with_visibility(Visibility::Private);
+    match id {
+        None => Ok(ctx),
+        Some(id) => match uuid::Uuid::parse_str(id) {
+            Ok(id) => Ok(ctx.with_conversation(id)),
+            Err(_) => Err((StatusCode::NOT_FOUND, "no conversation by that id").into_response()),
+        },
+    }
+}
+
+/// The store failed; the caller is told only that.
+fn unavailable(ctx: &RequestContext, error: &crate::core::types::store::StoreError) -> Response {
+    tracing::error!(%error, "conversation store failed");
+    Failure::new(
+        StatusCode::SERVICE_UNAVAILABLE,
+        ctx.request_id,
+        "conversation store unavailable",
+    )
+    .into_response()
+}
+
+/// GET /web/conversations: the signed-in student's open web conversations, newest first.
+pub async fn list(State(state): State<ChatState>, headers: HeaderMap) -> Response {
+    let ctx = match web_context(&state, &headers, None) {
+        Ok(ctx) => ctx,
+        Err(refused) => return refused,
+    };
+    let Some(store) = &state.conversations else {
+        return StatusCode::NOT_IMPLEMENTED.into_response();
+    };
+    match store
+        .list(&ctx, WEB_CHANNEL, state.web_lists.conversations)
+        .await
+    {
+        Ok(mut list) => {
+            for item in &mut list {
+                item.title = item
+                    .title
+                    .split_whitespace()
+                    .collect::<Vec<_>>()
+                    .join(" ")
+                    .chars()
+                    .take(state.web_lists.title_chars)
+                    .collect();
+            }
+            Json(list).into_response()
+        }
+        Err(e) => unavailable(&ctx, &e),
+    }
+}
+
+/// GET /web/conversations/{id}: the questions and answers of one of the student's conversations.
+pub async fn read(
+    State(state): State<ChatState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Response {
+    let ctx = match web_context(&state, &headers, Some(&id)) {
+        Ok(ctx) => ctx,
+        Err(refused) => return refused,
+    };
+    let Some(store) = &state.conversations else {
+        return StatusCode::NOT_IMPLEMENTED.into_response();
+    };
+    match store.owns(&ctx).await {
+        Ok(true) => {}
+        Ok(false) => return (StatusCode::NOT_FOUND, "no conversation by that id").into_response(),
+        Err(e) => return unavailable(&ctx, &e),
+    }
+    match store.load(&ctx, state.web_lists.turns).await {
+        Ok(stored) => {
+            let turns: Vec<Turn> = stored
+                .into_iter()
+                .filter_map(|s| {
+                    let role = match s.message.role {
+                        Role::User => "user",
+                        Role::Assistant => "assistant",
+                        _ => return None,
+                    };
+                    let text = s.message.content.trim();
+                    (!text.is_empty()).then(|| Turn {
+                        role: role.to_owned(),
+                        text: text.to_owned(),
+                    })
+                })
+                .collect();
+            Json(turns).into_response()
+        }
+        Err(e) => unavailable(&ctx, &e),
+    }
+}
+
+/// DELETE /web/conversations/{id}: deletes one of the student's conversations and its messages.
+pub async fn delete(
+    State(state): State<ChatState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Response {
+    let ctx = match web_context(&state, &headers, Some(&id)) {
+        Ok(ctx) => ctx,
+        Err(refused) => return refused,
+    };
+    let Some(store) = &state.conversations else {
+        return StatusCode::NOT_IMPLEMENTED.into_response();
+    };
+    match store.delete(&ctx).await {
+        Ok(true) => Json(serde_json::json!({ "deleted": true })).into_response(),
+        Ok(false) => (StatusCode::NOT_FOUND, "no conversation by that id").into_response(),
+        Err(e) => unavailable(&ctx, &e),
     }
 }

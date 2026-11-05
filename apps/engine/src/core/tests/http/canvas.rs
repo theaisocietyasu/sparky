@@ -41,6 +41,7 @@ fn router(feeds: Option<Arc<dyn CanvasFeeds>>) -> axum::Router {
             feeds,
             hosts: vec!["canvas.asu.edu".into()],
             service_token: SecretString::from(TOKEN),
+            web: None,
         })
 }
 
@@ -116,4 +117,58 @@ async fn the_routes_need_the_token_and_canvas_on() {
     assert_eq!(status, StatusCode::UNAUTHORIZED);
     let (status, _) = post(router(None), "/canvas/feed", TOKEN, &save_body(LINK)).await;
     assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+}
+
+#[tokio::test]
+async fn a_web_session_saves_and_reads_only_its_own_link() {
+    use crate::core::tests::http::web::{SITE, auth, browser, session};
+
+    let store = feeds().await;
+    let web = auth();
+    let Some(sealed) = web.seal(&session("222", &[], 3600)) else {
+        unreachable!("the session seals")
+    };
+    let app = axum::Router::new()
+        .route(
+            "/canvas/feed",
+            axum::routing::post(crate::routes::canvas::save).get(crate::routes::canvas::status),
+        )
+        .with_state(CanvasState {
+            feeds: Some(Arc::clone(&store)),
+            hosts: vec!["canvas.asu.edu".into()],
+            service_token: SecretString::from(TOKEN),
+            web: Some(web),
+        });
+    let send = |method: &str, body: String| {
+        let mut request = Request::builder().method(method).uri("/canvas/feed");
+        for (name, value) in &browser(SITE, &sealed) {
+            request = request.header(name, value);
+        }
+        let Ok(request) = request
+            .header("content-type", "application/json")
+            .body(Body::from(body))
+        else {
+            unreachable!("the request builds")
+        };
+        let app = app.clone();
+        async move {
+            let response = match app.oneshot(request).await {
+                Ok(response) => response,
+                Err(e) => match e {},
+            };
+            let status = response.status();
+            let Ok(bytes) = axum::body::to_bytes(response.into_body(), 1 << 16).await else {
+                unreachable!("the body reads")
+            };
+            (status, String::from_utf8_lossy(&bytes).into_owned())
+        }
+    };
+    let (_, body) = send("GET", String::new()).await;
+    assert_eq!(body, r#"{"linked":false}"#);
+    let (status, _) = send("POST", save_body(LINK)).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(matches!(store.load("111").await, Ok(None)));
+    assert!(matches!(store.load("222").await, Ok(Some(_))));
+    let (_, body) = send("GET", String::new()).await;
+    assert_eq!(body, r#"{"linked":true}"#);
 }

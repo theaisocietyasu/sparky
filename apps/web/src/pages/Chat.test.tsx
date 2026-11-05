@@ -84,7 +84,7 @@ describe("web chat", () => {
 
     const stream = calls.find((c) => c.url === `${ENGINE}/chat/stream`);
     expect(stream?.init?.credentials).toBe("include");
-    expect(JSON.parse(String(stream?.init?.body))).toMatchObject({ message: "library hours?", continue_channel: true });
+    expect(JSON.parse(String(stream?.init?.body))).toMatchObject({ message: "library hours?", conversation_id: null, continue_channel: false });
   });
 
   it("asks before a held action and sends the answer to /confirm", async () => {
@@ -152,5 +152,52 @@ describe("web chat", () => {
     await waitFor(() => expect(screen.queryByText("Studies at Tempe")).toBeNull());
     const sent = calls.find((c) => c.url === `${ENGINE}/memories/forget`);
     expect(JSON.parse(String(sent?.init?.body))).toMatchObject({ number: 1 });
+  });
+
+  it("lists chats, reopens one with its turns and deletes it", async () => {
+    let listed = [{ id: "c9", title: "When is my exam", updated_at: "2026-11-05" }];
+    const calls = engine({
+      "/web/me": () => Response.json(ME),
+      "/web/conversations": () => Response.json(listed),
+      "/web/conversations/c9": () => {
+        listed = [];
+        return Response.json([
+          { role: "user", text: "When is my exam" },
+          { role: "assistant", text: "Friday at 9." },
+        ]);
+      },
+    });
+    open("/chat");
+    const sidebar = within(await screen.findByRole("list", { name: "Chats" }));
+    fireEvent.click(sidebar.getByRole("link", { name: "When is my exam" }));
+    expect(await screen.findByText("Friday at 9.")).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/chat/c9");
+
+    fireEvent.click(sidebar.getByRole("button", { name: "Delete chat When is my exam" }));
+    await waitFor(() => expect(window.location.pathname).toBe("/chat"));
+    const removed = calls.find((c) => c.url === `${ENGINE}/web/conversations/c9` && c.init?.method === "DELETE");
+    expect(removed).toBeDefined();
+  });
+
+  it("links Canvas from the Connections page", async () => {
+    let linked = false;
+    const calls = engine({
+      "/web/me": () => Response.json(ME),
+      "/canvas/feed": () => {
+        if (calls[calls.length - 1]?.init?.method === "POST") linked = true;
+        return Response.json(linked ? { linked: true, saved: true } : { linked: false });
+      },
+      "/canvas/feed/remove": () => Response.json({ removed: true }),
+    });
+    open("/connections");
+    const link = "https://canvas.asu.edu/feeds/calendars/user_A.ics";
+    fireEvent.change(await screen.findByLabelText(/calendar feed/i), { target: { value: link } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByText("Linked")).toBeInTheDocument();
+    const saved = calls.find((c) => c.url === `${ENGINE}/canvas/feed` && c.init?.method === "POST");
+    expect(JSON.parse(String(saved?.init?.body))).toEqual({ link });
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    await waitFor(() => expect(screen.queryByText("Linked")).toBeNull());
   });
 });

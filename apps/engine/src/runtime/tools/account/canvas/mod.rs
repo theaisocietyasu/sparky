@@ -180,8 +180,10 @@ impl CanvasTool {
         })?;
         let Some(link) = link else {
             return Err(ToolError::Failed(
-                "You have not linked Canvas. Send /canvas in a direct message with your Canvas \
-                 Calendar Feed link (Canvas, Calendar, then Calendar Feed)."
+                "You have not linked Canvas, so there is nothing to read. Do not call this tool \
+                 again in this turn. Tell the student to link the Canvas Calendar Feed (Canvas, \
+                 Calendar, then Calendar Feed) with /canvas in a Discord direct message or on the \
+                 Connections page of the web chat."
                     .to_owned(),
             ));
         };

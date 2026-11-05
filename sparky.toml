@@ -262,6 +262,9 @@ cookie_name = "sparky_session"
 discord_api = "https://discord.com/api/v10"
 discord_authorize_url = "https://discord.com/oauth2/authorize"
 timeout_secs = 10
+conversation_list = 50         # conversations the sidebar lists, newest first
+conversation_turns = 200       # messages one reopened conversation shows
+title_chars = 60               # characters of the first question a title keeps
 
 # The admin pages at /admin: a session whose roles include policy.write_roles[0] switches tools,
 # edits the system instructions with history and rollback, denies held actions, and reads full

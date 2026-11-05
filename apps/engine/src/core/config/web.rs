@@ -37,6 +37,12 @@ pub struct Web {
     pub public_url: Option<String>,
     /// Origin of the site that serves the page. SPARKY_WEB__SITE_URL.
     pub site_url: Option<String>,
+    /// Conversations the web sidebar lists, newest first.
+    pub conversation_list: usize,
+    /// Messages one web conversation shows.
+    pub conversation_turns: usize,
+    /// Characters of the first question a conversation title keeps.
+    pub title_chars: usize,
 }
 
 impl Default for Web {
@@ -53,6 +59,9 @@ impl Default for Web {
             session_key: None,
             public_url: None,
             site_url: None,
+            conversation_list: 50,
+            conversation_turns: 200,
+            title_chars: 60,
         }
     }
 }

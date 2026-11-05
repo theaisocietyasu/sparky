@@ -101,3 +101,42 @@ async fn latest_and_end_are_per_channel_and_latest_is_per_visibility() {
         Ok(Some(_))
     ));
 }
+
+#[tokio::test]
+async fn list_shows_open_conversations_with_a_question_and_delete_removes_one() {
+    let store = store().await.conversations();
+    let first = caller();
+    let second = caller();
+    let empty = caller();
+    for ctx in [&first, &second, &empty] {
+        assert!(store.ensure(ctx, "web").await.is_ok());
+    }
+    let asked = [
+        Message::user("first question"),
+        Message::assistant("answer"),
+    ];
+    assert!(store.append(&first, &asked).await.is_ok());
+    assert!(
+        store
+            .append(&second, &[Message::user("second question")])
+            .await
+            .is_ok()
+    );
+
+    let Ok(list) = store.list(&first, "web", 10).await else {
+        unreachable!("the list loads")
+    };
+    let mut titles: Vec<&str> = list.iter().map(|c| c.title.as_str()).collect();
+    titles.sort_unstable();
+    assert_eq!(titles, ["first question", "second question"]);
+    assert!(matches!(store.list(&other(), "web", 10).await, Ok(v) if v.is_empty()));
+    assert!(matches!(store.list(&first, "elsewhere", 10).await, Ok(v) if v.is_empty()));
+    assert!(matches!(store.list(&first, "web", 1).await, Ok(v) if v.len() == 1));
+
+    let thief = other().with_conversation(first.conversation_id);
+    assert!(matches!(store.delete(&thief).await, Ok(false)));
+    assert!(matches!(store.delete(&first).await, Ok(true)));
+    assert!(matches!(store.owns(&first).await, Ok(false)));
+    assert!(matches!(store.load(&first, 10).await, Ok(v) if v.is_empty()));
+    assert!(matches!(store.list(&second, "web", 10).await, Ok(v) if v.len() == 1));
+}
