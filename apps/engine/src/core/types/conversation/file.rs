@@ -5,7 +5,8 @@ use serde::{Deserialize, Serialize};
 /// One non-image file attached to a message.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FileAttachment {
-    /// Direct link to the file.
+    /// Direct link to the file, empty when the file is sent inline.
+    #[serde(default)]
     pub url: String,
     /// File name as the caller uploaded it.
     pub name: String,

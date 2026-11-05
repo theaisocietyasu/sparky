@@ -495,3 +495,14 @@ fn a_pdf_is_read_in_the_engine() {
     };
     assert!(out.contains("Midterm exam: October 14"), "{out}");
 }
+
+#[test]
+fn an_inline_file_from_the_web_needs_no_url() {
+    let body = r#"{"name":"notes.md","media_type":"text/markdown","size":2,"data":"aGk="}"#;
+    let file: Result<FileAttachment, _> = serde_json::from_str(body);
+    let Ok(file) = file else {
+        unreachable!("the web sends inline files without a url: {file:?}")
+    };
+    assert_eq!(file.url, "");
+    assert_eq!(FileAttachment::accepted(vec![file], 4, 2_000).len(), 1);
+}
