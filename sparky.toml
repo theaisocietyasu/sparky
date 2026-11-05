@@ -94,6 +94,8 @@ sandbox_retry_line = "A tool you called this turn failed, and you have not opene
 upload_line = "The user attached {name} ({kind}, {size}). Its text, {chars} characters, is at {text_path} in the sandbox workspace, session {session}; the file itself is at {path}. It begins:\n{preview}\n\nThe passages of it that hold the most words of the question:\n{matches}\n\nAnswer a question about this file from these passages, never from search results or memory. When they do not hold the answer, read more with run_sandbox in session {session}: rg -i -n -C 3 SUBJECT {text_path}, or sed -n START,ENDp {text_path} around a line number above."
 # An attached file with no extractable text.
 upload_raw_line = "The user attached {name} ({kind}, {size}). It is at {path} in the sandbox workspace, session {session}, and no text could be pulled from it automatically. Open it with run_sandbox in that session before you answer: file {path} says what it is, and python3 with pypdf, docx, openpyxl or pandas, or pdftoppm and tesseract for a scan, reads it."
+# An attached file read in the engine, on a host with no sandbox.
+upload_inline_line = "The user attached {name} ({kind}, {size}). Its text, {chars} characters, begins:\n{preview}\n\nThe passages of it that hold the most words of the question:\n{matches}\n\nAnswer a question about this file from these passages, never from search results or memory. When they do not hold the answer, say which part of the file you would need."
 upload_failed_line = "The user attached {name} ({kind}), but it could not be opened: {reason}. Say so if the question depends on it."
 utc_offset_hours = -7          # Arizona, no daylight saving
 
@@ -322,7 +324,7 @@ enabled = true
 
 # ---------------------------------------------------------------- the HTTP surface
 [http]
-max_body_bytes = 1048576
+max_body_bytes = 5000000      # a web message carries its files inline, base64
 concurrency_limit = 0          # 0 removes the limit
 rate_limit_per_min = 0         # per user, 0 removes the limit
 cors_origins = []              # ["*"] for the Vite dev server

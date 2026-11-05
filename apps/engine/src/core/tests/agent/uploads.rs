@@ -103,6 +103,7 @@ fn syllabus() -> FileAttachment {
         name: "CSE 310 syllabus.pdf".into(),
         media_type: "application/pdf".into(),
         size: 1_200,
+        data: None,
     }
 }
 
@@ -247,6 +248,7 @@ async fn a_file_that_cannot_be_read_is_named_as_unopened() {
 fn only_files_within_the_cap_are_accepted_and_names_cannot_leave_the_workspace() {
     let big = FileAttachment {
         size: 3_000_000,
+        data: None,
         ..syllabus()
     };
     let kept = FileAttachment::accepted(vec![big, syllabus()], 4, 2_000_000);
@@ -390,4 +392,106 @@ echo made"#;
             "{path}: {want} not found in preview {preview:?} or matches {matches:?}"
         );
     }
+}
+
+/// The text of every message on the first model call.
+fn first_text(sent: &Arc<Mutex<Vec<crate::core::types::model::ModelRequest>>>) -> String {
+    sent.lock()
+        .ok()
+        .and_then(|r| r.first().cloned())
+        .map(|r| r.messages.iter().map(|m| m.content.clone()).collect())
+        .unwrap_or_default()
+}
+
+fn inline(name: &str, media_type: &str, body: &[u8]) -> FileAttachment {
+    use base64::Engine as _;
+    FileAttachment {
+        url: String::new(),
+        name: name.into(),
+        media_type: media_type.into(),
+        size: body.len() as u64,
+        data: Some(base64::engine::general_purpose::STANDARD.encode(body)),
+    }
+}
+
+fn agent_without_sandbox(model: Scripted) -> Agent {
+    let deps = AgentDeps {
+        model: Arc::new(model),
+        tools: ToolSet::new(),
+        policy: Arc::new(RiskPolicy::default()),
+        trace: Arc::new(MemorySink::new()),
+        conversations: None,
+        memory: None,
+        confirmations: None,
+        compactor: None,
+        guardrail: None,
+        sandbox: None,
+        files: None,
+    };
+    Agent::new(deps, AgentConfig::default(), "sys")
+}
+
+#[tokio::test]
+async fn an_inline_text_file_is_read_in_the_engine_without_a_sandbox() {
+    let model = Scripted::new(vec![Ok(text("October 14."))]);
+    let sent = first_prompt(&model);
+    let agent = agent_without_sandbox(model);
+    let notes = "CSE 310 Data Structures\n\nWeek 1: arrays\nWeek 7: midterm exam on October 14\n";
+    let ctx = ctx().with_files(vec![inline("notes.md", "text/markdown", notes.as_bytes())]);
+    assert!(agent.run(&ctx, "when is the midterm?").await.is_ok());
+    let prompt = first_text(&sent);
+    assert!(prompt.contains("The user attached notes.md"), "{prompt}");
+    assert!(prompt.contains("CSE 310 Data Structures"), "{prompt}");
+    let (_, passages) = prompt
+        .split_once("most words of the question:")
+        .unwrap_or_default();
+    assert!(passages.contains("midterm exam on October 14"), "{prompt}");
+    assert!(!prompt.contains("sandbox workspace"), "{prompt}");
+}
+
+#[tokio::test]
+async fn a_file_the_engine_cannot_read_is_named_with_the_reason() {
+    let model = Scripted::new(vec![Ok(text("I cannot open it."))]);
+    let sent = first_prompt(&model);
+    let agent = agent_without_sandbox(model);
+    let ctx = ctx().with_files(vec![inline(
+        "slides.pptx",
+        "application/vnd.ms-powerpoint",
+        b"PK\x03\x04\0\0",
+    )]);
+    assert!(agent.run(&ctx, "summarize this").await.is_ok());
+    let prompt = first_text(&sent);
+    assert!(prompt.contains("slides.pptx"), "{prompt}");
+    assert!(
+        prompt.contains("only PDF, text, CSV, JSON and code files"),
+        "{prompt}"
+    );
+}
+
+#[test]
+fn passages_rank_lines_by_the_question_words() {
+    use crate::runtime::harness::agent::read::passages;
+    let text = "intro\nnothing here\nmore filler\n\n\n\n\n\n\nfinal exam is in May\nroom 101\n";
+    let found = passages(text, &["exam".into(), "may".into()], 1_000);
+    assert!(found.contains("final exam is in May"), "{found}");
+    assert!(!found.contains("intro"), "{found}");
+}
+
+#[test]
+fn an_oversized_inline_file_is_not_accepted() {
+    let big = inline("big.txt", "text/plain", &vec![b'a'; 3_000]);
+    let small = inline("small.txt", "text/plain", b"hi");
+    let kept = FileAttachment::accepted(vec![big, small], 4, 2_000);
+    assert_eq!(kept.len(), 1);
+    assert_eq!(kept[0].name, "small.txt");
+}
+
+#[test]
+fn a_pdf_is_read_in_the_engine() {
+    use crate::runtime::harness::agent::read;
+    let file = inline("syllabus.pdf", "application/pdf", b"");
+    let Ok(out) = read::text(&file, include_bytes!("fixtures/syllabus.pdf")) else {
+        unreachable!("the fixture has a text layer")
+    };
+    assert!(out.contains("Midterm exam: October 14"), "{out}");
 }

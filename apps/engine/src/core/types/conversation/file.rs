@@ -15,6 +15,9 @@ pub struct FileAttachment {
     /// Size in bytes the edge reported.
     #[serde(default)]
     pub size: u64,
+    /// The file itself, base64, when the caller sends it inline instead of a link.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub data: Option<String>,
 }
 
 impl FileAttachment {
@@ -22,7 +25,10 @@ impl FileAttachment {
     pub fn accepted(files: Vec<Self>, most: usize, max_bytes: u64) -> Vec<Self> {
         files
             .into_iter()
-            .filter(|f| !f.url.is_empty() && f.size <= max_bytes)
+            .filter(|f| match &f.data {
+                Some(data) => (data.len() as u64 / 4).saturating_mul(3) <= max_bytes,
+                None => !f.url.is_empty() && f.size <= max_bytes,
+            })
             .take(most)
             .collect()
     }

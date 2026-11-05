@@ -30,6 +30,8 @@ pub struct PromptText {
     pub upload_line: String,
     /// Line naming a file no text could be pulled from.
     pub upload_raw_line: String,
+    /// Line naming a file read in the engine, for a host with no sandbox.
+    pub upload_inline_line: String,
     /// Line naming a file the user attached that could not be opened, with {reason}.
     pub upload_failed_line: String,
     /// What to remember and what never to store, for a private turn with the memory tools.
@@ -60,6 +62,7 @@ impl From<&crate::core::config::Prompt> for PromptText {
             sandbox_retry_line: cfg.sandbox_retry_line.clone(),
             upload_line: cfg.upload_line.clone(),
             upload_raw_line: cfg.upload_raw_line.clone(),
+            upload_inline_line: cfg.upload_inline_line.clone(),
             upload_failed_line: cfg.upload_failed_line.clone(),
             memory_rules: cfg.memory_rules.clone(),
             discovery_rules: cfg.discovery_rules.clone(),
