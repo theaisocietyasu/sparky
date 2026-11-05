@@ -1,17 +1,18 @@
-//! Live queries on the platform ASU module: its registry, and a fetch it runs while the call waits.
+//! Platform search: the live sources it publishes, and the search tool run over /api/tools.
 
 use async_trait::async_trait;
 use reqwest::Method;
-use serde_json::json;
+use serde_json::{Map, Value};
 
 use super::client::{Call, PlatformClient, PlatformError, field};
 use crate::core::traits::knowledge::query::SourceQueries;
 use crate::core::types::agent::context::RequestContext;
-use crate::core::types::knowledge::query::{
-    QueryError, QueryOutcome, QueryRequest, QuerySourceInfo,
-};
+use crate::core::types::knowledge::query::{QueryError, QuerySourceInfo, SearchAnswer, SearchSpec};
 
-/// Live queries run by the platform.
+/// Name of the search tool on Platform.
+const SEARCH_TOOL: &str = "search";
+
+/// Search run by the platform.
 pub struct PlatformQueries {
     client: PlatformClient,
 }
@@ -23,7 +24,7 @@ impl PlatformQueries {
     }
 }
 
-/// Maps a platform error: a refusal of the query goes back to the model, the rest are failures.
+/// Maps a platform error: a refusal of the arguments goes back to the model, the rest are failures.
 fn query_error(e: PlatformError) -> QueryError {
     match e {
         PlatformError::Timeout(budget) => QueryError::Timeout(budget),
@@ -33,6 +34,21 @@ fn query_error(e: PlatformError) -> QueryError {
         } => QueryError::Rejected(message),
         other => QueryError::Store(other.to_string()),
     }
+}
+
+/// The tool named name in a GET /api/tools answer.
+fn spec_in(listing: &Value, name: &str) -> Result<SearchSpec, QueryError> {
+    let tools: Vec<Value> =
+        field(listing, "tools").map_err(|e| QueryError::Store(e.to_string()))?;
+    let tool = tools
+        .into_iter()
+        .find(|t| t.get("name").and_then(Value::as_str) == Some(name))
+        .ok_or_else(|| {
+            QueryError::Store(format!(
+                "Platform offers no {name} tool to this token; it needs knowledge:read and the knowledge module on"
+            ))
+        })?;
+    serde_json::from_value(tool).map_err(|e| QueryError::Store(format!("{name} tool: {e}")))
 }
 
 #[async_trait]
@@ -46,23 +62,33 @@ impl SourceQueries for PlatformQueries {
         field(&value, "queries").map_err(|e| QueryError::Store(e.to_string()))
     }
 
-    async fn run(
+    async fn spec(&self) -> Result<SearchSpec, QueryError> {
+        let listing = self
+            .client
+            .call(&Call::new(Method::GET, "/api/tools"))
+            .await
+            .map_err(query_error)?;
+        spec_in(&listing, SEARCH_TOOL)
+    }
+
+    async fn search(
         &self,
         ctx: &RequestContext,
-        request: &QueryRequest,
-    ) -> Result<QueryOutcome, QueryError> {
+        args: &Map<String, Value>,
+    ) -> Result<SearchAnswer, QueryError> {
         let remaining = ctx.remaining();
         if remaining.is_zero() {
             return Err(QueryError::Timeout(remaining));
         }
-        let body = json!({ "source": request.source, "params": request.params });
-        let call = Call::new(Method::POST, "/api/asu/query")
+        let body = Value::Object(args.clone());
+        let path = format!("/api/tools/{SEARCH_TOOL}");
+        let call = Call::new(Method::POST, &path)
             .body(&body)
             .timeout(remaining);
         let value = tokio::select! {
             () = ctx.cancel.cancelled() => return Err(QueryError::Cancelled),
             answer = self.client.call(&call) => answer.map_err(query_error)?,
         };
-        serde_json::from_value(value).map_err(|e| QueryError::Store(format!("query result: {e}")))
+        field(&value, "result").map_err(|e| QueryError::Store(format!("search result: {e}")))
     }
 }

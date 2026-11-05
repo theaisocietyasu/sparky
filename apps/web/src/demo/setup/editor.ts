@@ -2,8 +2,6 @@
 export const EXPLORER = [
   "apps/",
   "  engine/src/runtime/tools/",
-  "    knowledge/search/",
-  "      sources/",
   "  evals/",
   "deploy/",
   ".env",

@@ -1,5 +1,4 @@
-//! What the agent can look up: evidence, retrieval, and live source queries.
+//! What the agent can look up: citations and Platform search.
 
 pub mod evidence;
 pub mod query;
-pub mod retrieval;

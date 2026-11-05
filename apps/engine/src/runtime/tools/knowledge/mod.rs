@@ -1,3 +1,3 @@
-//! Knowledge tools: one live search per source.
+//! Knowledge tools: Platform search.
 
 pub mod search;

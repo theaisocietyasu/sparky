@@ -3,17 +3,17 @@ import { finishedCard, liveResult, runningCard, sourceLabel, threadName, toolDon
 
 describe("reply format", () => {
   it("writes a running tool call as the engine does, arguments sorted by key", () => {
-    expect(toolStarted("search_live", { source: "library_hours", query: "Hayden hours today" })).toBe(
-      "\u{1f527} `search_live` (query: Hayden hours today, source: library_hours) — searching live",
+    expect(toolStarted("search", { source: "library_hours", query: "Hayden hours today" })).toBe(
+      "\u{1f527} `search` (query: Hayden hours today, source: library_hours) — searching",
     );
   });
 
   it("clips a returned call to 160 characters on one line", () => {
-    const line = toolDone("search_live", { query: "q" }, liveResult("ASU Library Hours", "https://lib.asu.edu/hours", "under an hour ago", "x ".repeat(200)));
+    const line = toolDone("search", { query: "q" }, liveResult("library_hours", "https://lib.asu.edu/hours", "x ".repeat(200)));
     const shown = line.split(" → ")[1];
     expect(Array.from(shown).length).toBeLessThanOrEqual(160);
     expect(shown.endsWith("…")).toBe(true);
-    expect(shown.startsWith("Live result from ASU Library Hours (https://lib.asu.edu/hours, fetched under an hour ago): x")).toBe(true);
+    expect(shown.startsWith("Live result from library_hours (https://lib.asu.edu/hours): x")).toBe(true);
   });
 
   it("puts the spinner header over the steps while running, and drops it when finished", () => {

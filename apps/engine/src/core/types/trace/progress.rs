@@ -4,7 +4,7 @@ use serde::Serialize;
 use serde_json::Value;
 
 use crate::core::types::safety::policy::Decision;
-use crate::core::types::tools::{SEARCH_KNOWLEDGE, SEARCH_LIVE};
+use crate::core::types::tools::SEARCH;
 use crate::core::types::trace::TraceEvent;
 
 /// How much of a tool call, a result, or a thought one progress line shows.
@@ -212,8 +212,7 @@ fn clip(text: &str, limit: usize) -> String {
 /// What a tool is shown as while it runs. A search tool names what it searches.
 fn running(tool: &str) -> String {
     match tool {
-        SEARCH_KNOWLEDGE => "searching the knowledge base".to_owned(),
-        SEARCH_LIVE => "searching live".to_owned(),
+        SEARCH => "searching".to_owned(),
         _ => "running".to_owned(),
     }
 }

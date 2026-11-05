@@ -4,7 +4,7 @@ import { PEOPLE, type Author, type LinkButton } from "./people";
 /** One live source the bot reaches, as the engine names it. */
 type Live = { key: string; label: string; url: string };
 
-/** Live sources of search_live, with the keys and labels the engine registers. */
+/** Live sources search can name, with the keys Platform publishes and labels for the buttons. */
 export const LIVE = {
   courses: { key: "courses", label: "ASU Class Search", url: "https://catalog.apps.asu.edu/catalog/classes/classlist" },
   scholarships: { key: "scholarships", label: "ASU Scholarship Search", url: "https://onsa.asu.edu/scholarships" },
@@ -14,15 +14,15 @@ export const LIVE = {
   dining: { key: "dining", label: "Sun Devil Dining", url: "https://asu.campusdish.com/" },
 } satisfies Record<string, Live>;
 
-/** One search_live call: its arguments, and the page text it brought back. */
+/** One search call: its arguments, and the page text it brought back. */
 export type LiveCall = { source: Live; query: string; text: string };
 
-/** The arguments of a search_live call. */
+/** The arguments of a search call. */
 const argsOf = (call: LiveCall): Args => ({ query: call.query, source: call.source.key });
 
-/** The progress line of a search_live call once it returned. */
-export const done = (call: LiveCall, age = "under an hour ago") =>
-  toolDone("search_live", argsOf(call), liveResult(call.source.label, call.source.url, age, call.text));
+/** The progress line of a search call once it returned. */
+export const done = (call: LiveCall) =>
+  toolDone("search", argsOf(call), liveResult(call.source.key, call.source.url, call.text));
 
 /** The link button a cited source puts under the answer. */
 export const button = (source: Live): LinkButton => ({ label: sourceLabel(source.label), href: source.url });

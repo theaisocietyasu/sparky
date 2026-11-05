@@ -23,7 +23,6 @@ use crate::core::traits::conversation::ConversationStore;
 use crate::core::traits::health::Probe;
 use crate::core::traits::knowledge::discovery::Discovery;
 use crate::core::traits::knowledge::query::SourceQueries;
-use crate::core::traits::knowledge::retrieval::{Embedder, Retriever};
 use crate::core::traits::memory::MemoryStore;
 use crate::core::traits::model::ModelProvider;
 use crate::core::traits::nudge::NudgeStore;
@@ -39,7 +38,7 @@ use crate::runtime::harness::agent::{Agent, AgentDeps, PromptText};
 use crate::runtime::harness::safety::policy::RiskPolicy;
 use crate::runtime::harness::trace::Fanout;
 use crate::runtime::model::limit::Limited;
-use crate::runtime::model::rig_openai::{self, RigChat, RigEmbedder};
+use crate::runtime::model::rig_openai::{self, RigChat};
 use crate::runtime::tools::files::HttpFiles;
 
 use self::agent::{agent_config, compactor, guardrail, home_rules, trace_sink};
@@ -52,9 +51,7 @@ pub use self::import::import_platform;
 
 /// Every store the harness, tools and routes read, from whichever mode is on.
 struct Stores {
-    /// Stored knowledge search.
-    retriever: Arc<dyn Retriever>,
-    /// Live source queries.
+    /// Platform search.
     queries: Arc<dyn SourceQueries>,
     /// Conversation history.
     conversations: Arc<dyn ConversationStore>,
@@ -101,22 +98,13 @@ pub async fn serve(cfg: Config) -> anyhow::Result<()> {
     let trace: Arc<dyn TraceSink> =
         Arc::new(Fanout::new(trace_sink(&cfg)?).with_style(cfg.agent.progress_style()));
 
-    let embed_client = rig_openai::client(&cfg.embedding.base_url, &cfg.embedding.api_key)
-        .map_err(|e| anyhow::anyhow!("embedding client: {e}"))?;
-    let embedder: Arc<dyn Embedder> = Arc::new(RigEmbedder::new(
-        embed_client,
-        &cfg.embedding.name,
-        usize::try_from(cfg.embedding.dim)?,
-    ));
-
     // Every configured dependency must be reachable at boot.
-    let mut stores = platform::stores(&cfg, &embedder)?;
+    let mut stores = platform::stores(&cfg)?;
     store::localize(&cfg, &mut stores).await?;
     let sandbox = sandbox(&cfg).await?;
     let (tools, mcp_names, upcoming) = build_tools(
         &cfg,
         Arc::clone(&stores.queries),
-        Arc::clone(&stores.retriever),
         sandbox.clone(),
         Arc::clone(&stores.oauth_store),
         Personal {

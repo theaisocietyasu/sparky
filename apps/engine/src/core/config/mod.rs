@@ -38,8 +38,6 @@ pub struct Config {
     pub discord: Discord,
     /// Chat model endpoint.
     pub model: Model,
-    /// Embedding endpoint, used to embed queries at retrieval time.
-    pub embedding: Embedding,
     /// OpenTelemetry export.
     #[serde(default)]
     pub telemetry: Telemetry,
@@ -52,13 +50,10 @@ pub struct Config {
     /// What the risk policy allows, denies, and holds for confirmation.
     #[serde(default)]
     pub policy: Policy,
-    /// Hybrid retrieval tuning.
-    #[serde(default)]
-    pub retrieval: Retrieval,
     /// Which tools are registered.
     #[serde(default)]
     pub tools: Tools,
-    /// How a live source query runs.
+    /// How a Platform search runs.
     #[serde(default)]
     pub query: Query,
     /// How history that no longer fits is compacted.
@@ -187,9 +182,8 @@ pub enum ConfigError {
 }
 
 /// Settings that moved to another section. A variable named here fails boot.
-const RENAMED: [(&str, &str); 4] = [
+const RENAMED: [(&str, &str); 3] = [
     ("SPARKY_AGENT__TRACE_DIR", "SPARKY_TRACE__DIR"),
-    ("SPARKY_AGENT__RETRIEVAL_TOP_K", "SPARKY_RETRIEVAL__TOP_K"),
     ("SPARKY_MODEL__THINKING", "SPARKY_AGENT__THINKING__MODE"),
     ("SPARKY_TOOLS__QUERY_SOURCE", "SPARKY_TOOLS__SEARCH"),
 ];
@@ -237,7 +231,6 @@ impl Config {
             return invalid("compaction.max_tokens must be at least 1".into());
         }
         validate_compaction(&self.compaction, self.agent.history_budget_tokens)?;
-        validate_tools(&self.tools)?;
         validate_mcp_risks(&self.mcp)?;
         validate_integrations(self)?;
         validate_platform(self)?;
@@ -251,12 +244,6 @@ impl Config {
             return invalid(
                 "admin.max_instructions_chars, admin.history_limit and admin.traces_limit must be above 0".into(),
             );
-        }
-        if self.retrieval.window < 0 {
-            return invalid(format!(
-                "retrieval.window must not be negative, got {}",
-                self.retrieval.window
-            ));
         }
         if self.agent.retry_cap_ms < self.agent.retry_base_ms {
             return invalid("agent.retry_cap_ms is below agent.retry_base_ms".into());
@@ -310,12 +297,6 @@ impl Config {
     }
 }
 
-/// Largest top_k the platform search accepts.
-const PLATFORM_MAX_TOP_K: usize = 50;
-/// Largest neighbor window the platform search accepts.
-const PLATFORM_MAX_WINDOW: i32 = 5;
-/// Longest query text the platform search accepts.
-const PLATFORM_MAX_QUERY_CHARS: usize = 1000;
 /// Longest hold the platform keeps a pending action, in seconds.
 const PLATFORM_MAX_TTL_SECS: u64 = 86_400;
 
@@ -343,21 +324,6 @@ fn validate_platform(cfg: &Config) -> Result<(), ConfigError> {
             || !(mcp.starts_with("https://") || mcp.starts_with("http://")))
     {
         return invalid("platform.mcp_url must be an http or https URL".into());
-    }
-    if !(1..=PLATFORM_MAX_QUERY_CHARS).contains(&platform.max_query_chars) {
-        return invalid(format!(
-            "platform.max_query_chars must be from 1 to {PLATFORM_MAX_QUERY_CHARS}"
-        ));
-    }
-    if !(1..=PLATFORM_MAX_TOP_K).contains(&cfg.retrieval.top_k) {
-        return invalid(format!(
-            "retrieval.top_k must be from 1 to {PLATFORM_MAX_TOP_K} on the platform"
-        ));
-    }
-    if cfg.retrieval.window > PLATFORM_MAX_WINDOW {
-        return invalid(format!(
-            "retrieval.window must be at most {PLATFORM_MAX_WINDOW} on the platform"
-        ));
     }
     if !(1..=PLATFORM_MAX_TTL_SECS).contains(&cfg.agent.confirmation_ttl_secs) {
         return invalid(format!(
@@ -627,32 +593,6 @@ fn validate_canvas(cfg: &Config) -> Result<(), ConfigError> {
     }
     if canvas.default_days == 0 || canvas.default_days > canvas.max_days {
         return invalid("default_days must be from 1 to max_days");
-    }
-    Ok(())
-}
-
-fn validate_tools(tools: &Tools) -> Result<(), ConfigError> {
-    if !tools.search {
-        return Ok(());
-    }
-    if tools.live_default_source.trim().is_empty() {
-        return Err(ConfigError::Invalid(
-            "tools.live_default_source is empty; name the source search_live falls back to".into(),
-        ));
-    }
-    for (name, text) in [
-        ("knowledge_description", &tools.knowledge_description),
-        ("live_description", &tools.live_description),
-        ("query_description", &tools.query_description),
-        ("source_description", &tools.source_description),
-        ("nothing_stored", &tools.nothing_stored),
-        ("stale_note", &tools.stale_note),
-    ] {
-        if text.trim().is_empty() {
-            return Err(ConfigError::Invalid(format!(
-                "tools.{name} is empty; the model would be given no wording for the search tools"
-            )));
-        }
     }
     Ok(())
 }

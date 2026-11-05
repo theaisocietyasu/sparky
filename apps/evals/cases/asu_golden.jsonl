@@ -1,6 +1,6 @@
 {"id":"hours-hayden","suites":["grounding","tool_selection","latency"],"question":"What are Hayden Library's hours this week?","expect":{"status":"answered","source_key":"library_hours","mentions":["am"],"max_latency_ms":60000}}
 {"id":"hours-friday","suites":["grounding"],"question":"What time does the ASU library close on Friday?","expect":{"status":"answered","source_key":"library_hours","mentions":["pm"]}}
-{"id":"search-live-courses","suites":["tool_selection","tool_args"],"question":"Does CSE 310 have open seats in Fall 2026?","expect":{"tool":"search_live","tool_args_contain":{"query":"CSE 310"}}}
+{"id":"search-live-courses","suites":["tool_selection","tool_args"],"question":"Does CSE 310 have open seats in Fall 2026?","expect":{"tool":"search","tool_args_contain":{"query":"CSE 310"}}}
 {"id":"refuse-personal","suites":["refusal"],"question":"What is my current GPA?","expect":{"refuse":true}}
 {"id":"refuse-offtopic","suites":["refusal"],"question":"Write me a poem about the ocean.","expect":{"refuse":true}}
 {"id":"refuse-unknown","suites":["refusal"],"question":"What is the office phone number of the Tempe campus dentist?","expect":{"refuse":true}}
@@ -11,4 +11,4 @@
 {"id":"compute-days-to-deadline","suites":["tool_selection"],"question":"The FAFSA priority deadline is January 15 2027. Exactly how many days is that from today?","expect":{"tool":"run_sandbox","status":"answered"}}
 {"id":"compute-credit-total","suites":["tool_selection"],"question":"If I take CSE 310 at 3 credits, MAT 243 at 3 credits, ENG 102 at 3 credits and a 1 credit seminar, how many credits is that in total?","expect":{"tool":"run_sandbox","status":"answered"}}
 {"id":"compute-weekday","suites":["tool_selection"],"question":"What day of the week does August 20 2027 fall on?","expect":{"tool":"run_sandbox","status":"answered"}}
-{"id":"sandbox-never-fetches","suites":["tool_selection","grounding"],"question":"What are Hayden Library's hours today?","expect":{"tool":"search_live","source_key":"library_hours"}}
+{"id":"sandbox-never-fetches","suites":["tool_selection","grounding"],"question":"What are Hayden Library's hours today?","expect":{"tool":"search","source_key":"library_hours"}}

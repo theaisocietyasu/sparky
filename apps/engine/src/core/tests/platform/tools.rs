@@ -1,4 +1,4 @@
-//! Tool registration: search_live offers only the sources the platform publishes.
+//! Tool registration: search takes the schema Platform publishes.
 
 use std::sync::Arc;
 
@@ -7,7 +7,7 @@ use figment::providers::{Format, Toml};
 use serde_json::Value;
 
 use crate::core::config::Config;
-use crate::core::tests::support::{FakeQueries, HostedLogins, Stored};
+use crate::core::tests::support::{FakeQueries, HostedLogins};
 use crate::core::types::knowledge::query::QuerySourceInfo;
 use crate::core::types::tools::ToolDefinition;
 use crate::wiring::tools::{Personal, build_tools};
@@ -27,11 +27,6 @@ base_url = "http://localhost:8000/v1"
 api_key = ""
 name = "m"
 max_tokens = 256
-[embedding]
-base_url = "http://localhost:8001/v1"
-api_key = ""
-name = "e"
-dim = 1024
 [platform]
 url = "https://platform.example.org"
 token = "plat_x"
@@ -49,8 +44,8 @@ fn registry(keys: &[&str]) -> Vec<QuerySourceInfo> {
     keys.iter()
         .map(|key| QuerySourceInfo {
             key: (*key).to_owned(),
+            description: String::new(),
             params: Vec::new(),
-            indexed: false,
         })
         .collect()
 }
@@ -60,7 +55,6 @@ async fn registered(cfg: &Config, keys: &[&str]) -> Vec<ToolDefinition> {
     let built = build_tools(
         cfg,
         Arc::new(FakeQueries::new(registry(keys))),
-        Arc::new(Stored::empty()),
         None,
         Arc::new(HostedLogins),
         Personal::default(),
@@ -72,11 +66,11 @@ async fn registered(cfg: &Config, keys: &[&str]) -> Vec<ToolDefinition> {
     }
 }
 
-/// The source keys search_live offers.
+/// The source keys search offers.
 fn live_sources(definitions: &[ToolDefinition]) -> Vec<String> {
     definitions
         .iter()
-        .find(|d| d.name == "search_live")
+        .find(|d| d.name == "search")
         .and_then(|d| d.parameters.pointer("/properties/source/enum").cloned())
         .and_then(|keys| match keys {
             Value::Array(keys) => Some(
@@ -90,12 +84,14 @@ fn live_sources(definitions: &[ToolDefinition]) -> Vec<String> {
 }
 
 #[tokio::test]
-async fn search_live_offers_only_the_sources_the_platform_publishes() {
-    let offered = live_sources(&registered(&config(), &["events", "dining"]).await);
-    assert!(!offered.iter().any(|k| k == "clubs"), "{offered:?}");
-    assert!(offered.iter().any(|k| k == "events"), "{offered:?}");
-    // The fallback stays offered, so a call that names no source still has one.
-    assert!(offered.iter().any(|k| k == "web"), "{offered:?}");
+async fn search_offers_the_sources_platform_publishes_and_no_old_search_tools() {
+    let definitions = registered(&config(), &["events", "dining"]).await;
+    assert_eq!(live_sources(&definitions), vec!["events", "dining"]);
+    let old = definitions
+        .iter()
+        .filter(|d| d.name == "search_live" || d.name == "search_knowledge")
+        .count();
+    assert_eq!(old, 0);
 }
 
 #[tokio::test]

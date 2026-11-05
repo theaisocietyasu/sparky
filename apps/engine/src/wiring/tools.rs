@@ -11,7 +11,6 @@ use crate::core::config::Config;
 use crate::core::traits::conversation::ConversationStore;
 use crate::core::traits::knowledge::discovery::Discovery;
 use crate::core::traits::knowledge::query::SourceQueries;
-use crate::core::traits::knowledge::retrieval::Retriever;
 use crate::core::traits::memory::MemoryStore;
 use crate::core::traits::oauth::OAuthStore;
 use crate::core::traits::reminder::ReminderStore;
@@ -22,9 +21,7 @@ use crate::core::traits::trace::TraceSink;
 use crate::core::types::tools::sandbox::Limits as SandboxLimits;
 use crate::runtime::harness::tools::ToolSet;
 use crate::runtime::tools::account::{canvas, gcal, outlook};
-use crate::runtime::tools::knowledge::search;
-use crate::runtime::tools::knowledge::search::live::{LiveSearch, Wording as LiveWording};
-use crate::runtime::tools::knowledge::search::stored::{StoredSearch, Wording as StoredWording};
+use crate::runtime::tools::knowledge::search::Search;
 use crate::runtime::tools::mcp::{self, McpLimits};
 use crate::runtime::tools::memory::{self, MemoryRules, MemoryTasks};
 use crate::runtime::tools::remind::{self, RemindRules};
@@ -59,7 +56,6 @@ pub(crate) struct Personal {
 pub(crate) async fn build_tools(
     cfg: &Config,
     queries: Arc<dyn SourceQueries>,
-    retriever: Arc<dyn Retriever>,
     sandbox: Option<Arc<ContainerSandbox>>,
     oauth_store: Arc<dyn OAuthStore>,
     personal: Personal,
@@ -68,10 +64,9 @@ pub(crate) async fn build_tools(
     let mut tools = ToolSet::new();
     let mut mcp_names = Vec::new();
     if cfg.tools.search {
-        for tool in search_tools(cfg, queries, retriever).await? {
-            if !disabled(&tool.definition().name) {
-                tools = tools.with(tool);
-            }
+        let tool = search_tool(cfg, queries).await?;
+        if !disabled(&tool.definition().name) {
+            tools = tools.with(tool);
         }
     }
     if let Some(sandbox) = sandbox {
@@ -296,73 +291,17 @@ fn register(
     tools
 }
 
-/// The stored and live search tools, after checking the catalog against the published registry.
-async fn search_tools(
+/// The search tool, as Platform describes it.
+async fn search_tool(
     cfg: &Config,
     queries: Arc<dyn SourceQueries>,
-    retriever: Arc<dyn Retriever>,
-) -> anyhow::Result<Vec<Arc<dyn Tool>>> {
-    let sources = search::catalog();
-    let fallback = cfg.tools.live_default_source.trim();
-    if !sources.iter().any(|s| s.key() == fallback) {
-        anyhow::bail!(
-            "tools.live_default_source is {fallback:?}, which is not a source the engine offers: {}",
-            search::source_keys(&sources, false).join(", ")
-        );
-    }
-    // A mismatch with the published registry is logged, not fatal.
-    let published = queries.sources().await?;
-    let mut unpublished = Vec::new();
-    for source in &sources {
-        let Some(served) = published.iter().find(|p| p.key == source.key()) else {
-            unpublished.push(source.key());
-            continue;
-        };
-        if let Err(difference) = search::conforms(source.as_ref(), served) {
-            tracing::warn!(
-                source = source.key(),
-                %difference,
-                "the tool and the platform registry disagree"
-            );
-        }
-    }
-    // One line for every unpublished source.
-    if !unpublished.is_empty() {
-        tracing::info!(
-            count = unpublished.len(),
-            sources = %unpublished.join(", "),
-            "the platform publishes no live query for these sources; search_live does not offer them"
-        );
-    }
-    let stored: Arc<dyn Tool> = Arc::new(StoredSearch::new(
-        &sources,
-        retriever,
-        cfg.retrieval.top_k,
-        cfg.retrieval.stale_days,
-        &StoredWording {
-            tool: cfg.tools.knowledge_description.clone(),
-            query: cfg.tools.query_description.clone(),
-            source: cfg.tools.source_description.clone(),
-            empty: cfg.tools.nothing_stored.clone(),
-            stale: cfg.tools.stale_note.clone(),
-        },
-    ));
-    // search_live offers only the sources the platform publishes, and the fallback.
-    let live_sources = search::published_only(sources, &published, fallback);
-    let live: Arc<dyn Tool> = Arc::new(LiveSearch::new(
-        live_sources,
-        queries,
-        fallback,
-        cfg.prompt.utc_offset_hours,
-        &LiveWording {
-            tool: cfg.tools.live_description.clone(),
-            query: cfg.tools.query_description.clone(),
-            source: cfg.tools.source_description.clone(),
-        },
-        cfg.query.timeout_secs,
-    ));
-    tracing::info!(fallback, "search tools registered");
-    Ok(vec![stored, live])
+) -> anyhow::Result<Arc<dyn Tool>> {
+    let spec = queries
+        .spec()
+        .await
+        .map_err(|e| anyhow::anyhow!("search tool: {e}"))?;
+    tracing::info!("search tool registered");
+    Ok(Arc::new(Search::new(queries, spec, cfg.query.timeout_secs)))
 }
 
 /// The sandbox, when it is enabled and its runtime answers. Starts the session sweeper.

@@ -30,7 +30,7 @@ just prod-logs engine
 
 Create the pod with the image, a volume at `/workspace` (the model cache), a host CUDA version of at least 12.8, and these environment variables: `SPARKY_DISCORD__TOKEN`, `SPARKY_DISCORD__GUILD_ID`, `SPARKY_ENGINE__SERVICE_TOKEN`, `SPARKY_PLATFORM__URL`, `SPARKY_PLATFORM__TOKEN`, `SPARKY_PLATFORM__MCP_URL`, `SPARKY_MEMORY__KEY`, `SPARKY_APP__ENV=production`, and `HF_TOKEN` (a read token; community hosts share an IP that the Hugging Face Hub rate-limits without one). Every service listens on `127.0.0.1`; the pod exposes no port. The first boot downloads the GGUFs into `/workspace/models`. The scopes the Platform token needs are listed in the `[platform]` section of `sparky.toml`.
 
-`SPARKY_MODELS_API_KEY` makes both model servers listen on every interface and require that key. Expose `8000/http` (chat) and `8001/http` (embed) on the pod to let other apps use them: Platform's `EMBEDDINGS_URL` for indexing, so its vectors match Sparky's queries, and Hermes or another agent for chat. The engine uses the same key.
+`SPARKY_MODELS_API_KEY` makes both model servers listen on every interface and require that key. Expose `8000/http` (chat) and `8001/http` (embed) on the pod to let other apps use them: Platform's `EMBEDDINGS_URL` for indexing and search, and Hermes or another agent for chat. The engine uses the same key.
 
 ### Models only
 
@@ -38,7 +38,7 @@ With `SPARKY_POD_ROLE=models` the pod runs only the two model servers, and `SPAR
 
 ### Apps only
 
-With `SPARKY_POD_ROLE=apps` the pod runs only the engine and the bot, so it fits a CPU pod. Set `SPARKY_MODEL__BASE_URL`, `SPARKY_MODEL__API_KEY` and `SPARKY_MODEL__NAME` to an OpenAI-compatible API whose model calls tools, for example ASU's `https://openai.rc.asu.edu/v1` (keys and models on the Voyager portal, LLM Access tab). Without an embeddings route on that API, set `SPARKY_RETRIEVAL__DENSE=false`; Platform then searches lexically. The pod refuses to start when `SPARKY_MODEL__BASE_URL` is unset or points at `127.0.0.1`.
+With `SPARKY_POD_ROLE=apps` the pod runs only the engine and the bot, so it fits a CPU pod. Set `SPARKY_MODEL__BASE_URL`, `SPARKY_MODEL__API_KEY` and `SPARKY_MODEL__NAME` to an OpenAI-compatible API whose model calls tools, for example ASU's `https://openai.rc.asu.edu/v1` (keys and models on the Voyager portal, LLM Access tab). The pod refuses to start when `SPARKY_MODEL__BASE_URL` is unset or points at `127.0.0.1`.
 
 ### GPU deployment
 
@@ -126,7 +126,7 @@ These lines appear on every healthy boot and need no action: the llama.cpp `cont
 Two `llama-server` containers: chat `:8000` and embeddings `:8001`. `just model` uses the CUDA image and reserves an NVIDIA device, so it needs a GPU and the container toolkit. Without one:
 
 - `just model-cpu` applies `deploy/compose.cpu.yml`: the plain image, no device reservation, the same GGUFs on the processor. Set `SPARKY_CHAT_NGL=0` and `SPARKY_EMBED_NGL=0`.
-- Or point `SPARKY_MODEL__BASE_URL` and `SPARKY_EMBEDDING__BASE_URL` at any OpenAI-compatible endpoint, with their API keys.
+- Or point `SPARKY_MODEL__BASE_URL` at any OpenAI-compatible endpoint, with its API key.
 
 Details: `deploy/inference/README.md`.
 

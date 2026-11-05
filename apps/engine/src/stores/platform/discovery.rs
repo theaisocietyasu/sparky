@@ -6,7 +6,7 @@ use serde_json::json;
 
 use super::client::{Call, PlatformClient};
 use crate::core::traits::knowledge::discovery::Discovery;
-use crate::core::types::knowledge::retrieval::RetrievalError;
+use crate::core::types::knowledge::query::QueryError;
 
 /// Suggests pages over POST /api/knowledge/discovered.
 pub struct PlatformDiscovery {
@@ -22,12 +22,12 @@ impl PlatformDiscovery {
 
 #[async_trait]
 impl Discovery for PlatformDiscovery {
-    async fn suggest(&self, url: &str) -> Result<(), RetrievalError> {
+    async fn suggest(&self, url: &str) -> Result<(), QueryError> {
         let body = json!({ "url": url });
         self.client
             .call(&Call::new(Method::POST, "/api/knowledge/discovered").body(&body))
             .await
             .map(|_| ())
-            .map_err(|e| RetrievalError::Store(e.to_string()))
+            .map_err(|e| QueryError::Store(e.to_string()))
     }
 }

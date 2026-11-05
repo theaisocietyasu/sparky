@@ -27,7 +27,7 @@ flowchart LR
     U["Student"] --> DC["Discord"]
     DC --> BOT["discord bot"]
     BOT -->|"HTTP and SSE"| ENG["engine"]
-    ENG -->|"chat and embeddings"| LLM["llama-server or another OpenAI-compatible API"]
+    ENG -->|"chat"| LLM["llama-server or another OpenAI-compatible API"]
     ENG --> API["Platform HTTP API"]
     ENG -.-> PMCP["Platform MCP tools"]
     API --> ASU["ASU sites and APIs"]

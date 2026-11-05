@@ -1,14 +1,14 @@
 import { Database } from "lucide-react";
 import * as api from "../../admin/client";
 import { useLoad } from "../../admin/useLoad";
-import { Alert, Badge, Card, Empty, Loading, PageHeader } from "./ui";
+import { Alert, Card, Empty, Loading, PageHeader } from "./ui";
 
 /** /admin/sources: the live query sources Platform publishes, read only. */
 const Sources = () => {
   const { data, error } = useLoad(api.sources);
   return (
     <section aria-label="Sources">
-      <PageHeader title="Sources" description="Live queries Sparky can run through Platform. Stored sources are managed on the Platform dashboard." />
+      <PageHeader title="Sources" description="Live sources Platform search can name. Stored pages are managed on the Platform dashboard." />
       <Alert text={error} />
       <Card className="overflow-x-auto">
         {!data && !error && <Loading />}
@@ -19,7 +19,7 @@ const Sources = () => {
               <tr>
                 <th className="px-4 py-2.5 font-medium">Source</th>
                 <th className="px-4 py-2.5 font-medium">Parameters</th>
-                <th className="px-4 py-2.5 font-medium">Results</th>
+                <th className="px-4 py-2.5 font-medium">Answers</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-edge">
@@ -29,7 +29,7 @@ const Sources = () => {
                   <td className="px-4 py-3 text-dim">
                     {s.params.length ? s.params.map((p) => (p.required ? `${p.name}*` : p.name)).join(", ") : "no parameters"}
                   </td>
-                  <td className="px-4 py-3">{s.indexed ? <Badge tone="good">indexed</Badge> : <Badge>not stored</Badge>}</td>
+                  <td className="px-4 py-3 text-dim">{s.description}</td>
                 </tr>
               ))}
             </tbody>

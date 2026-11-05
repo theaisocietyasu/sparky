@@ -1,6 +1,7 @@
-//! QuerySourceInfo, QueryRequest, QueryOutcome: live queries the platform runs.
+//! QuerySourceInfo, SearchSpec, SearchAnswer: the sources Platform publishes and its search tool.
 
-use serde::{Deserialize, Serialize};
+use chrono::{DateTime, NaiveDateTime, Utc};
+use serde::{Deserialize, Deserializer, Serialize};
 
 /// One parameter a query source accepts, as the platform published it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -23,54 +24,94 @@ pub struct QueryParam {
 pub struct QuerySourceInfo {
     /// Registry key.
     pub key: String,
+    /// What it answers.
+    #[serde(default)]
+    pub description: String,
     /// Parameters it accepts.
     pub params: Vec<QueryParam>,
-    /// Whether the platform writes a result of this source to the retrieval index.
-    #[serde(default = "indexed_by_default")]
-    pub indexed: bool,
 }
 
-/// A source published without the flag is read as indexed.
-fn indexed_by_default() -> bool {
-    true
+/// The search tool as Platform describes it: what the model reads and the arguments it takes.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct SearchSpec {
+    /// What the tool does, for the model.
+    pub description: String,
+    /// JSON Schema of the arguments.
+    #[serde(rename = "input_schema")]
+    pub parameters: serde_json::Value,
 }
 
-/// One live query to run.
+/// One stored passage a search returned.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct QueryRequest {
-    /// Registry key.
-    pub source: String,
-    /// Parameter values, as strings.
-    pub params: serde_json::Map<String, serde_json::Value>,
+pub struct StoredPage {
+    /// Page title.
+    pub title: String,
+    /// Page url, when the page has one.
+    #[serde(default)]
+    pub url: Option<String>,
+    /// When Platform fetched the page.
+    #[serde(default, deserialize_with = "utc_or_naive")]
+    pub fetched_at: Option<DateTime<Utc>>,
+    /// Passage text.
+    pub content: String,
 }
 
-/// What a finished query produced.
+/// An ISO 8601 time, read as UTC when it carries no offset. Text that is not a time reads as none.
+fn utc_or_naive<'de, D: Deserializer<'de>>(d: D) -> Result<Option<DateTime<Utc>>, D::Error> {
+    let text: Option<String> = Option::deserialize(d)?;
+    Ok(text.as_deref().and_then(|t| {
+        DateTime::parse_from_rfc3339(t)
+            .map(|at| at.with_timezone(&Utc))
+            .ok()
+            .or_else(|| {
+                NaiveDateTime::parse_from_str(t, "%Y-%m-%dT%H:%M:%S%.f")
+                    .ok()
+                    .map(|at| at.and_utc())
+            })
+    }))
+}
+
+/// What a search answered with, as the from field names it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct QueryOutcome {
-    /// The source that answered.
-    pub source: String,
-    /// The URL actually fetched.
-    pub url: String,
-    /// Readable text of the page.
-    pub text: String,
-    /// When the fetch happened, set only when the answer is a reused one.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub fetched_at: Option<chrono::DateTime<chrono::Utc>>,
+#[serde(tag = "from", rename_all = "snake_case")]
+pub enum SearchAnswer {
+    /// Passages from pages Platform keeps.
+    Stored {
+        /// Passages, best first.
+        results: Vec<StoredPage>,
+        /// Note for the model, set when some pages are old.
+        #[serde(default)]
+        note: Option<String>,
+    },
+    /// One page a live source fetched now.
+    Live {
+        /// Registry key of the source.
+        source: String,
+        /// The url fetched.
+        url: String,
+        /// Readable text of the page.
+        text: String,
+    },
+    /// Nothing found.
+    None {
+        /// What the model can try next.
+        note: String,
+    },
 }
 
-/// Why a live query did not answer.
+/// Why a search did not answer.
 #[derive(Debug, thiserror::Error)]
 pub enum QueryError {
-    /// The queue could not be reached.
-    #[error("query queue: {0}")]
+    /// Platform could not be reached or answered with something unreadable.
+    #[error("platform search: {0}")]
     Store(String),
-    /// The platform rejected it: unknown source, bad param, unreadable page. Goes back to the model.
+    /// Platform refused the arguments: unknown source, missing detail, unreadable page.
     #[error("{0}")]
     Rejected(String),
-    /// The platform did not answer inside the budget.
+    /// Platform did not answer inside the budget.
     #[error("the platform did not answer within {0:?}")]
     Timeout(std::time::Duration),
-    /// The request ended before the query did.
-    #[error("query cancelled")]
+    /// The request ended before the search did.
+    #[error("search cancelled")]
     Cancelled,
 }

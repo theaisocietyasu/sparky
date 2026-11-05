@@ -69,7 +69,7 @@ export type TraceSummary = {
 export type TraceRecord = { at: string; kind: string } & Record<string, unknown>;
 
 /** One live query source Platform publishes. */
-export type Source = { key: string; indexed: boolean; params: { name: string; required: boolean }[] };
+export type Source = { key: string; description: string; params: { name: string; required: boolean }[] };
 
 export const traces = () => call<TraceSummary[]>("GET", "/admin/traces");
 export const trace = (id: string) => call<TraceRecord[]>("GET", `/admin/traces/${encodeURIComponent(id)}`);
