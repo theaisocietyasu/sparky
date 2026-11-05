@@ -1,4 +1,5 @@
 //! read_page: the text of one public web page. Private and local addresses are refused.
+//! A page with text is suggested to the platform in the background, which may save it.
 
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
@@ -9,6 +10,7 @@ use futures::StreamExt;
 use serde_json::{Value, json};
 
 use crate::core::config::ReadPage as ReadPageConfig;
+use crate::core::traits::knowledge::discovery::Discovery;
 use crate::core::traits::tools::Tool;
 use crate::core::types::agent::context::RequestContext;
 use crate::core::types::knowledge::evidence::Citation;
@@ -21,6 +23,7 @@ pub const READ_PAGE: &str = "read_page";
 /// Reads the text of a public web page.
 pub struct ReadPageTool {
     cfg: Arc<Settings>,
+    discovery: Option<Arc<dyn Discovery>>,
 }
 
 /// What one read may fetch.
@@ -74,6 +77,9 @@ impl Tool for ReadPageTool {
         };
         let text = cut(&text, self.cfg.max_chars);
         let title = title.unwrap_or_else(|| host_of(&url));
+        if !text.is_empty() {
+            self.suggest(&url);
+        }
         Ok(ToolOutput {
             content: if text.is_empty() {
                 format!("{title} ({url}) has no readable text. It may need a browser to load.")
@@ -91,6 +97,20 @@ impl Tool for ReadPageTool {
 }
 
 impl ReadPageTool {
+    /// Sends url to the platform without waiting; a failure is logged only.
+    fn suggest(&self, url: &reqwest::Url) {
+        let Some(discovery) = self.discovery.clone() else {
+            return;
+        };
+        let mut page = url.clone();
+        page.set_fragment(None);
+        tokio::spawn(async move {
+            if let Err(error) = discovery.suggest(page.as_str()).await {
+                tracing::debug!(%error, "the platform did not take a page read");
+            }
+        });
+    }
+
     /// Fetches url, following redirects, with every hop checked to be public.
     async fn fetch(
         &self,
@@ -343,7 +363,7 @@ fn host_of(url: &reqwest::Url) -> String {
 }
 
 /// The page reading tool, when it is enabled.
-pub fn tools(cfg: &ReadPageConfig) -> Vec<Arc<dyn Tool>> {
+pub fn tools(cfg: &ReadPageConfig, discovery: Option<Arc<dyn Discovery>>) -> Vec<Arc<dyn Tool>> {
     let tool: Arc<dyn Tool> = Arc::new(ReadPageTool {
         cfg: Arc::new(Settings {
             timeout: Duration::from_secs(cfg.timeout_secs),
@@ -352,6 +372,7 @@ pub fn tools(cfg: &ReadPageConfig) -> Vec<Arc<dyn Tool>> {
             max_redirects: cfg.max_redirects,
             user_agent: cfg.user_agent.clone(),
         }),
+        discovery,
     });
     vec![tool]
 }

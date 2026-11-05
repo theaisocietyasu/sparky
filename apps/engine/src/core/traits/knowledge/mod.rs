@@ -1,4 +1,5 @@
-//! Knowledge interfaces: retrieval and live source queries.
+//! Knowledge interfaces: retrieval, live source queries, and page discovery.
 
+pub mod discovery;
 pub mod query;
 pub mod retrieval;

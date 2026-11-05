@@ -365,6 +365,7 @@ max_bytes = 2000000
 max_chars = 6000
 max_redirects = 5
 user_agent = "Mozilla/5.0 (compatible; SparkyAI/2.0; ASU student copilot)"
+save_pages = true               # send each page read to Platform, which saves ASU pages and queues others for review
 
 # Wikipedia lookups over the MediaWiki API. Public, no key.
 [wikipedia]

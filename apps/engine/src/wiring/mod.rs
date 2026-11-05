@@ -21,6 +21,7 @@ use crate::core::config::{Config, StoreBackend};
 use crate::core::traits::admin::AdminStore;
 use crate::core::traits::conversation::ConversationStore;
 use crate::core::traits::health::Probe;
+use crate::core::traits::knowledge::discovery::Discovery;
 use crate::core::traits::knowledge::query::SourceQueries;
 use crate::core::traits::knowledge::retrieval::{Embedder, Retriever};
 use crate::core::traits::memory::MemoryStore;
@@ -71,6 +72,8 @@ struct Stores {
     nudges: Option<Arc<dyn NudgeStore>>,
     /// Admin changes, when the local store holds them.
     admin: Option<Arc<dyn AdminStore>>,
+    /// Where pages read_page reads are suggested, when read_page.save_pages is on.
+    discovery: Option<Arc<dyn Discovery>>,
     /// What readiness checks besides the model.
     probes: Vec<Arc<dyn Probe>>,
 }
@@ -122,6 +125,7 @@ pub async fn serve(cfg: Config) -> anyhow::Result<()> {
             memory: memory_tools(&cfg, &stores, &trace),
             chats: (cfg.store.backend == StoreBackend::Sqlite)
                 .then(|| Arc::clone(&stores.conversations)),
+            pages: stores.discovery.clone(),
         },
     )
     .await?;

@@ -9,6 +9,7 @@ use secrecy::ExposeSecret;
 
 use crate::core::config::Config;
 use crate::core::traits::conversation::ConversationStore;
+use crate::core::traits::knowledge::discovery::Discovery;
 use crate::core::traits::knowledge::query::SourceQueries;
 use crate::core::traits::knowledge::retrieval::Retriever;
 use crate::core::traits::memory::MemoryStore;
@@ -50,6 +51,8 @@ pub(crate) struct Personal {
     pub memory: Option<(Arc<dyn MemoryStore>, Arc<dyn TraceSink>)>,
     /// Conversations in the local file, for the chat search.
     pub chats: Option<Arc<dyn ConversationStore>>,
+    /// Where read_page suggests the pages it reads.
+    pub pages: Option<Arc<dyn Discovery>>,
 }
 
 /// Every tool the model may call, with tools.disabled removed at registration.
@@ -183,6 +186,7 @@ fn integrations<'a>(
         reminders,
         memory,
         chats,
+        pages,
     } = personal;
     let mut all: Vec<Integration<'a>> = Vec::new();
     all.extend::<[Integration<'a>; 10]>([
@@ -262,7 +266,7 @@ fn integrations<'a>(
         (
             "read_page",
             cfg.read_page.enabled,
-            Box::new(move || Ok(Built::from(page::tools(&cfg.read_page)))),
+            Box::new(move || Ok(Built::from(page::tools(&cfg.read_page, pages)))),
         ),
         (
             "wikipedia",

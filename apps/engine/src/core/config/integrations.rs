@@ -330,6 +330,8 @@ pub struct ReadPage {
     pub max_redirects: usize,
     /// User agent sent with each request.
     pub user_agent: String,
+    /// Whether each page read is sent to the platform to save and refresh.
+    pub save_pages: bool,
 }
 
 impl Default for ReadPage {
@@ -341,6 +343,7 @@ impl Default for ReadPage {
             max_chars: 6_000,
             max_redirects: 5,
             user_agent: "Mozilla/5.0 (compatible; SparkyAI/2.0; ASU student copilot)".into(),
+            save_pages: true,
         }
     }
 }
