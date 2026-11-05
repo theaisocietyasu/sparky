@@ -36,6 +36,10 @@ Create the pod with the image, a volume at `/workspace` (the model cache), a hos
 
 With `SPARKY_POD_ROLE=models` the pod runs only the two model servers, and `SPARKY_MODELS_API_KEY` is required. Use it on a GPU pod when the engine and the bot run elsewhere, for example on the Platform pod, which runs them against any OpenAI-compatible API. Point that engine at `https://<pod>-8000.proxy.runpod.net/v1` with the same key, and Platform's embeddings at `https://<pod>-8001.proxy.runpod.net/v1`.
 
+### Apps only
+
+With `SPARKY_POD_ROLE=apps` the pod runs only the engine and the bot, so it fits a CPU pod. Set `SPARKY_MODEL__BASE_URL`, `SPARKY_MODEL__API_KEY` and `SPARKY_MODEL__NAME` to an OpenAI-compatible API whose model calls tools, for example ASU's `https://openai.rc.asu.edu/v1` (keys and models on the Voyager portal, LLM Access tab). Without an embeddings route on that API, set `SPARKY_RETRIEVAL__DENSE=false`; Platform then searches lexically. The pod refuses to start when `SPARKY_MODEL__BASE_URL` is unset or points at `127.0.0.1`.
+
 ### GPU deployment
 
 This pod was terminated on 2026-10-08. The engine and the bot now run on the Platform pod with a hosted model API ("Agents on the platform pod" in the Platform `docs/operations.md`). This section records the GPU setup for a later GPU pod, with `SPARKY_POD_ROLE=models` or without it.
