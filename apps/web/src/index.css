@@ -370,6 +370,75 @@
   }
 }
 
+/* A hop and a flare once, when an answer lands or something good happens. */
+.sparky[data-mood="done"] .sparky-body {
+  animation: sparky-hop 0.7s cubic-bezier(0.3, 1.6, 0.5, 1) 1;
+}
+
+.sparky[data-mood="done"] .sparky-spark {
+  animation: sparky-flare 0.7s ease-out 1;
+}
+
+/* Dozing on an empty page: eye shut, slow breath. */
+.sparky[data-mood="sleepy"] .sparky-eye {
+  animation: none;
+  transform: scaleY(0.12);
+}
+
+.sparky[data-mood="sleepy"] .sparky-body {
+  animation-duration: 8s;
+}
+
+.sparky[data-mood="sleepy"] .sparky-spark {
+  opacity: 0.35;
+}
+
+/* Sorry: head down, spark dim. */
+.sparky[data-mood="sad"] .sparky-body {
+  animation: none;
+  transform: rotate(7deg) translateY(2%);
+}
+
+.sparky[data-mood="sad"] .sparky-eye {
+  animation: none;
+  transform: scaleY(0.55) translateY(10%);
+}
+
+.sparky[data-mood="sad"] .sparky-spark {
+  animation: none;
+  opacity: 0.25;
+}
+
+@keyframes sparky-hop {
+  0% {
+    transform: translateY(0) rotate(0deg);
+  }
+  35% {
+    transform: translateY(-9%) rotate(-5deg);
+  }
+  70% {
+    transform: translateY(1%) rotate(1deg);
+  }
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+}
+
+@keyframes sparky-flare {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  30% {
+    opacity: 1;
+    transform: scale(1.35) rotate(-6deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 .sparky[data-still] * {
   animation: none;
 }
@@ -379,7 +448,9 @@
   .sparky-eye,
   .sparky-spark,
   .sparky[data-mood="thinking"] .sparky-spark,
-  .sparky[data-mood="thinking"] .sparky-current {
+  .sparky[data-mood="thinking"] .sparky-current,
+  .sparky[data-mood="done"] .sparky-body,
+  .sparky[data-mood="done"] .sparky-spark {
     animation: none;
   }
 }

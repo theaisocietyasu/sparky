@@ -18,13 +18,13 @@ const latest = (lines: Line[]) => {
  * What the running turn shows: Sparky at work and one status line that changes in place as the engine
  * reports each step, then the draft as it streams in.
  */
-const Running = ({ lines, draft, onShown }: { lines: Line[]; draft: string; onShown: (text: string) => void }) => {
+const Running = ({ lines, draft, onShown, fly = false }: { lines: Line[]; draft: string; onShown: (text: string) => void; fly?: boolean }) => {
   const still = useReducedMotion() ?? false;
   const { text } = useSmoothText(draft, { off: still });
   useEffect(() => onShown(text), [text, onShown]);
   const status = latest(lines);
   return (
-    <AssistantRow mood={draft ? "idle" : "thinking"}>
+    <AssistantRow mood={draft ? "idle" : "thinking"} fly={fly}>
       <div aria-live="polite" aria-label="Progress">
         {!draft && (
           <div className="relative h-6 overflow-hidden text-sm">

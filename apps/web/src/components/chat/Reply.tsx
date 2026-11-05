@@ -6,19 +6,20 @@ import type { Answer } from "../../chat/types";
 import { useSmoothText } from "../../chat/useSmoothText";
 import { host, isWeb } from "../../chat/links";
 import Sparky, { type Mood } from "../sparky/Sparky";
+import { useHopWhen } from "../sparky/cue";
 import Markdown, { CopyButton } from "./Markdown";
 
-/** Sparky beside each answer, at work while the turn runs. */
-export const Avatar = ({ mood = "idle" }: { mood?: Mood }) => (
-  <span aria-hidden className="glass grid size-8 shrink-0 place-items-center rounded-full">
+/** Sparky beside each answer: at work while the turn runs, a hop when it lands, a droop on a failure. */
+export const Avatar = ({ mood = "idle", fly = false }: { mood?: Mood; fly?: boolean }) => (
+  <motion.span layoutId={fly ? "sparky-hero" : undefined} aria-hidden className="glass grid size-8 shrink-0 place-items-center rounded-full">
     <Sparky mood={mood} still={mood === "idle"} className="h-5 w-auto" />
-  </span>
+  </motion.span>
 );
 
-/** An assistant turn: the avatar and its content. */
-export const AssistantRow = ({ mood, children }: { mood?: Mood; children: ReactNode }) => (
+/** An assistant turn: the avatar and its content. With fly set, the avatar flies in from the empty page. */
+export const AssistantRow = ({ mood, fly, children }: { mood?: Mood; fly?: boolean; children: ReactNode }) => (
   <div className="flex gap-4">
-    <Avatar mood={mood} />
+    <Avatar mood={mood} fly={fly} />
     <div className="min-w-0 flex-1 pt-1">{children}</div>
   </div>
 );
@@ -47,8 +48,9 @@ const Reply = ({
   const { choices } = splitChoices(answer.text);
   const sources = answer.citations ?? [];
   const animate = revealFrom !== undefined && !still;
+  const mood = useHopWhen(animate && done);
   return (
-    <AssistantRow>
+    <AssistantRow mood={mood}>
       <Markdown text={shown} streaming={!done} />
       {done && onChoose && choices.length > 0 && (
         <ul aria-label="Choices" className="mt-3 flex flex-wrap gap-2">

@@ -1,4 +1,5 @@
 import { AlarmClock, X } from "lucide-react";
+import Sparky from "../../components/sparky/Sparky";
 import { useCallback, useEffect, useState } from "react";
 import { cancelReminder, reminders } from "../../chat/client";
 import type { Reminder } from "../../chat/types";
@@ -46,7 +47,7 @@ const Reminders = () => {
       {!items && !error && <div aria-hidden className="mt-6 h-16 animate-pulse rounded-2xl bg-sunk" />}
       {items && items.length === 0 && (
         <div className="mt-6 flex flex-col items-center rounded-2xl border border-dashed border-edge px-6 py-12 text-center">
-          <AlarmClock className="size-6 text-dim" />
+          <Sparky mood="sleepy" still className="h-12 w-auto" />
           <p className="mt-3 text-sm font-medium">No reminders set</p>
         </div>
       )}
