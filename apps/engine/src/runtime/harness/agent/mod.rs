@@ -13,8 +13,10 @@ pub mod uploads;
 use std::sync::Arc;
 use std::time::Instant;
 
+use opentelemetry::trace::{TraceContextExt, TraceId};
 use tracing::Instrument;
 use tracing::field::Empty;
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::core::traits::conversation::ConversationStore;
 use crate::core::traits::conversation::compaction::Compactor;
@@ -268,6 +270,7 @@ impl Agent {
                 input: input.to_owned(),
                 tenant_id: ctx.tenant_id.clone(),
                 user_id: ctx.user_id.clone(),
+                trace_id: current_trace_id(),
             },
         );
 
@@ -365,4 +368,14 @@ impl Agent {
 /// Milliseconds elapsed since since.
 fn ms(since: Instant) -> u64 {
     u64::try_from(since.elapsed().as_millis()).unwrap_or(u64::MAX)
+}
+
+/// The OpenTelemetry trace id of the current span, or None when no span is exported.
+fn current_trace_id() -> Option<String> {
+    let id = tracing::Span::current()
+        .context()
+        .span()
+        .span_context()
+        .trace_id();
+    (id != TraceId::INVALID).then(|| id.to_string())
 }

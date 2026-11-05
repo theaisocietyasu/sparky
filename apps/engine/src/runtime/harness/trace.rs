@@ -146,6 +146,7 @@ impl JsonlTraces {
             input,
             tenant_id,
             user_id,
+            trace_id,
         } = &first.event
         else {
             return None;
@@ -164,7 +165,18 @@ impl JsonlTraces {
             steps: 0,
             tokens: 0,
             duration_ms: 0,
+            trace_id: trace_id.clone(),
+            phoenix_url: None,
+            guardrail_blocks: 0,
+            guardrail_redactions: 0,
         };
+        for record in records {
+            match record.event {
+                TraceEvent::GuardrailBlocked { .. } => summary.guardrail_blocks += 1,
+                TraceEvent::GuardrailRedacted { .. } => summary.guardrail_redactions += 1,
+                _ => {}
+            }
+        }
         if let Some(TraceEvent::Completed {
             status,
             steps,

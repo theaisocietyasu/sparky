@@ -160,4 +160,35 @@ pub struct TraceSummary {
     pub tokens: u32,
     /// Wall time.
     pub duration_ms: u64,
+    /// OpenTelemetry trace id of the request span; None when span export is off.
+    pub trace_id: Option<String>,
+    /// The trace in Phoenix; None when telemetry.phoenix_ui_url or trace_id is unset.
+    pub phoenix_url: Option<String>,
+    /// Responses the guardrail refused.
+    pub guardrail_blocks: u32,
+    /// Responses the guardrail redacted.
+    pub guardrail_redactions: u32,
+}
+
+/// GET /admin/guardrails answer: the guardrail and policy settings, read only.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct AdminGuardrails {
+    /// Responses are checked at all.
+    pub enabled: bool,
+    /// Phrases that block a response.
+    pub denied_phrases: Vec<String>,
+    /// Terms removed from an answer.
+    pub protected_terms: Vec<String>,
+    /// Shown in place of a protected term.
+    pub redaction: String,
+    /// Longest answer allowed; 0 is unlimited.
+    pub max_answer_chars: usize,
+    /// Shown in place of a blocked response.
+    pub replacement: String,
+    /// Roles allowed to run external writes.
+    pub write_roles: Vec<String>,
+    /// Tools may read inside the authenticated session of the user.
+    pub allow_authenticated_reads: bool,
+    /// Lowest risk class that waits for confirmation.
+    pub confirm_from: String,
 }

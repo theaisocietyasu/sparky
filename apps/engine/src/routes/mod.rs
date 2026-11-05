@@ -151,6 +151,7 @@ pub fn router(states: States, limits: Limits, cors_origins: &[String]) -> Router
         .route("/admin/history", get(admin::history))
         .route("/admin/rollback/{id}", post(admin::rollback))
         .route("/admin/limits", get(admin::limits))
+        .route("/admin/guardrails", get(admin::guardrails))
         .route("/admin/traces", get(admin::traces))
         .route("/admin/traces/{id}", get(admin::trace))
         .route("/admin/sources", get(admin::sources))

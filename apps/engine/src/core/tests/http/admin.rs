@@ -11,7 +11,9 @@ use serde_json::{Value, json};
 
 use super::web::{SITE, auth, browser, session};
 use crate::core::tests::support::{Ledger, Named, Scripted, agent};
-use crate::core::types::admin::{AdminLimits, HeldAction, InstructionsUpdate, ToolSwitch};
+use crate::core::types::admin::{
+    AdminGuardrails, AdminLimits, HeldAction, InstructionsUpdate, ToolSwitch,
+};
 use crate::core::types::agent::AgentConfig;
 use crate::routes::admin::{self, AdminState};
 use crate::runtime::harness::tools::ToolSet;
@@ -40,6 +42,18 @@ fn state(store: Arc<Ledger>) -> AdminState {
         traces: None,
         traces_limit: 10,
         queries: None,
+        guardrails: AdminGuardrails {
+            enabled: true,
+            denied_phrases: vec!["exam answers".into()],
+            protected_terms: vec!["ssn".into()],
+            redaction: "[hidden]".into(),
+            max_answer_chars: 8000,
+            replacement: "I cannot answer that.".into(),
+            write_roles: vec!["MANAGE_GUILD".into()],
+            allow_authenticated_reads: false,
+            confirm_from: "external_write".into(),
+        },
+        phoenix_ui_url: None,
     }
 }
 
@@ -226,6 +240,7 @@ async fn a_moderator_lists_traces_of_the_tenant_and_reads_one_in_full() {
     use crate::core::traits::trace::TraceSink;
     use crate::core::types::agent::context::RequestContext;
     use crate::core::types::model::Usage;
+    use crate::core::types::safety::guardrail::Stage;
     use crate::core::types::trace::{RunStatus, TraceEvent};
     use crate::runtime::harness::trace::{JsonlSink, JsonlTraces};
 
@@ -241,6 +256,15 @@ async fn a_moderator_lists_traces_of_the_tenant_and_reads_one_in_full() {
                 input: input.into(),
                 tenant_id: tenant.into(),
                 user_id: "222".into(),
+                trace_id: Some("4bf92f3577b34da6a3ce929d0e0e4736".into()),
+            },
+        );
+        sink.emit(
+            &ctx,
+            TraceEvent::GuardrailBlocked {
+                step: 1,
+                stage: Stage::Answer,
+                reason: "denied phrase".into(),
             },
         );
         sink.emit(
@@ -263,6 +287,7 @@ async fn a_moderator_lists_traces_of_the_tenant_and_reads_one_in_full() {
 
     let mut state = state(Arc::new(Ledger::default()));
     state.traces = Some(Arc::new(JsonlTraces::new(&dir)));
+    state.phoenix_ui_url = Some("https://phoenix.example/".into());
     let (status, listed) = body(admin::traces(State(state.clone()), moderator()).await).await;
     assert_eq!(status, StatusCode::OK);
     let rows = listed.as_array().cloned().unwrap_or_default();
@@ -271,11 +296,17 @@ async fn a_moderator_lists_traces_of_the_tenant_and_reads_one_in_full() {
     assert_eq!(rows[0]["input"], "when is the library open?");
     assert_eq!(rows[0]["status"], "answered");
     assert_eq!(rows[0]["tokens"], 120);
+    assert_eq!(rows[0]["guardrail_blocks"], 1);
+    assert_eq!(rows[0]["guardrail_redactions"], 0);
+    assert_eq!(
+        rows[0]["phoenix_url"],
+        "https://phoenix.example/redirects/traces/4bf92f3577b34da6a3ce929d0e0e4736"
+    );
 
     let (status, full) =
         body(admin::trace(State(state.clone()), moderator(), Path(mine.to_string())).await).await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(full.as_array().map(Vec::len), Some(2));
+    assert_eq!(full.as_array().map(Vec::len), Some(3));
     assert_eq!(full[0]["kind"], "request_started");
 
     let missing = admin::trace(
@@ -305,4 +336,15 @@ async fn sources_list_the_live_registry_and_traces_off_is_not_implemented() {
     assert_eq!(sources[0]["key"], "library_hours");
     let off = admin::traces(State(state), moderator()).await;
     assert_eq!(off.status(), StatusCode::NOT_IMPLEMENTED);
+}
+
+#[tokio::test]
+async fn a_moderator_reads_the_guardrails_and_a_member_is_refused() {
+    let state = state(Arc::new(Ledger::default()));
+    let (status, shown) = body(admin::guardrails(State(state.clone()), moderator()).await).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(shown["denied_phrases"], json!(["exam answers"]));
+    assert_eq!(shown["confirm_from"], "external_write");
+    let member = admin::guardrails(State(state), signed_in(&[])).await;
+    assert_eq!(member.status(), StatusCode::FORBIDDEN);
 }

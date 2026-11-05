@@ -3,6 +3,7 @@
 # live on the platform. RunPod pods cannot run containers, so supervisord runs every service as
 # a process and run_sandbox stays off. The model cache lives under /workspace, the pod volume.
 ARG LLAMA_IMAGE=ghcr.io/ggml-org/llama.cpp:server-cuda
+ARG PHOENIX_VERSION=21.0.0
 
 FROM mirror.gcr.io/library/rust:1.95-bookworm AS chef
 RUN cargo install cargo-chef --locked
@@ -20,10 +21,14 @@ RUN cargo build --release -p engine -p discord
 
 # llama.cpp server image: Ubuntu 24.04 with the CUDA runtime and /app/llama-server.
 FROM ${LLAMA_IMAGE}
+ARG PHOENIX_VERSION
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
-    && apt-get install --yes --no-install-recommends ca-certificates curl supervisor \
+    && apt-get install --yes --no-install-recommends ca-certificates curl supervisor python3-venv \
     && rm -rf /var/lib/apt/lists/*
+# Phoenix, the trace viewer. It runs only with SPARKY_RUN_PHOENIX=true.
+RUN python3 -m venv /opt/phoenix \
+    && /opt/phoenix/bin/pip install --no-cache-dir "arize-phoenix==${PHOENIX_VERSION}"
 
 COPY --from=builder /app/target/release/engine /usr/local/bin/engine
 COPY --from=builder /app/target/release/discord /usr/local/bin/discord

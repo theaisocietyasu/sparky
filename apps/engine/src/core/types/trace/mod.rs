@@ -27,6 +27,9 @@ pub enum TraceEvent {
         tenant_id: String,
         /// Caller.
         user_id: String,
+        /// OpenTelemetry trace id of the request span; None when span export is off.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        trace_id: Option<String>,
     },
     /// Context assembled for one step.
     ContextAssembled {

@@ -173,6 +173,46 @@ describe("admin pages", () => {
     expect(events.getByText("Completed")).toBeInTheDocument();
   });
 
+  it("shows the guardrails and the requests they stopped, with a Phoenix link", async () => {
+    const row = (id: string, blocks: number) => ({
+      request_id: id,
+      conversation_id: "c",
+      at: "2026-11-04T10:00:00Z",
+      user_id: "222",
+      input: `question ${id}`,
+      status: "answered",
+      steps: 1,
+      tokens: 10,
+      duration_ms: 500,
+      trace_id: "ab",
+      phoenix_url: `https://phoenix.example/redirects/traces/${id}`,
+      guardrail_blocks: blocks,
+      guardrail_redactions: 0,
+    });
+    engine({
+      "GET /web/me": () => Response.json(MOD),
+      "GET /admin/guardrails": () =>
+        Response.json({
+          enabled: true,
+          denied_phrases: ["exam answers"],
+          protected_terms: [],
+          redaction: "[hidden]",
+          max_answer_chars: 8000,
+          replacement: "I cannot answer that.",
+          write_roles: ["MANAGE_GUILD"],
+          allow_authenticated_reads: false,
+          confirm_from: "external_write",
+        }),
+      "GET /admin/traces": () => Response.json([row("r1", 1), row("r2", 0)]),
+    });
+    open("/admin/guardrails");
+    expect(await screen.findByText("exam answers")).toBeInTheDocument();
+    expect(screen.getByText("8,000 characters")).toBeInTheDocument();
+    const link = await screen.findByRole("link", { name: "Open trace r1 in Phoenix" });
+    expect(link).toHaveAttribute("href", "https://phoenix.example/redirects/traces/r1");
+    expect(screen.queryByText("question r2")).not.toBeInTheDocument();
+  });
+
   it("lists the live sources", async () => {
     engine({
       "GET /web/me": () => Response.json(MOD),
