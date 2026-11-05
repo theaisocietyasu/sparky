@@ -17,7 +17,7 @@ cargo test -p engine -- --ignored   # tests that need a container runtime
 | `POST /confirm` | approves or refuses an action the policy held, by token |
 | `POST /conversation/reset` | ends the caller's conversations in a channel |
 | `POST /memories/list`, `/memories/forget` | the caller's memories, numbered, and removing one or all |
-| `POST /oauth/{provider}/authorize`, `/oauth/{provider}/logout` | the Platform login link for a provider, and removal of the linked grant |
+| `POST /oauth/{provider}/authorize`, `/oauth/{provider}/logout`, `GET /oauth/{provider}/status` | the Platform login link for a provider, removal of the linked grant, and whether a web session has one |
 | `GET /sandbox`, `DELETE /sandbox/{name}`, `POST /sandbox/enabled` | sandbox containers and the `run_sandbox` switch |
 | `GET /health/live` | the process is up |
 | `GET /health/ready` | `{"platform":bool,"model":bool}`, 503 until both are true |
