@@ -13,8 +13,8 @@ export type NavItem = { to: string; label: string; icon: LucideIcon; end?: boole
 /** A titled group of sidebar links; a group with no title has no heading. */
 export type NavGroup = { title?: string; items: NavItem[] };
 
-/** The profile button at the foot of the sidebar and its menu: settings, admin, theme and sign out. */
-const Account = () => {
+/** The profile button and its menu: settings, admin, theme and sign out. compact shows the avatar alone and opens downward. */
+export const Account = ({ compact = false }: { compact?: boolean }) => {
   const { me, signOut } = useMe();
   const { theme, toggle } = useTheme();
   const [open, setOpen] = useState(false);
@@ -37,17 +37,21 @@ const Account = () => {
 
   const item = "flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-sm text-fg hover:bg-sunk";
   return (
-    <div ref={box} className="relative p-3">
+    <div ref={box} className={compact ? "relative" : "relative p-3"}>
       <AnimatePresence>
         {open && (
           <motion.div
             role="menu"
             aria-label="Account"
-            initial={still ? false : { opacity: 0, y: 6, scale: 0.98 }}
+            initial={still ? false : { opacity: 0, y: compact ? -6 : 6, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={still ? undefined : { opacity: 0, y: 4, scale: 0.98 }}
-            transition={{ duration: 0.16, ease: "easeOut" }}
-            className="glass absolute inset-x-3 bottom-full mb-1 origin-bottom rounded-xl p-1.5"
+            exit={still ? undefined : { opacity: 0, y: compact ? -4 : 4, scale: 0.96 }}
+            transition={{ duration: 0.16, ease: [0.23, 1, 0.32, 1] }}
+            className={
+              compact
+                ? "glass absolute right-0 top-full z-50 mt-2 w-56 origin-top-right rounded-2xl p-1.5 shadow-xl shadow-black/10"
+                : "glass absolute inset-x-3 bottom-full mb-1 origin-bottom rounded-xl p-1.5"
+            }
           >
             <Link role="menuitem" to="/settings" onClick={() => setOpen(false)} className={item}>
               <Settings className="size-4 text-dim" />
@@ -71,6 +75,19 @@ const Account = () => {
           </motion.div>
         )}
       </AnimatePresence>
+      {compact ? (
+        <motion.button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          aria-label="Account menu"
+          whileTap={still ? undefined : { scale: 0.92 }}
+          className="grid size-9 place-items-center rounded-full bg-accent text-sm font-semibold text-accent-fg ring-2 ring-transparent transition-shadow hover:ring-accent/25"
+        >
+          {me.name.slice(0, 1).toUpperCase()}
+        </motion.button>
+      ) : (
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -85,6 +102,7 @@ const Account = () => {
         <span className="min-w-0 flex-1 truncate text-sm font-medium">{me.name}</span>
         <ChevronsUpDown className="size-4 shrink-0 text-dim" />
       </button>
+      )}
     </div>
   );
 };

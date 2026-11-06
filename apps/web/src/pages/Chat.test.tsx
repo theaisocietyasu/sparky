@@ -429,12 +429,15 @@ describe("web chat", () => {
       },
     });
     open("/chat");
+    fireEvent.click(await screen.findByRole("button", { name: "Threads" }));
     const sidebar = within(await screen.findByRole("list", { name: "Threads" }));
     fireEvent.click(sidebar.getByRole("link", { name: "When is my exam" }));
     expect(await screen.findByText("Friday at 9.")).toBeInTheDocument();
     expect(window.location.pathname).toBe("/chat/c9");
 
-    fireEvent.click(sidebar.getByRole("button", { name: "Delete thread When is my exam" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Threads" }));
+    const reopened = within(await screen.findByRole("list", { name: "Threads" }));
+    fireEvent.click(reopened.getByRole("button", { name: "Delete thread When is my exam" }));
     await waitFor(() => expect(window.location.pathname).toBe("/chat"));
     const removed = calls.find((c) => c.url === `${ENGINE}/web/conversations/c9` && c.init?.method === "DELETE");
     expect(removed).toBeDefined();

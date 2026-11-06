@@ -9,6 +9,7 @@ import Sparky, { type Mood } from "../sparky/Sparky";
 import { useHopWhen } from "../sparky/cue";
 import Markdown, { CopyButton } from "./Markdown";
 import { NoticeTag, NoticeThumbs } from "./Notice";
+import { arrive, settled, spring } from "../../app/motion";
 
 /** Sparky beside each answer: at work while the turn runs, a hop when it lands, a droop on a failure. */
 export const Avatar = ({ mood = "idle", fly = false }: { mood?: Mood; fly?: boolean }) => (
@@ -18,12 +19,15 @@ export const Avatar = ({ mood = "idle", fly = false }: { mood?: Mood; fly?: bool
 );
 
 /** An assistant turn: the avatar and its content. With fly set, the avatar flies in from the empty page. */
-export const AssistantRow = ({ mood, fly, children }: { mood?: Mood; fly?: boolean; children: ReactNode }) => (
-  <div className="flex gap-4">
-    <Avatar mood={mood} fly={fly} />
-    <div className="min-w-0 flex-1 pt-1">{children}</div>
-  </div>
-);
+export const AssistantRow = ({ mood, fly, enter = false, children }: { mood?: Mood; fly?: boolean; enter?: boolean; children: ReactNode }) => {
+  const still = useReducedMotion() ?? false;
+  return (
+    <motion.div initial={enter ? arrive(still, { y: 10 }) : false} animate={settled} transition={spring.soft} className="flex gap-4">
+      <Avatar mood={mood} fly={fly} />
+      <div className="min-w-0 flex-1 pt-1">{children}</div>
+    </motion.div>
+  );
+};
 
 /** What hangs off one message: open its threads, or start one. */
 export type Threads = { count: number; onOpen?: () => void; onStart: () => void };

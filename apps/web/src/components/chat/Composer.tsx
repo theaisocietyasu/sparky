@@ -1,5 +1,7 @@
 import { ArrowUp, FileText, Paperclip, Square, X } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { type DragEvent, type FormEvent, type KeyboardEvent, useEffect, useRef } from "react";
+import { spring } from "../../app/motion";
 import { ACCEPT } from "../../chat/files";
 
 /** The message box: grows with its text, sends on Enter, takes files, and offers Stop while a turn runs. */
@@ -25,6 +27,7 @@ const Composer = ({
   onRemoveFile?: (index: number) => void;
 }) => {
   const box = useRef<HTMLTextAreaElement>(null);
+  const still = useReducedMotion() ?? false;
   const picker = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -59,7 +62,7 @@ const Composer = ({
       onSubmit={submit}
       onDragOver={(e) => onFiles && e.preventDefault()}
       onDrop={drop}
-      className="glass rounded-3xl p-2 transition-shadow focus-within:shadow-[0_0_0_3px_rgb(120_28_53/0.12),0_8px_32px_-12px_rgb(0_0_0/0.18)]"
+      className="glass rounded-[1.75rem] p-2 transition-[box-shadow,border-color] duration-300 focus-within:border-accent/30 focus-within:shadow-[0_0_0_4px_rgb(120_28_53/0.10),0_18px_48px_-16px_rgb(120_28_53/0.35)]"
     >
       {files.length > 0 && (
         <ul aria-label="Attached files" className="flex flex-wrap gap-2 px-2 pb-2 pt-1">
@@ -119,25 +122,39 @@ const Composer = ({
           autoFocus={autoFocus}
           className={`max-h-[200px] min-h-10 flex-1 resize-none bg-transparent py-2 text-[15px] leading-6 outline-none placeholder:text-dim ${onFiles ? "" : "pl-2"}`}
         />
-        {busy ? (
-          <button
-            type="button"
-            onClick={onStop}
-            aria-label="Stop"
-            className="grid size-10 shrink-0 place-items-center rounded-full bg-fg text-canvas hover:opacity-90"
-          >
-            <Square className="size-3.5 fill-current" />
-          </button>
-        ) : (
-          <button
-            type="submit"
-            disabled={!ready}
-            aria-label="Send"
-            className="grid size-10 shrink-0 place-items-center rounded-full bg-fg text-canvas hover:opacity-90 disabled:bg-sunk disabled:text-dim"
-          >
-            <ArrowUp className="size-5" />
-          </button>
-        )}
+        <AnimatePresence initial={false} mode="popLayout">
+          {busy ? (
+            <motion.button
+              key="stop"
+              type="button"
+              onClick={onStop}
+              aria-label="Stop"
+              initial={still ? false : { scale: 0.6, opacity: 0, rotate: -45 }}
+              animate={{ scale: 1, opacity: 1, rotate: 0 }}
+              exit={still ? undefined : { scale: 0.6, opacity: 0, rotate: 45 }}
+              whileTap={still ? undefined : { scale: 0.9 }}
+              transition={spring.snap}
+              className="grid size-10 shrink-0 place-items-center rounded-full bg-fg text-canvas hover:opacity-90"
+            >
+              <Square className="size-3.5 fill-current" />
+            </motion.button>
+          ) : (
+            <motion.button
+              key="send"
+              type="submit"
+              disabled={!ready}
+              aria-label="Send"
+              initial={still ? false : { scale: 0.6, opacity: 0, rotate: 45 }}
+              animate={{ scale: ready ? 1 : 0.92, opacity: 1, rotate: 0 }}
+              exit={still ? undefined : { scale: 0.6, opacity: 0, rotate: -45 }}
+              whileTap={still || !ready ? undefined : { scale: 0.9 }}
+              transition={spring.snap}
+              className="grid size-10 shrink-0 place-items-center rounded-full bg-fg text-canvas transition-colors hover:opacity-90 disabled:bg-sunk disabled:text-dim"
+            >
+              <ArrowUp className="size-5" />
+            </motion.button>
+          )}
+        </AnimatePresence>
       </div>
     </form>
   );

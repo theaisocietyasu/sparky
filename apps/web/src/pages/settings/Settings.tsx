@@ -26,7 +26,7 @@ const Settings = () => {
   return (
     <ChatFrame>
       <main className="flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-4xl px-4 py-10">
+        <div className="mx-auto w-full max-w-4xl px-4 pb-10 pt-24">
           <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
           <div className="mt-6 flex flex-col gap-8 md:flex-row">
             <nav aria-label="Settings" className="-mx-1 flex gap-1 overflow-x-auto md:mx-0 md:w-52 md:shrink-0 md:flex-col">
