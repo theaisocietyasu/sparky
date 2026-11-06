@@ -8,7 +8,7 @@ import { useMe } from "../app/useMe";
 import { ask, chats as listChats, chatTurns, confirm, deleteChat, EngineError, homeId, readNotices, type ThreadStart } from "../chat/client";
 import { addFiles, toUpload } from "../chat/files";
 import { useFollow } from "../chat/useFollow";
-import { applyProgress, type Line } from "../chat/lines";
+import { applyProgress, type LiveState } from "../chat/lines";
 import type { Answer, ChatSummary, ChatTurn } from "../chat/types";
 import ClearHome from "../components/chat/ClearHome";
 import Composer from "../components/chat/Composer";
@@ -34,9 +34,9 @@ type Turn = {
 
 const EVERY_MS = 60_000;
 
-type Live = { lines: Line[]; draft: string; next: number };
+type Live = LiveState;
 
-const IDLE: Live = { lines: [], draft: "", next: 0 };
+const IDLE: Live = { lines: [], draft: "", held: "", next: 0 };
 
 const SUGGESTIONS: { text: string; icon: LucideIcon }[] = [
   { text: "What is due this week?", icon: CalendarClock },
@@ -493,7 +493,7 @@ const Chat = () => {
                       </div>
                     </AssistantRow>
                   )}
-                  {!t.answer && !t.error && busy && t.id === liveId && <Running lines={live.lines} draft={live.draft} onShown={onShown} fly={turns.length === 1} />}
+                  {!t.answer && !t.error && busy && t.id === liveId && <Running lines={live.lines} draft={live.draft} held={live.held} onShown={onShown} fly={turns.length === 1} />}
                 </motion.li>
               ))}
             </ol>

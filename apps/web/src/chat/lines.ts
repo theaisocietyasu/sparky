@@ -3,12 +3,16 @@ import type { Progress } from "./types";
 /** One progress line on screen. */
 export type Line = { key: string; text: string };
 
-/** The progress lines and the draft answer after one more progress event. */
-export const applyProgress = (
-  state: { lines: Line[]; draft: string; next: number },
-  p: Progress,
-): { lines: Line[]; draft: string; next: number } => {
-  if (p.draft) return { ...state, draft: p.text };
+/** What a running turn shows: its steps, the draft being written, and a withdrawn draft kept on screen. */
+export type LiveState = { lines: Line[]; draft: string; held: string; next: number };
+
+/**
+ * The state after one more progress event. A withdrawn draft stays on screen as held until the next
+ * draft replaces it, so a reply never vanishes mid-turn.
+ */
+export const applyProgress = (state: LiveState, p: Progress): LiveState => {
+  if (p.draft && (p.clear || !p.text)) return { ...state, draft: "", held: state.draft || state.held };
+  if (p.draft) return { ...state, draft: p.text, held: "" };
   if (p.slot !== undefined && p.clear) {
     return { ...state, lines: state.lines.filter((l) => l.key !== `slot:${p.slot}`) };
   }
