@@ -23,7 +23,7 @@ use crate::core::traits::trace::TraceSink;
 use crate::core::types::nudge::NudgePrefs;
 use crate::core::types::tools::sandbox::Limits as SandboxLimits;
 use crate::runtime::harness::tools::ToolSet;
-use crate::runtime::tools::account::{canvas, gcal, outlook};
+use crate::runtime::tools::account::{canvas, gcal};
 use crate::runtime::tools::knowledge::search::Search;
 use crate::runtime::tools::mcp::{self, McpLimits};
 use crate::runtime::tools::memory::{self, MemoryRules, MemoryTasks};
@@ -202,7 +202,7 @@ fn integrations<'a>(
         nudges: _,
     } = personal;
     let mut all: Vec<Integration<'a>> = Vec::new();
-    all.extend::<[Integration<'a>; 10]>([
+    all.extend::<[Integration<'a>; 9]>([
         (
             "memory",
             memory.is_some(),
@@ -232,13 +232,6 @@ fn integrations<'a>(
                     offset,
                 };
                 Ok(remind::tools(&store, rules))
-            }),
-        ),
-        (
-            "outlook",
-            cfg.outlook.enabled,
-            Box::new(move || {
-                outlook::tools(&cfg.outlook, oauth_store.clone()).map_err(|e| e.to_string())
             }),
         ),
         (
@@ -297,14 +290,11 @@ fn settings_stores(
     canvas: Option<&Arc<dyn CanvasFeeds>>,
     nudges: Option<(Arc<dyn NudgeStore>, NudgePrefs)>,
 ) -> SettingsStores {
-    let names = [
-        ("google", "google", cfg.gcal.enabled),
-        ("outlook", "microsoft", cfg.outlook.enabled),
-    ]
-    .into_iter()
-    .filter(|(_, _, on)| *on)
-    .map(|(name, provider, _)| (name.to_owned(), provider.to_owned()))
-    .collect();
+    let names = [("google", "google", cfg.gcal.enabled)]
+        .into_iter()
+        .filter(|(_, _, on)| *on)
+        .map(|(name, provider, _)| (name.to_owned(), provider.to_owned()))
+        .collect();
     SettingsStores {
         nudge_defaults: nudges.as_ref().map(|(_, defaults)| defaults.clone()),
         nudges: nudges.map(|(store, _)| store),

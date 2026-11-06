@@ -124,8 +124,8 @@ fn a_pin_the_server_does_not_list_is_reported() {
 
 #[test]
 fn platform_tools_get_a_model_safe_name() {
-    assert_eq!(platform_name("org.set_modules"), "platform_org_set_modules");
-    assert_eq!(platform_name("apps.list"), "platform_apps_list");
+    assert_eq!(platform_name("modules.set"), "platform_modules_set");
+    assert_eq!(platform_name("hosting.list"), "platform_hosting_list");
 }
 
 #[test]
@@ -172,7 +172,7 @@ fn a_private_prefix_matches_the_tools_it_names() {
     let prefixes = vec!["canvas.".to_owned()];
     assert!(is_private("canvas.grades", &prefixes));
     assert!(is_private("canvas.assignment_grades", &prefixes));
-    assert!(!is_private("asu.clubs", &prefixes));
+    assert!(!is_private("knowledge.query", &prefixes));
     assert!(!is_private("org.info", &prefixes));
     assert!(!is_private("canvas.grades", &[String::new()]));
 }

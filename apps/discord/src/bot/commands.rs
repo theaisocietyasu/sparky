@@ -25,7 +25,7 @@ pub const CANVAS_FORM: &str = "canvas_feed";
 /// Name of the service option on /login and /logout.
 pub const SERVICE: &str = "service";
 /// The services a login connects: the option value is the provider key the engine expects.
-pub const SERVICES: [(&str, &str); 2] = [("Outlook", "microsoft"), ("Google Calendar", "google")];
+pub const SERVICES: [(&str, &str); 1] = [("Google Calendar", "google")];
 
 /// Every command the bot registers on its guild.
 pub fn all() -> Vec<CreateCommand> {
@@ -44,10 +44,10 @@ pub fn all() -> Vec<CreateCommand> {
                 .required(true),
             ),
         CreateCommand::new(LOGIN)
-            .description("Connect an account (Outlook, Google) so Sparky can check it in DMs")
+            .description("Connect your Google Calendar so Sparky can check it in DMs")
             .add_option(service_option()),
         CreateCommand::new(LOGOUT)
-            .description("Disconnect an account (Outlook, Google) from Sparky")
+            .description("Disconnect your Google Calendar from Sparky")
             .add_option(service_option()),
         CreateCommand::new(CANVAS)
             .description("Link your Canvas calendar so Sparky can list due dates in DMs")

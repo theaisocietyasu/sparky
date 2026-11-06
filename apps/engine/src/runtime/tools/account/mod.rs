@@ -3,4 +3,3 @@
 pub mod canvas;
 pub mod gcal;
 pub mod grant;
-pub mod outlook;

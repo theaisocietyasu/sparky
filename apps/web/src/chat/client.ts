@@ -176,8 +176,8 @@ export const reminders = async (): Promise<Reminder[]> => (await call<{ reminder
 /** Cancels one reminder. */
 export const cancelReminder = (id: string) => send("DELETE", `/web/reminders/${encodeURIComponent(id)}`);
 
-/** A calendar account Sparky can read once linked: google or microsoft. */
-export type Provider = "google" | "microsoft";
+/** A calendar account Sparky can read once linked. */
+export type Provider = "google";
 
 /** Whether the student has linked an account for a provider. */
 export const accountStatus = async (provider: Provider): Promise<boolean> =>

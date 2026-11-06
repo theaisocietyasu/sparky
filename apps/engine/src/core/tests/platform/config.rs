@@ -75,10 +75,7 @@ fn platform_tools_the_engine_serves_or_officers_use_are_skipped_unless_told_othe
     let Ok(cfg) = load(ON) else {
         unreachable!("a complete platform section is valid")
     };
-    assert_eq!(
-        cfg.platform.mcp_skip,
-        vec!["canvas.", "knowledge.", "batch", "search", "submodules."]
-    );
+    assert_eq!(cfg.platform.mcp_skip, vec!["batch", "search", "modules."]);
     assert_eq!(cfg.platform.mcp_private, Vec::<String>::new());
     assert!(load(&format!("{ON}mcp_private = [\"\"]\n")).is_err_and(|e| e.contains("mcp_private")));
     assert!(load(&format!("{ON}mcp_skip = [\"\"]\n")).is_err_and(|e| e.contains("mcp_skip")));
