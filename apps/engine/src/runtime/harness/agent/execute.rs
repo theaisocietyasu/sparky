@@ -172,7 +172,7 @@ impl Agent {
                 run.new_turns.push(Message::tool_result(
                     &call.id,
                     &call.name,
-                    format!("error: no tool named `{}`", call.name),
+                    deps.tools.unknown(&call.name),
                 ));
                 continue;
             };

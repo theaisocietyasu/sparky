@@ -12,6 +12,7 @@ use crate::core::traits::conversation::ConversationStore;
 use crate::core::traits::knowledge::discovery::Discovery;
 use crate::core::traits::knowledge::query::SourceQueries;
 use crate::core::traits::memory::MemoryStore;
+use crate::core::traits::nudge::NudgeStore;
 use crate::core::traits::oauth::OAuthStore;
 use crate::core::traits::reminder::ReminderStore;
 use crate::core::traits::tools::Tool;
@@ -19,6 +20,7 @@ use crate::core::traits::tools::canvas::CanvasFeeds;
 use crate::core::traits::tools::sandbox::Sandbox;
 use crate::core::traits::tools::upcoming::UpcomingSource;
 use crate::core::traits::trace::TraceSink;
+use crate::core::types::nudge::NudgePrefs;
 use crate::core::types::tools::sandbox::Limits as SandboxLimits;
 use crate::runtime::harness::tools::ToolSet;
 use crate::runtime::tools::account::{canvas, gcal, outlook};
@@ -30,6 +32,7 @@ use crate::runtime::tools::sandbox::{
     ContainerSandbox, SandboxTool, WasmLimits, WasmSandbox, Wording as SandboxWording,
     reap_sessions,
 };
+use crate::runtime::tools::settings::{self, Accounts, SettingsStores};
 use crate::runtime::tools::upcoming::{UpcomingTool, Window as UpcomingWindow};
 use crate::runtime::tools::{Built, calculate, chats, page, papers, wiki};
 
@@ -52,6 +55,8 @@ pub(crate) struct Personal {
     pub chats: Option<Arc<dyn ConversationStore>>,
     /// Where read_page suggests the pages it reads.
     pub pages: Option<Arc<dyn Discovery>>,
+    /// Nudge settings and their defaults, for the settings tool.
+    pub nudges: Option<(Arc<dyn NudgeStore>, NudgePrefs)>,
 }
 
 /// Every tool the model may call, with tools.disabled removed at registration.
@@ -135,6 +140,16 @@ pub(crate) async fn build_tools(
         }
         tracing::info!(url = %url, count = registered, "platform mcp tools registered");
     }
+    let mut personal = personal;
+    if cfg.settings.enabled {
+        let stores = settings_stores(
+            cfg,
+            &oauth_store,
+            personal.canvas.as_ref(),
+            personal.nudges.take(),
+        );
+        tools = register(tools, settings::tools(stores), &disabled, "settings");
+    }
     let mut sources: Vec<Arc<dyn UpcomingSource>> = Vec::new();
     for (integration, enabled, build) in integrations(cfg, &oauth_store, personal) {
         if !enabled {
@@ -184,6 +199,7 @@ fn integrations<'a>(
         memory,
         chats,
         pages,
+        nudges: _,
     } = personal;
     let mut all: Vec<Integration<'a>> = Vec::new();
     all.extend::<[Integration<'a>; 10]>([
@@ -272,6 +288,32 @@ fn integrations<'a>(
         ),
     ]);
     all
+}
+
+/// What the settings tools read and change: check-ins, the Canvas link, and accounts with a sign-in.
+fn settings_stores(
+    cfg: &Config,
+    oauth_store: &Arc<dyn OAuthStore>,
+    canvas: Option<&Arc<dyn CanvasFeeds>>,
+    nudges: Option<(Arc<dyn NudgeStore>, NudgePrefs)>,
+) -> SettingsStores {
+    let names = [
+        ("google", "google", cfg.gcal.enabled),
+        ("outlook", "microsoft", cfg.outlook.enabled),
+    ]
+    .into_iter()
+    .filter(|(_, _, on)| *on)
+    .map(|(name, provider, _)| (name.to_owned(), provider.to_owned()))
+    .collect();
+    SettingsStores {
+        nudge_defaults: nudges.as_ref().map(|(_, defaults)| defaults.clone()),
+        nudges: nudges.map(|(store, _)| store),
+        canvas: canvas.filter(|_| cfg.canvas.enabled).cloned(),
+        accounts: Some(Accounts {
+            store: Arc::clone(oauth_store),
+            names,
+        }),
+    }
 }
 
 /// Adds each built tool that is not disabled to the set, logging how many an integration added.

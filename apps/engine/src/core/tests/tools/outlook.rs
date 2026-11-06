@@ -61,7 +61,7 @@ async fn an_unconnected_user_is_told_to_log_in() {
         .call(&dm(), json!({}))
         .await;
     assert!(
-        matches!(&out, Err(ToolError::Failed(m)) if m.contains("/login")),
+        matches!(&out, Err(ToolError::Failed(m)) if m.contains("action connect")),
         "{out:?}"
     );
 }

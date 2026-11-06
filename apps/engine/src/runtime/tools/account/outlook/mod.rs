@@ -122,7 +122,7 @@ impl Tool for OutlookTool {
         }
         let Some(token) = self.creds.resolve(ctx).await? else {
             return Err(ToolError::Failed(
-                "You have not connected Outlook. Send /login in a direct message to connect it."
+                "Outlook is not linked. Call settings with action connect and account outlook, and hand the student the link."
                     .to_owned(),
             ));
         };
@@ -173,7 +173,7 @@ impl UpcomingSource for OutlookSource {
             .resolve(ctx)
             .await
             .map_err(|e| e.to_string())?
-            .ok_or_else(|| "not connected; send /login and choose Outlook".to_owned())?;
+            .ok_or_else(|| "not linked; settings with action connect links it".to_owned())?;
         let events = self
             .client
             .calendar(&token)

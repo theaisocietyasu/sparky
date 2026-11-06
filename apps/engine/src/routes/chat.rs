@@ -23,6 +23,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::core::traits::conversation::ConversationStore;
 use crate::core::traits::safety::confirmation::ConfirmationStore;
+use crate::core::traits::tools::canvas::CanvasFeeds;
 use crate::core::types::agent::Answer;
 use crate::core::types::agent::context::RequestContext;
 use crate::core::types::conversation::Visibility;
@@ -32,6 +33,7 @@ use crate::core::types::conversation::image::Attachment;
 use crate::core::types::http::chat::{ChatRequest, ChatResponse, ConfirmRequest};
 use crate::core::types::http::web::Session;
 use crate::core::types::store::StoreError;
+use crate::core::types::tools::canvas::feed_in;
 use crate::core::types::trace::progress::Progress;
 use crate::routes::auth::{Caller, caller, too_many};
 use crate::routes::failure::{Failure, NO_SUCH_CONVERSATION};
@@ -76,6 +78,38 @@ pub struct ChatState {
     pub web_lists: WebLists,
     /// The welcome and thread rules of the home chat.
     pub home: HomeRules,
+    /// Saves a Canvas feed link pasted in chat. None when Canvas is off.
+    pub canvas: Option<PastedFeeds>,
+}
+
+/// Where a Canvas feed link pasted in chat is saved, and what replaces it in the message.
+#[derive(Clone)]
+pub struct PastedFeeds {
+    /// Where links are kept.
+    pub feeds: Arc<dyn CanvasFeeds>,
+    /// Hosts a link may point at.
+    pub hosts: Vec<String>,
+    /// Text in place of a saved link.
+    pub saved_line: String,
+    /// Text in place of a link that could not be saved.
+    pub save_failed_line: String,
+}
+
+impl PastedFeeds {
+    /// The message with a feed link in it saved for user and replaced.
+    async fn take(&self, user: &str, message: &mut String) {
+        let Some((raw, link)) = feed_in(message, &self.hosts) else {
+            return;
+        };
+        let replacement = match self.feeds.save(user, &link).await {
+            Ok(()) => &self.saved_line,
+            Err(error) => {
+                tracing::error!(%error, "could not keep a Canvas feed link pasted in chat");
+                &self.save_failed_line
+            }
+        };
+        *message = message.replace(&raw, replacement);
+    }
 }
 
 /// Bounds of the web conversation list and view.
@@ -191,6 +225,10 @@ pub async fn chat(
     if !state.rate_limit.allow(&req.user_id) {
         return too_many(&req.user_id);
     }
+    // Before the span records the message, so a pasted feed link is never traced.
+    if let Some(pasted) = &state.canvas {
+        pasted.take(&req.user_id, &mut req.message).await;
+    }
     let span = route_span!("http.chat", req);
     adopt_parent(&span, &headers);
     let outcome = run_turn(state, req, None).instrument(span.clone()).await;
@@ -214,6 +252,10 @@ pub async fn stream(
     }
     if !state.rate_limit.allow(&req.user_id) {
         return too_many(&req.user_id);
+    }
+    // Before the span records the message, so a pasted feed link is never traced.
+    if let Some(pasted) = &state.canvas {
+        pasted.take(&req.user_id, &mut req.message).await;
     }
     let span = route_span!("http.chat.stream", req);
     adopt_parent(&span, &headers);

@@ -47,7 +47,7 @@ src/wiring/     builds every adapter from config and composes them; the boot che
 
 `Agent::run` in `runtime/harness/agent/`. History and memory are loaded once before the first step; nothing is retrieved until the model calls a tool. A step calls the model, passes the response through the guardrail, authorizes the requested tool calls against `Policy`, runs the allowed ones, and continues. It stops on an answer, a confirmation, `agent.max_steps`, the request deadline, or cancellation.
 
-Tools are `search` (described and run by Platform), `read_page`, `calculate`, `search_chats`, `remember`, `forget_memory`, `remind`, `cancel_reminder`, `upcoming`, `canvas_deadlines`, `run_sandbox`, `search_papers`, `wikipedia_lookup`, the Outlook and Google Calendar tools when enabled, the Platform MCP tools, and any configured MCP servers. Each declares a `RiskClass`; anything at `policy.confirm_from` or above waits for the caller to approve.
+Tools are `search` (described and run by Platform), `read_page`, `calculate`, `search_chats`, `remember`, `forget_memory`, `remind`, `cancel_reminder`, `settings`, `disconnect`, `upcoming`, `canvas_deadlines`, `run_sandbox`, `search_papers`, `wikipedia_lookup`, the Outlook and Google Calendar tools when enabled, the Platform MCP tools, and any configured MCP servers. Each declares a `RiskClass`; anything at `policy.confirm_from` or above waits for the caller to approve.
 
 ## Nudges
 

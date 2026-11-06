@@ -95,6 +95,9 @@ pub struct Config {
     /// Arithmetic and date math.
     #[serde(default)]
     pub calculate: Calculate,
+    /// Changing settings in chat.
+    #[serde(default)]
+    pub settings: Settings,
     /// Searching earlier private chats.
     #[serde(default)]
     pub chat_search: ChatSearch,

@@ -107,6 +107,29 @@ async fn a_search_sends_the_arguments_and_reads_each_kind_of_answer() {
 }
 
 #[tokio::test]
+async fn a_live_source_that_is_down_is_tried_twice_and_not_blamed_on_the_arguments() {
+    let fake = Fake::default();
+    fake.on(
+        "POST",
+        "/api/tools/search",
+        502,
+        json!({"error": "https://example.edu could not be reached"}),
+    );
+    let result = PlatformQueries::new(client(&fake).await)
+        .search(&caller(), &args("hayden hours"))
+        .await;
+    assert!(
+        matches!(result, Err(QueryError::Unavailable(m)) if m.contains("could not be reached"))
+    );
+    let searches = fake
+        .seen()
+        .iter()
+        .filter(|s| s.path == "/api/tools/search")
+        .count();
+    assert_eq!(searches, 2);
+}
+
+#[tokio::test]
 async fn a_refused_search_goes_back_to_the_model() {
     let fake = Fake::default();
     fake.on(

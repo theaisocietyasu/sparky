@@ -81,9 +81,9 @@ impl CanvasTool {
 fn failed(error: CanvasError) -> ToolError {
     match error {
         CanvasError::Refused(401 | 403 | 404) => ToolError::Failed(
-            "Canvas no longer accepts the saved calendar feed link. Tell the student to link the \
-             current Calendar Feed link with /canvas in a Discord direct message or on the \
-             Connections page of the web chat, never by pasting it into the chat."
+            "Canvas no longer accepts the saved calendar feed link. Ask the student to paste their \
+             current Calendar Feed link here (Canvas, Calendar, Calendar Feed); it is saved the \
+             moment they send it."
                 .to_owned(),
         ),
         other => ToolError::Failed(other.to_string()),
@@ -97,7 +97,8 @@ impl Tool for CanvasTool {
             name: CANVAS_DEADLINES.to_owned(),
             description: "List the user's upcoming Canvas assignment due dates and course \
                           events, soonest first, from their Canvas calendar feed. No grades. \
-                          Works only in a direct message, after the user has sent /canvas."
+                          Works only in a direct message, once the user has pasted their Canvas \
+                          Calendar Feed link in chat."
                 .to_owned(),
             parameters: json!({
                 "type": "object",
@@ -182,9 +183,9 @@ impl CanvasTool {
         let Some(link) = link else {
             return Err(ToolError::Failed(
                 "You have not linked Canvas, so there is nothing to read. Do not call this tool \
-                 again in this turn. Tell the student to link the Canvas Calendar Feed (Canvas, \
-                 Calendar, then Calendar Feed) with /canvas in a Discord direct message or on the \
-                 Connections page of the web chat."
+                 again in this turn. Ask the student to paste their Canvas Calendar Feed link here \
+                 (Canvas, Calendar, then Calendar Feed at the bottom right); it is saved the moment \
+                 they send it."
                     .to_owned(),
             ));
         };
