@@ -133,7 +133,8 @@ impl Tool for RemindTool {
     fn definition(&self) -> ToolDefinition {
         ToolDefinition {
             name: REMIND.to_owned(),
-            description: "Set a reminder the student asked for. At the time, Sparky sends them a \
+            description: "Set a reminder for the student, one they asked for or one you set for a \
+                          deadline or plan of theirs. At the time, Sparky sends them a \
                           direct message and a notification on the web. Give either at, a local \
                           date and time, or in_minutes for a time relative to now. Say back the \
                           time it was set for."

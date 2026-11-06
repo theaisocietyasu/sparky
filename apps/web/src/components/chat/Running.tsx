@@ -16,9 +16,22 @@ const latest = (lines: Line[]) => {
 
 /**
  * What the running turn shows: Sparky at work and one status line that changes in place as the engine
- * reports each step, then the draft as it streams in.
+ * reports each step, then the draft as it streams in. A draft the engine withdrew stays, dimmed, above
+ * the status line until the next draft takes its place.
  */
-const Running = ({ lines, draft, onShown, fly = false }: { lines: Line[]; draft: string; onShown: (text: string) => void; fly?: boolean }) => {
+const Running = ({
+  lines,
+  draft,
+  held = "",
+  onShown,
+  fly = false,
+}: {
+  lines: Line[];
+  draft: string;
+  held?: string;
+  onShown: (text: string) => void;
+  fly?: boolean;
+}) => {
   const still = useReducedMotion() ?? false;
   const { text } = useSmoothText(draft, { off: still });
   useEffect(() => onShown(text), [text, onShown]);
@@ -26,6 +39,17 @@ const Running = ({ lines, draft, onShown, fly = false }: { lines: Line[]; draft:
   return (
     <AssistantRow mood={draft ? "idle" : "thinking"} fly={fly} enter={!fly}>
       <div aria-live="polite" aria-label="Progress">
+        {!draft && held && (
+          <motion.div
+            initial={false}
+            animate={{ opacity: 0.45 }}
+            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            aria-hidden
+            className="mb-2"
+          >
+            <Markdown text={splitChoices(held).text} />
+          </motion.div>
+        )}
         {!draft && (
           <div className="relative h-6 overflow-hidden text-sm">
             <AnimatePresence initial={false} mode="popLayout">
