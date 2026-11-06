@@ -479,14 +479,13 @@ timeout_secs = 10              # one platform call; a search uses what is left o
 # http://127.0.0.1:8001/mcp) to register them as platform_<name>. The token scopes decide which
 # tools exist. Read tools run for anyone; write tools need policy.write_roles and a confirmation.
 mcp_url = ""
-mcp_tools = []                 # e.g. ["org.info", "events.list"]; empty registers every allowed tool
+mcp_tools = []                 # e.g. ["org.info", "activity.errors"]; empty registers every allowed tool
 # Tool name prefixes whose results belong to one member. Such a tool runs only in a direct
 # message, is ReadAuthenticated, and is sent the caller as discord_id in place of the model's value.
 mcp_private = []
-# Tool name prefixes never registered. The engine serves Canvas itself from the calendar feed;
-# the knowledge admin tools are for officers on Platform; the engine serves search itself, and
-# search covers the submodule queries.
-mcp_skip = ["canvas.", "knowledge.", "batch", "search", "submodules."]
+# Tool name prefixes never registered. The engine serves search itself, and search covers the
+# live queries; the module tools behind modules.* (knowledge admin and the rest) are for officers.
+mcp_skip = ["batch", "search", "modules."]
 
 # ---------------------------------------------------------------- local store
 # Conversations, memories and pending confirmations live in one SQLite file that only the engine

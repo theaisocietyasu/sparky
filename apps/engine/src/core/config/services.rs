@@ -190,13 +190,7 @@ impl Default for Platform {
             mcp_url: None,
             mcp_tools: Vec::new(),
             mcp_private: Vec::new(),
-            mcp_skip: vec![
-                "canvas.".into(),
-                "knowledge.".into(),
-                "batch".into(),
-                "search".into(),
-                "submodules.".into(),
-            ],
+            mcp_skip: vec!["batch".into(), "search".into(), "modules.".into()],
         }
     }
 }
