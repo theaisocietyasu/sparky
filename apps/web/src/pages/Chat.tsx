@@ -1,5 +1,5 @@
 import { ArrowLeft, BookOpen, CalendarClock, ChevronRight, FileText, MessageSquareText, RotateCcw, Sparkles, Users, type LucideIcon } from "lucide-react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import ChatFrame from "../app/ChatFrame";
@@ -336,7 +336,20 @@ const Chat = () => {
   );
 
   return (
-    <ChatFrame chats={chats} seen={seen}>
+    <ChatFrame
+      chats={chats}
+      seen={seen}
+      crumb={
+        thread ? (
+          <Link to="/chat" aria-label="Back to home" className="inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-sm text-dim transition-colors hover:bg-sunk/70 hover:text-fg">
+            <ArrowLeft className="size-4" />
+            <span className="hidden sm:inline">Home</span>
+            <span aria-hidden className="text-edge">/</span>
+            <span>Thread</span>
+          </Link>
+        ) : undefined
+      }
+    >
       {waiting ? (
         <main className="flex-1" />
       ) : empty ? (
@@ -389,26 +402,7 @@ const Chat = () => {
         </main>
       ) : (
         <main className="relative flex min-h-0 flex-1 flex-col">
-          <AnimatePresence>
-            {thread && (
-              <motion.div
-                key="thread-bar"
-                initial={arrive(still, { y: -8 })}
-                animate={settled}
-                exit={still ? undefined : { opacity: 0, y: -6 }}
-                transition={spring.soft}
-                className="glass absolute left-1/2 top-[4.25rem] z-20 flex -translate-x-1/2 items-center gap-1 rounded-full py-1 pl-1 pr-3 text-sm text-dim"
-              >
-                <Link to="/chat" aria-label="Back to home" className="inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 hover:bg-sunk/70 hover:text-fg">
-                  <ArrowLeft className="size-4" />
-                  Home
-                </Link>
-                <span aria-hidden>/</span>
-                <span>Thread</span>
-              </motion.div>
-            )}
-          </AnimatePresence>
-          <div ref={scroller} onScroll={follow} className="flex-1 overflow-y-auto [scrollbar-gutter:stable]">
+          <div ref={scroller} onScroll={follow} className="fade-under-bar flex-1 overflow-y-auto [scrollbar-gutter:stable]">
             {start && (
               <blockquote aria-label="Thread of" className="mx-auto mt-28 w-full max-w-3xl px-4">
                 <p className="glass line-clamp-4 rounded-2xl px-4 py-3 text-sm text-dim">{start.quote}</p>
@@ -416,7 +410,7 @@ const Chat = () => {
             )}
             <ol
               aria-label="Conversation"
-              className={`mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 pb-48 ${start ? "pt-8" : thread ? "pt-32" : "pt-24"}`}
+              className={`mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 pb-48 ${start ? "pt-8" : "pt-24"}`}
             >
               {turns.map((t) => (
                 <motion.li
@@ -484,7 +478,7 @@ const Chat = () => {
               ))}
             </ol>
           </div>
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-canvas via-canvas/85 to-transparent pt-12">
+          <div className="pointer-events-none absolute inset-x-0 bottom-0">
             <div className="pointer-events-auto mx-auto w-full max-w-3xl px-4 pb-4">
               {composer}
               <p className="mt-2 text-center text-xs text-dim">Sparky can be wrong. Check the sources it links.</p>

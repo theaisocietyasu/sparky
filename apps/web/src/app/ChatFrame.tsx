@@ -41,9 +41,10 @@ const Aura = () => (
 
 /**
  * The frame of the student pages: a floating bar with Sparky, which links home and shows a dot for unread
- * messages, the threads sheet and the profile menu. seen changes when home has been read, so the dot clears.
+ * messages, crumb (where a thread sits), the threads sheet and the profile menu. seen changes when home has been
+ * read, so the dot clears.
  */
-const ChatFrame = ({ chats, seen = 0, children }: { chats?: number; seen?: number; children: ReactNode }) => {
+const ChatFrame = ({ chats, seen = 0, crumb, children }: { chats?: number; seen?: number; crumb?: ReactNode; children: ReactNode }) => {
   const unread = useUnread(seen);
   const mood = useCue();
   const still = useReducedMotion() ?? false;
@@ -58,7 +59,7 @@ const ChatFrame = ({ chats, seen = 0, children }: { chats?: number; seen?: numbe
           initial={still ? false : { y: -14, opacity: 0, filter: "blur(6px)" }}
           animate={{ y: 0, opacity: 1, filter: "blur(0px)" }}
           transition={spring.soft}
-          className="glass pointer-events-auto flex h-12 w-full max-w-3xl items-center gap-1 rounded-full pl-1.5 pr-1.5"
+          className="bar pointer-events-auto flex h-12 w-full max-w-3xl items-center gap-1 rounded-full pl-1.5 pr-1.5"
         >
           <NavLink
             to="/chat"
@@ -81,6 +82,19 @@ const ChatFrame = ({ chats, seen = 0, children }: { chats?: number; seen?: numbe
               )}
             </AnimatePresence>
           </NavLink>
+          <AnimatePresence initial={false}>
+            {crumb && (
+              <motion.div
+                key="crumb"
+                initial={still ? false : { opacity: 0, x: -6, filter: "blur(4px)" }}
+                animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
+                exit={still ? undefined : { opacity: 0, x: -6, filter: "blur(4px)" }}
+                transition={spring.soft}
+              >
+                {crumb}
+              </motion.div>
+            )}
+          </AnimatePresence>
           <div className="flex-1" />
           <motion.button
             type="button"
