@@ -1,14 +1,16 @@
 import { ArrowLeft, BookOpen, CalendarClock, ChevronRight, FileText, MessageSquareText, RotateCcw, Sparkles, Users, type LucideIcon } from "lucide-react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import ChatFrame from "../app/ChatFrame";
 import { arrive, EASE, settled, spring } from "../app/motion";
 import { useMe } from "../app/useMe";
-import { ask, chats as listChats, chatTurns, confirm, EngineError, homeId, readNotices, type ThreadStart } from "../chat/client";
+import { ask, chats as listChats, chatTurns, confirm, deleteChat, EngineError, homeId, readNotices, type ThreadStart } from "../chat/client";
 import { addFiles, toUpload } from "../chat/files";
+import { useFollow } from "../chat/useFollow";
 import { applyProgress, type Line } from "../chat/lines";
 import type { Answer, ChatSummary, ChatTurn } from "../chat/types";
+import ClearHome from "../components/chat/ClearHome";
 import Composer from "../components/chat/Composer";
 import Reply, { AssistantRow } from "../components/chat/Reply";
 import Running from "../components/chat/Running";
@@ -126,8 +128,10 @@ const Chat = () => {
   const busyNow = useRef(false);
   const abort = useRef<AbortController | null>(null);
   const drafted = useRef("");
-  const scroller = useRef<HTMLDivElement>(null);
-  const pinned = useRef(true);
+  const { bind: scroll, pin, follow, jump } = useFollow(still);
+  const landed = useRef(false);
+  // Bumped when home is cleared, so the page loads home again under the same id.
+  const [epoch, setEpoch] = useState(0);
 
   const start = opened === "new" ? ((location.state as ThreadStart | null) ?? null) : null;
   // undefined while the home id loads; null is a new conversation.
@@ -156,13 +160,12 @@ const Chat = () => {
   }, [home, chats]);
 
   // Follows new text only while the reader is at the bottom, so scrolling up to read is never pulled back.
-  const follow = () => {
-    const el = scroller.current;
-    if (el) pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-  };
+  // A chat that just loaded jumps to its end; text that arrives after glides into view.
   useEffect(() => {
-    const el = scroller.current;
-    if (el && pinned.current) el.scrollTop = el.scrollHeight;
+    if (landed.current) {
+      landed.current = false;
+      jump();
+    } else follow();
   });
 
   const markRead = useCallback(() => {
@@ -187,7 +190,8 @@ const Chat = () => {
         const loaded = exchanges(target, stored);
         counter.current = loaded.length;
         latest.current = newest(stored);
-        pinned.current = true;
+        pin();
+        landed.current = true;
         setTurns(loaded);
         if (target === home) markRead();
       })
@@ -196,7 +200,7 @@ const Chat = () => {
     return () => {
       live = false;
     };
-  }, [target, home, navigate, markRead]);
+  }, [target, home, navigate, markRead, epoch, pin]);
 
   // While home is open, Sparky's new messages appear in it.
   useEffect(() => {
@@ -220,6 +224,21 @@ const Chat = () => {
     return () => window.clearInterval(timer);
   }, [home, atHome, markRead]);
 
+  /** Deletes home and its messages; the engine makes it again with a fresh welcome. */
+  const clearHome = async () => {
+    if (!home || busy) return;
+    try {
+      await deleteChat(home);
+      await homeId();
+    } catch {
+      return;
+    }
+    conversation.current = null;
+    setShown(null);
+    setEpoch((v) => v + 1);
+    setChats((v) => v + 1);
+  };
+
   const onShown = useCallback((shown: string) => {
     drafted.current = shown;
   }, []);
@@ -239,7 +258,7 @@ const Chat = () => {
     const question = raw.trim();
     if ((!question && attached.length === 0) || busy) return;
     const id = ++counter.current;
-    pinned.current = true;
+    pin();
     drafted.current = "";
     setTurns((all) => [...all, { id, question, files: attached.map((f) => f.name), answer: null, error: null }]);
     setLiveId(id);
@@ -336,7 +355,21 @@ const Chat = () => {
   );
 
   return (
-    <ChatFrame chats={chats} seen={seen}>
+    <ChatFrame
+      chats={chats}
+      seen={seen}
+      tools={atHome && turns.length > 0 ? <ClearHome onClear={clearHome} disabled={busy} /> : undefined}
+      crumb={
+        thread ? (
+          <Link to="/chat" aria-label="Back to home" className="inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-sm text-dim transition-colors hover:bg-sunk/70 hover:text-fg">
+            <ArrowLeft className="size-4" />
+            <span className="hidden sm:inline">Home</span>
+            <span aria-hidden className="text-edge">/</span>
+            <span>Thread</span>
+          </Link>
+        ) : undefined
+      }
+    >
       {waiting ? (
         <main className="flex-1" />
       ) : empty ? (
@@ -389,26 +422,7 @@ const Chat = () => {
         </main>
       ) : (
         <main className="relative flex min-h-0 flex-1 flex-col">
-          <AnimatePresence>
-            {thread && (
-              <motion.div
-                key="thread-bar"
-                initial={arrive(still, { y: -8 })}
-                animate={settled}
-                exit={still ? undefined : { opacity: 0, y: -6 }}
-                transition={spring.soft}
-                className="glass absolute left-1/2 top-[4.25rem] z-20 flex -translate-x-1/2 items-center gap-1 rounded-full py-1 pl-1 pr-3 text-sm text-dim"
-              >
-                <Link to="/chat" aria-label="Back to home" className="inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 hover:bg-sunk/70 hover:text-fg">
-                  <ArrowLeft className="size-4" />
-                  Home
-                </Link>
-                <span aria-hidden>/</span>
-                <span>Thread</span>
-              </motion.div>
-            )}
-          </AnimatePresence>
-          <div ref={scroller} onScroll={follow} className="flex-1 overflow-y-auto [scrollbar-gutter:stable]">
+          <div {...scroll} className="fade-under-bar flex-1 overflow-y-auto [scrollbar-gutter:stable]">
             {start && (
               <blockquote aria-label="Thread of" className="mx-auto mt-28 w-full max-w-3xl px-4">
                 <p className="glass line-clamp-4 rounded-2xl px-4 py-3 text-sm text-dim">{start.quote}</p>
@@ -416,7 +430,7 @@ const Chat = () => {
             )}
             <ol
               aria-label="Conversation"
-              className={`mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 pb-48 ${start ? "pt-8" : thread ? "pt-32" : "pt-24"}`}
+              className={`mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 pb-48 ${start ? "pt-8" : "pt-24"}`}
             >
               {turns.map((t) => (
                 <motion.li
@@ -484,7 +498,7 @@ const Chat = () => {
               ))}
             </ol>
           </div>
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-canvas via-canvas/85 to-transparent pt-12">
+          <div className="pointer-events-none absolute inset-x-0 bottom-0">
             <div className="pointer-events-auto mx-auto w-full max-w-3xl px-4 pb-4">
               {composer}
               <p className="mt-2 text-center text-xs text-dim">Sparky can be wrong. Check the sources it links.</p>

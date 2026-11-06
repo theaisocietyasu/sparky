@@ -57,6 +57,40 @@ impl Default for Guardrail {
     }
 }
 
+/// The check on answers written without tools. One that rests on facts that need a look goes back once to search.
+#[derive(Debug, Deserialize)]
+#[serde(default)]
+pub struct Grounding {
+    /// Check answers at all.
+    pub enabled: bool,
+    /// Instructions for the check. It answers LOOK or OK.
+    pub prompt: String,
+    /// The line a run gets when its answer goes back to search.
+    pub retry_line: String,
+    /// Completion budget for the check.
+    pub max_tokens: u32,
+    /// Wall-clock budget for the check.
+    pub timeout_secs: u64,
+}
+
+/// Default instructions for the grounding check.
+pub const GROUNDING_PROMPT: &str = "You check one reply that Sparky, a student assistant that can search the web and ASU sources, wrote without looking anything up. Answer LOOK when the reply states, guesses or estimates a fact that could have changed since the model was trained, or one tied to a place, person, date, schedule, price, score, event or service; when it says it lacks live data or cannot look something up; or when it tells the student to check a site, an app or an office for the answer. Answer OK when it is small talk, thanks, a clarifying question, a reply about the chat itself, or settled general knowledge such as what a word means or how a concept works. Answer with the one word LOOK or OK.";
+
+/// Default line a run gets when its answer goes back to search.
+pub const GROUNDING_RETRY_LINE: &str = "Your last reply was written without looking anything up, and it rests on facts that need a look. Search now, then answer from what you find. Do not say you lack live data and do not send the student somewhere else for the answer.";
+
+impl Default for Grounding {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            prompt: GROUNDING_PROMPT.into(),
+            retry_line: GROUNDING_RETRY_LINE.into(),
+            max_tokens: 8,
+            timeout_secs: 8,
+        }
+    }
+}
+
 /// A command in an isolated environment.
 #[derive(Debug, Deserialize)]
 #[serde(default)]

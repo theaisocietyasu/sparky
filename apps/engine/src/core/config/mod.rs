@@ -62,6 +62,9 @@ pub struct Config {
     /// What the guardrail refuses.
     #[serde(default)]
     pub guardrail: Guardrail,
+    /// The check on answers written without tools.
+    #[serde(default)]
+    pub grounding: Grounding,
     /// How a sandboxed command runs.
     #[serde(default)]
     pub sandbox: SandboxSettings,
@@ -234,6 +237,7 @@ impl Config {
             return invalid("compaction.max_tokens must be at least 1".into());
         }
         validate_compaction(&self.compaction, self.agent.history_budget_tokens)?;
+        validate_grounding(&self.grounding)?;
         validate_mcp_risks(&self.mcp)?;
         validate_integrations(self)?;
         validate_platform(self)?;
@@ -347,6 +351,23 @@ fn validate_platform(cfg: &Config) -> Result<(), ConfigError> {
 }
 
 /// Rejects search wording the model would read as an empty string, and a missing fallback source.
+fn validate_grounding(grounding: &Grounding) -> Result<(), ConfigError> {
+    if !grounding.enabled {
+        return Ok(());
+    }
+    if grounding.prompt.trim().is_empty() || grounding.retry_line.trim().is_empty() {
+        return Err(ConfigError::Invalid(
+            "grounding.prompt and grounding.retry_line must be set, or set grounding.enabled = false".into(),
+        ));
+    }
+    if grounding.max_tokens == 0 || grounding.timeout_secs == 0 {
+        return Err(ConfigError::Invalid(
+            "grounding.max_tokens and grounding.timeout_secs must be at least 1".into(),
+        ));
+    }
+    Ok(())
+}
+
 fn validate_compaction(compaction: &Compaction, history: usize) -> Result<(), ConfigError> {
     if !compaction.enabled {
         return Ok(());

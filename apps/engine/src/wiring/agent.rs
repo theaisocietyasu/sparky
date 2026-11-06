@@ -10,6 +10,7 @@ use crate::core::traits::safety::guardrail::Guardrail;
 use crate::core::traits::trace::TraceSink;
 use crate::core::types::agent::AgentConfig;
 use crate::routes::home::HomeRules;
+use crate::runtime::harness::agent::ground::Grounding;
 use crate::runtime::harness::agent::task::{Task, TaskConfig};
 use crate::runtime::harness::compact::{self, ChatCompactor};
 use crate::runtime::harness::safety::guardrail::{RuleGuardrail, Rules};
@@ -84,6 +85,25 @@ pub(super) fn compactor(
         },
     );
     Some(Arc::new(ChatCompactor::new(task)))
+}
+
+/// The check on answers written without tools, when it is enabled. Shares the model the loop calls.
+pub(super) fn grounding(cfg: &Config, model: &Arc<dyn ModelProvider>) -> Option<Grounding> {
+    let set = &cfg.grounding;
+    set.enabled.then(|| {
+        let task = Task::new(
+            Arc::clone(model),
+            "grounding",
+            set.prompt.trim(),
+            TaskConfig {
+                max_tokens: set.max_tokens,
+                temperature: 0.0,
+                timeout: Duration::from_secs(set.timeout_secs),
+                ..task_config(cfg)
+            },
+        );
+        Grounding::new(task, set.retry_line.trim())
+    })
 }
 
 /// The response gate, when it is enabled. The registered tool names are protected from answers.

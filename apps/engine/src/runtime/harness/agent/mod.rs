@@ -3,6 +3,7 @@
 pub mod call;
 mod conclude;
 mod execute;
+pub mod ground;
 mod inputs;
 pub mod prompt;
 pub mod read;
@@ -108,6 +109,8 @@ pub struct Agent {
     prompt: Arc<PromptText>,
     /// Names of the MCP tools, so a capability line says how each one runs.
     mcp_names: Arc<[String]>,
+    /// The check that sends an answer written without tools back to search.
+    grounding: Option<Arc<ground::Grounding>>,
 }
 
 /// What a step decided.
@@ -128,6 +131,7 @@ impl Agent {
             instructions: Arc::default(),
             prompt: Arc::new(PromptText::default()),
             mcp_names: Arc::from([]),
+            grounding: None,
         }
     }
 
@@ -193,6 +197,12 @@ impl Agent {
             &self.deps.tools.definitions_for(visibility),
             &self.mcp_names,
         ))
+    }
+
+    /// Checks every answer written without tools, and sends one that needs a look back to search.
+    pub fn with_grounding(mut self, grounding: ground::Grounding) -> Self {
+        self.grounding = Some(Arc::new(grounding));
+        self
     }
 
     /// Replaces the wording written around the prompt sections.
@@ -346,6 +356,12 @@ impl Agent {
                 }
             };
             if self.send_to_sandbox(run, &status, confirmation.as_ref()) {
+                continue;
+            }
+            if self
+                .send_to_search(run, &status, confirmation.as_ref(), &text)
+                .await
+            {
                 continue;
             }
             return self.conclude(run, status, text, confirmation).await;

@@ -160,6 +160,27 @@ describe("web chat", () => {
     expect(window.location.pathname).toBe("/chat");
   });
 
+  it("clears home after a second press and loads the fresh welcome", async () => {
+    let cleared = false;
+    const calls = engine({
+      "/web/me": () => Response.json(ME),
+      "/web/home": () => Response.json({ id: "h1" }),
+      "/web/conversations": () => Response.json([]),
+      "/web/conversations/h1": () => {
+        if (calls.some((c) => c.init?.method === "DELETE")) cleared = true;
+        return Response.json([{ position: cleared ? 9 : 1, role: "assistant", text: cleared ? "Fresh start." : "Old note." }]);
+      },
+      "/web/notifications": () => Response.json({ notifications: [], unread: 0 }),
+      "/web/notifications/read": () => new Response(null, { status: 204 }),
+    });
+    open("/chat");
+    expect(await screen.findByText("Old note.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Clear home chat" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm clear home chat" }));
+    expect(await screen.findByText("Fresh start.")).toBeInTheDocument();
+    expect(calls.some((c) => c.url === `${ENGINE}/web/conversations/h1` && c.init?.method === "DELETE")).toBe(true);
+  });
+
   it("starts a thread off a home message and sends it as the parent", async () => {
     const calls = engine({
       "/web/me": () => Response.json(ME),

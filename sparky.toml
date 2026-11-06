@@ -193,6 +193,14 @@ redaction = "[hidden]"
 max_answer_chars = 8000
 replacement = "I cannot answer that. Ask a moderator if you need help."
 
+# Checks an answer written without tools. One that rests on facts that need a look goes back once to search.
+[grounding]
+enabled = true
+max_tokens = 8
+timeout_secs = 8
+prompt = "You check one reply that Sparky, a student assistant that can search the web and ASU sources, wrote without looking anything up. Answer LOOK when the reply states, guesses or estimates a fact that could have changed since the model was trained, or one tied to a place, person, date, schedule, price, score, event or service; when it says it lacks live data or cannot look something up; or when it tells the student to check a site, an app or an office for the answer. Answer OK when it is small talk, thanks, a clarifying question, a reply about the chat itself, or settled general knowledge such as what a word means or how a concept works. Answer with the one word LOOK or OK."
+retry_line = "Your last reply was written without looking anything up, and it rests on facts that need a look. Search now, then answer from what you find. Do not say you lack live data and do not send the student somewhere else for the answer."
+
 # Replaces history past its budget with one summary turn. Off drops the oldest turns.
 [compaction]
 enabled = true
