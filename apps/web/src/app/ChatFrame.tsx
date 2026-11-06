@@ -41,10 +41,22 @@ const Aura = () => (
 
 /**
  * The frame of the student pages: a floating bar with Sparky, which links home and shows a dot for unread
- * messages, crumb (where a thread sits), the threads sheet and the profile menu. seen changes when home has been
+ * messages, crumb (where a thread sits), tools for the page, the threads sheet and the profile menu. seen changes when home has been
  * read, so the dot clears.
  */
-const ChatFrame = ({ chats, seen = 0, crumb, children }: { chats?: number; seen?: number; crumb?: ReactNode; children: ReactNode }) => {
+const ChatFrame = ({
+  chats,
+  seen = 0,
+  crumb,
+  tools,
+  children,
+}: {
+  chats?: number;
+  seen?: number;
+  crumb?: ReactNode;
+  tools?: ReactNode;
+  children: ReactNode;
+}) => {
   const unread = useUnread(seen);
   const mood = useCue();
   const still = useReducedMotion() ?? false;
@@ -96,6 +108,7 @@ const ChatFrame = ({ chats, seen = 0, crumb, children }: { chats?: number; seen?
             )}
           </AnimatePresence>
           <div className="flex-1" />
+          {tools}
           <motion.button
             type="button"
             aria-label="Threads"

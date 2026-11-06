@@ -39,6 +39,8 @@ pub(super) struct Run<'a> {
     pub(super) force_answer: bool,
     /// Set once the run has been sent back to try the sandbox. It is offered once a turn.
     pub(super) sent_to_sandbox: bool,
+    /// Set once an answer written without tools has gone to the grounding check. It runs once a turn.
+    pub(super) sent_to_search: bool,
     /// Leading new_turns entries that assembly appends itself, which the prompt must not repeat.
     pub(super) appended_by_assembly: usize,
     /// Time kept for the final answer. Gathering stops when less is left.
@@ -66,6 +68,7 @@ impl<'a> Run<'a> {
             tool_sources: Vec::new(),
             force_answer: false,
             sent_to_sandbox: false,
+            sent_to_search: false,
             appended_by_assembly,
             reserve: Duration::ZERO,
         }

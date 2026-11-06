@@ -1,7 +1,8 @@
 import { Check, Copy } from "lucide-react";
-import { type ReactNode, isValidElement, memo, useState } from "react";
+import { type ReactNode, isValidElement, memo, useMemo, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { fadeWords } from "../../chat/fadeWords";
 import { linkable } from "../../chat/links";
 
 const textOf = (node: ReactNode): string => {
@@ -87,13 +88,19 @@ const components: Components = {
 
 const plugins = [remarkGfm];
 
-/** Model text as GitHub flavored markdown. Raw HTML stays text and images show their alt text. */
-const Markdown = memo(({ text, streaming }: { text: string; streaming?: boolean }) => (
-  <div className={`text-[15px] leading-7 [overflow-wrap:anywhere] ${streaming ? "streaming" : ""}`}>
-    <ReactMarkdown remarkPlugins={plugins} components={components}>
-      {text}
-    </ReactMarkdown>
-  </div>
-));
+/**
+ * Model text as GitHub flavored markdown. Raw HTML stays text and images show their alt text. While
+ * streaming, each word from character fadeFrom on fades in as it arrives.
+ */
+const Markdown = memo(({ text, streaming, fadeFrom = 0 }: { text: string; streaming?: boolean; fadeFrom?: number }) => {
+  const rehype = useMemo(() => (streaming ? [fadeWords(fadeFrom)] : []), [streaming, fadeFrom]);
+  return (
+    <div className={`text-[15px] leading-7 [overflow-wrap:anywhere] ${streaming ? "streaming" : ""}`}>
+      <ReactMarkdown remarkPlugins={plugins} rehypePlugins={rehype} components={components}>
+        {text}
+      </ReactMarkdown>
+    </div>
+  );
+});
 
 export default Markdown;

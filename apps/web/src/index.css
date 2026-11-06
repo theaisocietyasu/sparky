@@ -162,7 +162,33 @@
     vertical-align: -0.15em;
     border-radius: 2px;
     background: var(--color-accent);
-    animation: blink 1.1s step-end infinite;
+    animation: caret-glow 1.2s ease-in-out infinite;
+  }
+}
+
+/* A streamed word: it fades up out of a soft blur when it first mounts. Only new words mount. */
+.word-in {
+  animation: word-in 0.5s cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+@keyframes word-in {
+  from {
+    opacity: 0;
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+@keyframes caret-glow {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 0.9;
   }
 }
 
@@ -505,6 +531,65 @@
 
 @media (prefers-reduced-motion: reduce) {
   .aura-blob {
+    animation: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .word-in {
+    animation: none;
+  }
+}
+
+/* The dragon beside an answer drifts on a slow loop and zips about while it works. */
+.sparky-float {
+  display: inline-block;
+  transform-origin: 50% 60%;
+  animation: sparky-drift 7s ease-in-out infinite;
+}
+
+.sparky-float[data-mood="thinking"] {
+  animation: sparky-zip 1.6s ease-in-out infinite;
+}
+
+.sparky-float[data-mood="sad"] {
+  animation: none;
+}
+
+@keyframes sparky-drift {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(-4deg);
+  }
+  25% {
+    transform: translate(3px, -4px) rotate(3deg);
+  }
+  50% {
+    transform: translate(0, -6px) rotate(6deg);
+  }
+  75% {
+    transform: translate(-3px, -3px) rotate(-2deg);
+  }
+}
+
+@keyframes sparky-zip {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(-10deg) scale(1);
+  }
+  25% {
+    transform: translate(6px, -6px) rotate(8deg) scale(1.05);
+  }
+  50% {
+    transform: translate(0, -10px) rotate(14deg) scale(1);
+  }
+  75% {
+    transform: translate(-6px, -5px) rotate(-6deg) scale(1.05);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sparky-float {
     animation: none;
   }
 }

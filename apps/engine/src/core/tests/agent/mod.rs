@@ -4,6 +4,7 @@ mod assemble;
 mod capability;
 mod citation;
 mod context;
+mod ground;
 mod stream;
 mod thinking;
 mod uploads;

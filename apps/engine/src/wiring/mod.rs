@@ -40,7 +40,7 @@ use crate::runtime::model::limit::Limited;
 use crate::runtime::model::rig_openai::{self, RigChat};
 use crate::runtime::tools::files::HttpFiles;
 
-use self::agent::{agent_config, compactor, guardrail, home_rules, trace_sink};
+use self::agent::{agent_config, compactor, grounding, guardrail, home_rules, trace_sink};
 use self::boot::{fits_the_prompt, fits_the_slot};
 use self::http::http_router;
 use self::prompt::SYSTEM_PROMPT;
@@ -130,6 +130,7 @@ pub async fn serve(cfg: Config) -> anyhow::Result<()> {
     let agent_cfg = agent_config(&cfg);
 
     let home = home_rules(&cfg, &model);
+    let grounding = grounding(&cfg, &model);
     let deps = AgentDeps {
         compactor: compactor(&cfg, &model),
         guardrail: guardrail(&cfg, &tool_names),
@@ -147,9 +148,12 @@ pub async fn serve(cfg: Config) -> anyhow::Result<()> {
         ) as Arc<dyn FileSource>),
     };
     let system_prompt = cfg.system_prompt(SYSTEM_PROMPT)?;
-    let agent = Agent::new(deps, agent_cfg, system_prompt)
+    let mut agent = Agent::new(deps, agent_cfg, system_prompt)
         .with_prompt_text(PromptText::from(&cfg.prompt))
         .with_mcp_names(mcp_names);
+    if let Some(grounding) = grounding {
+        agent = agent.with_grounding(grounding);
+    }
     if let Some(admin) = &stores.admin {
         let tenant = cfg.discord.guild_id.to_string();
         let restored = crate::routes::admin::restore(admin.as_ref(), &tenant, &agent)

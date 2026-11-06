@@ -11,10 +11,15 @@ import Markdown, { CopyButton } from "./Markdown";
 import { NoticeTag, NoticeThumbs } from "./Notice";
 import { arrive, settled, spring } from "../../app/motion";
 
-/** Sparky beside each answer: at work while the turn runs, a hop when it lands, a droop on a failure. */
+/**
+ * Sparky beside each answer, no badge behind it: it drifts while it rests, loops about while the turn runs,
+ * hops when the answer lands and droops on a failure.
+ */
 export const Avatar = ({ mood = "idle", fly = false }: { mood?: Mood; fly?: boolean }) => (
-  <motion.span layoutId={fly ? "sparky-hero" : undefined} aria-hidden className="glass grid size-8 shrink-0 place-items-center rounded-full">
-    <Sparky mood={mood} still={mood === "idle"} className="h-5 w-auto" />
+  <motion.span layoutId={fly ? "sparky-hero" : undefined} aria-hidden className="grid size-9 shrink-0 place-items-center">
+    <span data-mood={mood} className="sparky-float">
+      <Sparky mood={mood} className="h-8 w-auto drop-shadow-[0_6px_10px_rgb(120_28_53/0.28)]" />
+    </span>
   </motion.span>
 );
 
@@ -62,7 +67,7 @@ const Reply = ({
   return (
     <AssistantRow mood={mood}>
       {answer.notice && <NoticeTag notice={answer.notice} />}
-      <Markdown text={shown} streaming={!done} />
+      <Markdown text={shown} streaming={!done} fadeFrom={revealFrom ?? 0} />
       {done && onChoose && choices.length > 0 && (
         <ul aria-label="Choices" className="mt-3 flex flex-wrap gap-2">
           {choices.map((c, i) => (
