@@ -175,7 +175,7 @@ What Platform serves beside the stores:
 | Part | Platform |
 |---|---|
 | Search | the `search` tool: stored pages, the live sources of the `asu` pack, and SearXNG web search, with a shared Playwright browser for JS pages |
-| Sun Devil Central clubs and events behind an ASU sign-in | `platform_asu_clubs` and `platform_asu_events` (scope `asu:read`), over the organization's ASU sign-in |
+| Sun Devil Central clubs and events behind an ASU sign-in | the `clubs` and `club_events` sources of `search`, over the organization's ASU sign-in |
 | `/login` and `/logout` | the Platform accounts link (`accounts:link`) and grant removal |
 | Outlook and Google Calendar | engine tools over tokens from Platform (`accounts:token`) |
 

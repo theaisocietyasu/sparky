@@ -80,16 +80,6 @@ fn action(tool: &str, arguments: &Value) -> Action {
                 place,
             }
         }
-        "platform_asu_clubs" => simple(
-            "Looking through clubs on Sun Devil Central",
-            "Looked through clubs",
-            "Sun Devil Central",
-        ),
-        "platform_asu_events" => simple(
-            "Looking for events on Sun Devil Central",
-            "Looked for events",
-            "Sun Devil Central",
-        ),
         "canvas_deadlines" => simple("Checking your Canvas", "Checked your Canvas", "Canvas"),
         "upcoming" => simple(
             "Checking what is coming up",
@@ -138,6 +128,7 @@ fn live_place(source: &str) -> String {
         "library" | "library_hours" => "library hours".to_owned(),
         "events" => "campus events".to_owned(),
         "clubs" => "clubs".to_owned(),
+        "club_events" => "club events".to_owned(),
         "shuttles" => "shuttle times".to_owned(),
         "study_rooms" => "study rooms".to_owned(),
         "dining" => "dining".to_owned(),

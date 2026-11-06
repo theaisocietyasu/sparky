@@ -473,7 +473,6 @@ max_file_bytes = 2000000
 #   knowledge:discover          saving the pages read_page reads
 #   accounts:link               the /login link for a member
 #   accounts:token              the Outlook and Google tokens of a member
-#   asu:read                    platform_asu_clubs and platform_asu_events
 [platform]
 timeout_secs = 10              # one platform call; a search uses what is left of the request
 # Platform tools over MCP, with the same token. Set SPARKY_PLATFORM__MCP_URL (for example
