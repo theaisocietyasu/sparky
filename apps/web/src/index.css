@@ -454,3 +454,32 @@
     animation: none;
   }
 }
+
+/* The drifting washes behind the student pages. Only transform moves. */
+.aura-blob {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(90px);
+  will-change: transform;
+  animation: aura-drift 28s ease-in-out infinite alternate;
+}
+
+.aura-blob-late {
+  animation-duration: 34s;
+  animation-direction: alternate-reverse;
+}
+
+@keyframes aura-drift {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(-8vw, 6vh, 0) scale(1.18);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aura-blob {
+    animation: none;
+  }
+}

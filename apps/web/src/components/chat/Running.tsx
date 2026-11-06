@@ -24,7 +24,7 @@ const Running = ({ lines, draft, onShown, fly = false }: { lines: Line[]; draft:
   useEffect(() => onShown(text), [text, onShown]);
   const status = latest(lines);
   return (
-    <AssistantRow mood={draft ? "idle" : "thinking"} fly={fly}>
+    <AssistantRow mood={draft ? "idle" : "thinking"} fly={fly} enter={!fly}>
       <div aria-live="polite" aria-label="Progress">
         {!draft && (
           <div className="relative h-6 overflow-hidden text-sm">

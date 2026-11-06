@@ -1,8 +1,9 @@
-import { ArrowLeft, ChevronRight, FileText, MessageSquareText, RotateCcw } from "lucide-react";
-import { motion, useReducedMotion } from "motion/react";
+import { ArrowLeft, BookOpen, CalendarClock, ChevronRight, FileText, MessageSquareText, RotateCcw, Sparkles, Users, type LucideIcon } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import ChatFrame from "../app/ChatFrame";
+import { arrive, EASE, settled, spring } from "../app/motion";
 import { useMe } from "../app/useMe";
 import { ask, chats as listChats, chatTurns, confirm, EngineError, homeId, readNotices, type ThreadStart } from "../chat/client";
 import { addFiles, toUpload } from "../chat/files";
@@ -35,11 +36,11 @@ type Live = { lines: Line[]; draft: string; next: number };
 
 const IDLE: Live = { lines: [], draft: "", next: 0 };
 
-const SUGGESTIONS = [
-  "What is due this week?",
-  "When is Hayden Library open today?",
-  "Find AI clubs I could join",
-  "What do you remember about me?",
+const SUGGESTIONS: { text: string; icon: LucideIcon }[] = [
+  { text: "What is due this week?", icon: CalendarClock },
+  { text: "When is Hayden Library open today?", icon: BookOpen },
+  { text: "Find AI clubs I could join", icon: Users },
+  { text: "What do you remember about me?", icon: Sparkles },
 ];
 
 /** A greeting for the hour of the day. */
@@ -305,9 +306,9 @@ const Chat = () => {
   const loading = waiting || (Boolean(target) && target !== shown && turns.length === 0);
   const empty = turns.length === 0 && !loading && !start;
   const thread = Boolean(home) && !atHome && !waiting;
-  const enter = still ? false : { opacity: 0, y: 8 };
+  const enter = arrive(still);
   const composer = (
-    <motion.div layoutId="composer" layout={!still} transition={{ type: "spring", stiffness: 380, damping: 36 }}>
+    <motion.div layoutId="composer" layout={!still} transition={spring.glide}>
       <Composer
         value={text}
         onChange={setText}
@@ -339,8 +340,8 @@ const Chat = () => {
       {waiting ? (
         <main className="flex-1" />
       ) : empty ? (
-        <main className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-4 pb-16">
-          <motion.div initial={enter} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: "easeOut" }} className="w-full max-w-2xl">
+        <main className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-4 pb-16 pt-20">
+          <motion.div initial={enter} animate={settled} transition={spring.soft} className="w-full max-w-2xl">
             <motion.div
               layoutId="sparky-hero"
               initial={still ? false : { opacity: 0, scale: 0.9, y: 10 }}
@@ -350,53 +351,88 @@ const Chat = () => {
             >
               <Sparky watch className="h-28 w-auto drop-shadow-[0_12px_24px_rgb(120_28_53/0.25)]" />
             </motion.div>
-            <h1 className="mt-6 text-center text-2xl font-semibold tracking-tight sm:text-3xl">
+            <motion.h1
+              initial={arrive(still, { y: 14 })}
+              animate={settled}
+              transition={{ ...spring.soft, delay: 0.08 }}
+              className="mt-6 text-center text-3xl font-semibold tracking-tight sm:text-4xl"
+            >
               {greeting(new Date().getHours())}, {me.name.split(" ")[0]}
-            </h1>
-            <p className="mt-2 text-center text-[15px] text-dim">What is on your plate today?</p>
+            </motion.h1>
+            <motion.p
+              initial={arrive(still, { y: 10 })}
+              animate={settled}
+              transition={{ ...spring.soft, delay: 0.14 }}
+              className="mt-2 text-center text-[15px] text-dim"
+            >
+              What is on your plate today?
+            </motion.p>
             <div className="mt-8">{composer}</div>
-            <ul aria-label="Suggestions" className="mt-4 flex flex-wrap justify-center gap-2">
+            <ul aria-label="Suggestions" className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
               {SUGGESTIONS.map((s, i) => (
-                <motion.li
-                  key={s}
-                  initial={still ? false : { opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, ease: "easeOut", delay: 0.25 + i * 0.05 }}
-                >
-                  <button
+                <motion.li key={s.text} initial={arrive(still, { y: 12 })} animate={settled} transition={{ ...spring.soft, delay: 0.22 + i * 0.05 }}>
+                  <motion.button
                     type="button"
-                    onClick={() => send(s)}
-                    className="glass h-9 rounded-full px-3.5 text-sm text-dim transition-colors hover:text-fg"
+                    onClick={() => send(s.text)}
+                    whileHover={still ? undefined : { y: -2 }}
+                    whileTap={still ? undefined : { scale: 0.97 }}
+                    transition={spring.snap}
+                    className="glass group flex h-12 w-full items-center gap-3 rounded-2xl px-4 text-left text-sm text-dim transition-colors hover:text-fg"
                   >
-                    {s}
-                  </button>
+                    <s.icon className="size-4 shrink-0 text-accent transition-transform group-hover:scale-110" />
+                    <span className="truncate">{s.text}</span>
+                  </motion.button>
                 </motion.li>
               ))}
             </ul>
           </motion.div>
         </main>
       ) : (
-        <main className="flex min-h-0 flex-1 flex-col">
-          {thread && (
-            <div className="mx-auto flex w-full max-w-3xl items-center gap-2 px-4 pt-4 text-sm text-dim">
-              <Link to="/chat" aria-label="Back to home" className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2 hover:bg-sunk/70 hover:text-fg">
-                <ArrowLeft className="size-4" />
-                Home
-              </Link>
-              <span aria-hidden>/</span>
-              <span>Thread</span>
-            </div>
-          )}
+        <main className="relative flex min-h-0 flex-1 flex-col">
+          <AnimatePresence>
+            {thread && (
+              <motion.div
+                key="thread-bar"
+                initial={arrive(still, { y: -8 })}
+                animate={settled}
+                exit={still ? undefined : { opacity: 0, y: -6 }}
+                transition={spring.soft}
+                className="glass absolute left-1/2 top-[4.25rem] z-20 flex -translate-x-1/2 items-center gap-1 rounded-full py-1 pl-1 pr-3 text-sm text-dim"
+              >
+                <Link to="/chat" aria-label="Back to home" className="inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 hover:bg-sunk/70 hover:text-fg">
+                  <ArrowLeft className="size-4" />
+                  Home
+                </Link>
+                <span aria-hidden>/</span>
+                <span>Thread</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
           <div ref={scroller} onScroll={follow} className="flex-1 overflow-y-auto [scrollbar-gutter:stable]">
             {start && (
-              <blockquote aria-label="Thread of" className="mx-auto mt-6 w-full max-w-3xl px-4">
+              <blockquote aria-label="Thread of" className="mx-auto mt-28 w-full max-w-3xl px-4">
                 <p className="glass line-clamp-4 rounded-2xl px-4 py-3 text-sm text-dim">{start.quote}</p>
               </blockquote>
             )}
-            <ol aria-label="Conversation" className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-8">
+            <ol
+              aria-label="Conversation"
+              className={`mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 pb-48 ${start ? "pt-8" : thread ? "pt-32" : "pt-24"}`}
+            >
               {turns.map((t) => (
-                <motion.li key={t.id} initial={enter} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, ease: "easeOut" }} className="flex flex-col gap-6">
-                  <div className="flex max-w-[85%] flex-col items-end gap-2 self-end">
+                <motion.li
+                  key={t.id}
+                  initial={still ? false : { opacity: 0, filter: "blur(6px)" }}
+                  animate={{ opacity: 1, filter: "blur(0px)" }}
+                  transition={{ duration: 0.35, ease: EASE }}
+                  className="flex flex-col gap-6"
+                >
+                  <motion.div
+                    initial={arrive(still, { y: 14, scale: 0.94 })}
+                    animate={settled}
+                    transition={spring.soft}
+                    style={{ originX: 1, originY: 1 }}
+                    className="flex max-w-[85%] flex-col items-end gap-2 self-end"
+                  >
                     {t.files && t.files.length > 0 && (
                       <ul aria-label="Files sent" className="flex flex-wrap justify-end gap-2">
                         {t.files.map((name, i) => (
@@ -407,9 +443,13 @@ const Chat = () => {
                         ))}
                       </ul>
                     )}
-                    {t.question && <p className="whitespace-pre-wrap rounded-3xl bg-shu px-4 py-2.5 text-[15px] leading-6 text-white">{t.question}</p>}
+                    {t.question && (
+                      <p className="whitespace-pre-wrap rounded-3xl rounded-br-lg bg-shu px-4 py-2.5 text-[15px] leading-6 text-white shadow-[0_8px_24px_-12px_rgb(120_28_53/0.6)]">
+                        {t.question}
+                      </p>
+                    )}
                     <MovedTo thread={threadOfQuestion(t)} />
-                  </div>
+                  </motion.div>
                   {t.answer && (
                     <Reply
                       answer={t.answer}
@@ -421,7 +461,7 @@ const Chat = () => {
                     />
                   )}
                   {t.error && (
-                    <AssistantRow mood="sad">
+                    <AssistantRow mood="sad" enter>
                       <div className="flex flex-wrap items-center gap-3">
                         <p role="alert" className="text-sm text-bad">
                           {t.error}
@@ -444,9 +484,11 @@ const Chat = () => {
               ))}
             </ol>
           </div>
-          <div className="mx-auto w-full max-w-3xl px-4 pb-4">
-            {composer}
-            <p className="mt-2 text-center text-xs text-dim">Sparky can be wrong. Check the sources it links.</p>
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-canvas via-canvas/85 to-transparent pt-12">
+            <div className="pointer-events-auto mx-auto w-full max-w-3xl px-4 pb-4">
+              {composer}
+              <p className="mt-2 text-center text-xs text-dim">Sparky can be wrong. Check the sources it links.</p>
+            </div>
           </div>
         </main>
       )}
