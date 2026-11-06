@@ -108,6 +108,9 @@ pub enum QueryError {
     /// Platform refused the arguments: unknown source, missing detail, unreadable page.
     #[error("{0}")]
     Rejected(String),
+    /// Platform answered, but the live source behind it failed or was down.
+    #[error("{0}")]
+    Unavailable(String),
     /// Platform did not answer inside the budget.
     #[error("the platform did not answer within {0:?}")]
     Timeout(std::time::Duration),

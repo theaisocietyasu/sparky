@@ -59,6 +59,7 @@ pub(crate) fn state_with_web(
             title_chars: 20,
         },
         home: crate::routes::home::HomeRules::default(),
+        canvas: None,
     }
 }
 

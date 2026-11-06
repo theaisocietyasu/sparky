@@ -132,3 +132,36 @@ fn a_public_turn_is_offered_no_private_tool() {
     assert_eq!(set.definitions_for(Visibility::Public), Vec::new());
     assert_eq!(set.definitions_for(Visibility::Private).len(), 2);
 }
+
+#[test]
+fn an_unknown_tool_name_points_at_the_tools_it_was_close_to() {
+    use std::sync::Arc;
+
+    use crate::core::config::MemorySettings;
+    use crate::core::tests::support::{MemorySink, Recalling};
+    use crate::core::traits::memory::MemoryStore;
+    use crate::core::traits::trace::TraceSink;
+    use crate::runtime::harness::tools::ToolSet;
+    use crate::runtime::tools::memory::{MemoryRules, tools};
+
+    let store: Arc<dyn MemoryStore> = Arc::new(Recalling::default());
+    let trace: Arc<dyn TraceSink> = Arc::new(MemorySink::new());
+    let mut set = ToolSet::new();
+    for tool in tools(
+        &store,
+        &trace,
+        MemoryRules::new(&MemorySettings::default(), 0),
+    ) {
+        set = set.with(tool);
+    }
+    let near = set.unknown("forget");
+    assert!(
+        near.contains("forget_memory") && !near.contains("remember"),
+        "{near}"
+    );
+    let none = set.unknown("search_live");
+    assert!(
+        none.contains("forget_memory") && none.contains("remember"),
+        "{none}"
+    );
+}

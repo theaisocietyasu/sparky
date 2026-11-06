@@ -19,7 +19,7 @@ use crate::core::types::admin::{AdminGuardrails, AdminLimits};
 use crate::routes::Limits;
 use crate::routes::admin::AdminState;
 use crate::routes::canvas::CanvasState;
-use crate::routes::chat::{ChatState, WebLists};
+use crate::routes::chat::{ChatState, PastedFeeds, WebLists};
 use crate::routes::health::HealthState;
 use crate::routes::home::HomeRules;
 use crate::routes::memories::MemoryState;
@@ -40,6 +40,7 @@ pub(super) fn chat_state(
     confirmations: Arc<dyn ConfirmationStore>,
     web: Option<WebAuth>,
     home: HomeRules,
+    feeds: Option<Arc<dyn CanvasFeeds>>,
 ) -> ChatState {
     ChatState {
         confirmations: Some(confirmations),
@@ -62,6 +63,14 @@ pub(super) fn chat_state(
             title_chars: cfg.web.title_chars,
         },
         home,
+        canvas: feeds
+            .filter(|_| cfg.canvas.enabled)
+            .map(|feeds| PastedFeeds {
+                feeds,
+                hosts: cfg.canvas.hosts.clone(),
+                saved_line: cfg.canvas.saved_line.clone(),
+                save_failed_line: cfg.canvas.save_failed_line.clone(),
+            }),
     }
 }
 
@@ -284,6 +293,7 @@ pub(super) fn http_router(
         stores.confirmations,
         web.clone(),
         home,
+        stores.canvas.clone(),
     );
     let memories = memory_state(
         cfg,

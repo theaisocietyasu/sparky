@@ -12,6 +12,7 @@ pub mod page;
 pub mod papers;
 pub mod remind;
 pub mod sandbox;
+pub mod settings;
 pub mod upcoming;
 pub mod wiki;
 

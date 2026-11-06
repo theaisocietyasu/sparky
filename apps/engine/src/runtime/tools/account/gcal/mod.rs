@@ -84,7 +84,7 @@ impl Tool for GcalTool {
         }
         let Some(token) = self.creds.resolve(ctx).await? else {
             return Err(ToolError::Failed(
-                "You have not connected Google. Send /login in a direct message to connect it."
+                "Google is not linked. Call settings with action connect and account google, and hand the student the link."
                     .to_owned(),
             ));
         };
@@ -136,7 +136,7 @@ impl UpcomingSource for GcalSource {
             .resolve(ctx)
             .await
             .map_err(|e| e.to_string())?
-            .ok_or_else(|| "not connected; send /login and choose Google Calendar".to_owned())?;
+            .ok_or_else(|| "not linked; settings with action connect links it".to_owned())?;
         let events = self
             .client
             .events(&token)

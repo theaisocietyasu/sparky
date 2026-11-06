@@ -225,11 +225,11 @@ async fn the_tool_is_refused_outside_a_direct_message() {
 }
 
 #[tokio::test]
-async fn an_unlinked_user_is_told_to_send_the_feed_link() {
+async fn an_unlinked_user_is_asked_to_paste_the_feed_link() {
     let (tool, _) = tool(false, String::new(), None);
     let out = tool.call(&dm(), json!({})).await;
     assert!(
-        matches!(&out, Err(ToolError::Failed(m)) if m.contains("/canvas")),
+        matches!(&out, Err(ToolError::Failed(m)) if m.contains("paste their")),
         "{out:?}"
     );
 }
@@ -283,7 +283,7 @@ async fn a_revoked_feed_asks_for_a_new_link() {
     let (tool, _) = tool(true, String::new(), Some(401));
     let out = tool.call(&dm(), json!({})).await;
     assert!(
-        matches!(&out, Err(ToolError::Failed(m)) if m.contains("/canvas")),
+        matches!(&out, Err(ToolError::Failed(m)) if m.contains("paste their")),
         "{out:?}"
     );
 }

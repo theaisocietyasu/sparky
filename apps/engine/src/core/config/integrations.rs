@@ -47,7 +47,16 @@ pub struct Canvas {
     pub max_items: usize,
     /// User-Agent header sent with each feed request.
     pub user_agent: String,
+    /// What a feed link pasted in chat is replaced with once it is saved.
+    pub saved_line: String,
+    /// What a feed link pasted in chat is replaced with when it could not be saved.
+    pub save_failed_line: String,
 }
+
+/// Default text in place of a Canvas feed link that was saved.
+pub const SAVED_LINE: &str = "[my Canvas calendar feed link. Sparky saved it, so Canvas is now linked; tell me it worked and offer to show what is due]";
+/// Default text in place of a Canvas feed link that could not be saved.
+pub const SAVE_FAILED_LINE: &str = "[my Canvas calendar feed link. Sparky could not save it just now; tell me to paste it again in a minute]";
 
 impl Default for Canvas {
     fn default() -> Self {
@@ -60,6 +69,8 @@ impl Default for Canvas {
             max_days: 60,
             max_items: 25,
             user_agent: "SparkyAI/1.0 (+https://github.com/theaisocietyasu/sparky)".into(),
+            saved_line: SAVED_LINE.into(),
+            save_failed_line: SAVE_FAILED_LINE.into(),
         }
     }
 }
@@ -389,6 +400,20 @@ pub struct Calculate {
 }
 
 impl Default for Calculate {
+    fn default() -> Self {
+        Self { enabled: true }
+    }
+}
+
+/// The settings tools: the student changes check-ins and linked accounts by asking in chat.
+#[derive(Debug, Deserialize)]
+#[serde(default)]
+pub struct Settings {
+    /// Whether settings and disconnect are registered at boot.
+    pub enabled: bool,
+}
+
+impl Default for Settings {
     fn default() -> Self {
         Self { enabled: true }
     }

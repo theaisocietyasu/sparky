@@ -63,6 +63,17 @@ pub fn feed_link(raw: &str, hosts: &[String]) -> Result<String, String> {
     Ok(parsed.to_string())
 }
 
+/// The first Canvas feed link in a message, as written and as checked.
+pub fn feed_in(message: &str, hosts: &[String]) -> Option<(String, String)> {
+    message.split_whitespace().find_map(|word| {
+        let raw = word
+            .trim_matches(|c: char| matches!(c, '<' | '>' | '(' | ')' | '"' | '\'' | ',' | '.'));
+        feed_link(raw, hosts)
+            .ok()
+            .map(|link| (raw.to_owned(), link))
+    })
+}
+
 /// Every event of an iCalendar text. A TZID time is read at offset; a floating time too.
 pub fn parse_ics(text: &str, offset: FixedOffset) -> Vec<CanvasItem> {
     let mut items = Vec::new();

@@ -113,6 +113,10 @@ pub async fn serve(cfg: Config) -> anyhow::Result<()> {
             chats: (cfg.store.backend == StoreBackend::Sqlite)
                 .then(|| Arc::clone(&stores.conversations)),
             pages: stores.discovery.clone(),
+            nudges: stores
+                .nudges
+                .clone()
+                .map(|store| (store, background::defaults(&cfg))),
         },
     )
     .await?;

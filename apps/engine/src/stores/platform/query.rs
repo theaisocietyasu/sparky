@@ -29,11 +29,26 @@ fn query_error(e: PlatformError) -> QueryError {
     match e {
         PlatformError::Timeout(budget) => QueryError::Timeout(budget),
         PlatformError::Status {
-            status: 400 | 404 | 422 | 502 | 503,
+            status: 400 | 404 | 422,
             message,
         } => QueryError::Rejected(message),
+        PlatformError::Status {
+            status: 502..=504,
+            message,
+        } => QueryError::Unavailable(message),
+        PlatformError::Transport(_) => {
+            QueryError::Unavailable("the connection to Platform broke".into())
+        }
         other => QueryError::Store(other.to_string()),
     }
+}
+
+/// Time a request must still have left for a failed search to be sent again.
+const RETRY_ROOM: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// Whether a failed call may pass when sent again: the connection broke, or a live source was down.
+fn transient(error: &PlatformError) -> bool {
+    matches!(error, PlatformError::Transport(_)) || matches!(error.status(), Some(502..=504))
 }
 
 /// The tool named name in a GET /api/tools answer.
@@ -82,12 +97,24 @@ impl SourceQueries for PlatformQueries {
         }
         let body = Value::Object(args.clone());
         let path = format!("/api/tools/{SEARCH_TOOL}");
-        let call = Call::new(Method::POST, &path)
-            .body(&body)
-            .timeout(remaining);
-        let value = tokio::select! {
-            () = ctx.cancel.cancelled() => return Err(QueryError::Cancelled),
-            answer = self.client.call(&call) => answer.map_err(query_error)?,
+        let mut retried = false;
+        let value = loop {
+            let remaining = ctx.remaining();
+            let call = Call::new(Method::POST, &path)
+                .body(&body)
+                .timeout(remaining);
+            let answer = tokio::select! {
+                () = ctx.cancel.cancelled() => return Err(QueryError::Cancelled),
+                answer = self.client.call(&call) => answer,
+            };
+            match answer {
+                Ok(value) => break value,
+                Err(error) if !retried && transient(&error) && ctx.remaining() > RETRY_ROOM => {
+                    tracing::warn!(%error, "search failed for a moment; trying once more");
+                    retried = true;
+                }
+                Err(error) => return Err(query_error(error)),
+            }
         };
         field(&value, "result").map_err(|e| QueryError::Store(format!("search result: {e}")))
     }

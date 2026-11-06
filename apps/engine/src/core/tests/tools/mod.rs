@@ -10,5 +10,6 @@ mod outlook;
 mod page;
 mod remind;
 mod sandbox;
+mod settings;
 mod upcoming;
 mod wasm_sandbox;

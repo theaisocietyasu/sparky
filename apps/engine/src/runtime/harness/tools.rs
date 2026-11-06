@@ -79,6 +79,27 @@ impl ToolSet {
         out
     }
 
+    /// The error a call to an unknown tool gets back: the names the model meant, or every name offered.
+    pub fn unknown(&self, name: &str) -> String {
+        let offered: Vec<String> = self.definitions().into_iter().map(|d| d.name).collect();
+        let wanted = bare(name);
+        let mut near: Vec<&String> = offered
+            .iter()
+            .filter(|o| {
+                let have = bare(o);
+                have.contains(&wanted) || wanted.contains(&have) || distance(&have, &wanted) <= 3
+            })
+            .collect();
+        if near.is_empty() {
+            near = offered.iter().collect();
+        }
+        let names: Vec<&str> = near.iter().map(|n| n.as_str()).collect();
+        format!(
+            "error: no tool named `{name}`. Call one of these by its exact name: {}",
+            names.join(", ")
+        )
+    }
+
     /// Estimated tokens the tool schemas add to every model request.
     pub fn estimated_tokens(&self, chars_per_token: usize) -> usize {
         self.definitions()
@@ -91,6 +112,33 @@ impl ToolSet {
             })
             .sum()
     }
+}
+
+/// A tool name in lower case with the platform prefix and separators taken out.
+fn bare(name: &str) -> String {
+    name.trim_start_matches("platform_")
+        .chars()
+        .filter(char::is_ascii_alphanumeric)
+        .map(|c| c.to_ascii_lowercase())
+        .collect()
+}
+
+/// Edit distance between two short names.
+fn distance(a: &str, b: &str) -> usize {
+    let b: Vec<char> = b.chars().collect();
+    let mut row: Vec<usize> = (0..=b.len()).collect();
+    for (i, ca) in a.chars().enumerate() {
+        let mut last = row[0];
+        row[0] = i + 1;
+        for (j, cb) in b.iter().enumerate() {
+            let next = (row[j + 1] + 1)
+                .min(row[j] + 1)
+                .min(last + usize::from(ca != *cb));
+            last = row[j + 1];
+            row[j + 1] = next;
+        }
+    }
+    row[b.len()]
 }
 
 impl std::fmt::Debug for ToolSet {

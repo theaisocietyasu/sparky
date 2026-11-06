@@ -54,6 +54,8 @@ if [ "$SPARKY_RUN_PHOENIX" = "true" ]; then
     . "$phoenix/keys.env"
     set +a
     ui="${SPARKY_TELEMETRY__PHOENIX_UI_URL:-https://${RUNPOD_POD_ID}-6006.proxy.runpod.net}"
+    # PHOENIX_ROOT_URL is the address MCP clients sign in through; without it Phoenix names its pod-internal IP.
+    export PHOENIX_ROOT_URL="${PHOENIX_ROOT_URL:-$ui}"
     export PHOENIX_WORKING_DIR="$phoenix" PHOENIX_ENABLE_AUTH=true PHOENIX_HOST=0.0.0.0 PHOENIX_PORT=6006 \
         PHOENIX_USE_SECURE_COOKIES=true PHOENIX_CSRF_TRUSTED_ORIGINS="$ui" PHOENIX_TELEMETRY_ENABLED=false \
         PHOENIX_DEFAULT_RETENTION_POLICY_DAYS="${SPARKY_PHOENIX_RETENTION_DAYS:-30}"
