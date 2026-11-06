@@ -2,31 +2,6 @@
 
 use serde::Deserialize;
 
-/// Outlook (Microsoft Graph) read-only tools. Off by default; reads the caller's Microsoft account linked on the platform.
-#[derive(Debug, Deserialize)]
-#[serde(default)]
-pub struct Outlook {
-    /// Whether the Outlook tools are registered at boot.
-    pub enabled: bool,
-    /// Base URL of Microsoft Graph, no trailing path.
-    pub base_url: String,
-    /// Budget for one Graph request.
-    pub timeout_secs: u64,
-    /// Most rows one list tool returns to the model.
-    pub max_items: usize,
-}
-
-impl Default for Outlook {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            base_url: "https://graph.microsoft.com/v1.0".into(),
-            timeout_secs: 30,
-            max_items: 15,
-        }
-    }
-}
-
 /// Canvas due dates and events from each student's calendar feed link. Off with store.backend platform.
 #[derive(Debug, Deserialize)]
 #[serde(default)]

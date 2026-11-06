@@ -222,14 +222,11 @@ pub(super) fn oauth_state(
     store: Arc<dyn OAuthStore>,
     web: Option<WebAuth>,
 ) -> OAuthState {
-    let providers = [
-        ("google", cfg.gcal.enabled),
-        ("microsoft", cfg.outlook.enabled),
-    ]
-    .into_iter()
-    .filter(|(_, on)| *on)
-    .map(|(name, _)| name.to_owned())
-    .collect();
+    let providers = [("google", cfg.gcal.enabled)]
+        .into_iter()
+        .filter(|(_, on)| *on)
+        .map(|(name, _)| name.to_owned())
+        .collect();
     OAuthState {
         store,
         service_token: cfg.engine.service_token.clone(),

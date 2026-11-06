@@ -77,9 +77,6 @@ pub struct Config {
     /// MCP servers exposed as tools.
     #[serde(default)]
     pub mcp: Mcp,
-    /// Outlook (Microsoft Graph) integration. Off by default.
-    #[serde(default)]
-    pub outlook: Outlook,
     /// Google Calendar integration. Off by default.
     #[serde(default)]
     pub gcal: Gcal,
@@ -462,18 +459,6 @@ fn validate_integrations(cfg: &Config) -> Result<(), ConfigError> {
     validate_upcoming(&cfg.upcoming)?;
     validate_reminders(&cfg.reminders)?;
     validate_nudges(&cfg.nudges)?;
-    if cfg.outlook.enabled {
-        if !cfg.outlook.base_url.starts_with("https://") {
-            return Err(ConfigError::Invalid(
-                "outlook: base_url must be https".into(),
-            ));
-        }
-        if cfg.outlook.timeout_secs == 0 || cfg.outlook.max_items == 0 {
-            return Err(ConfigError::Invalid(
-                "outlook: timeout_secs and max_items must be at least 1".into(),
-            ));
-        }
-    }
     Ok(())
 }
 

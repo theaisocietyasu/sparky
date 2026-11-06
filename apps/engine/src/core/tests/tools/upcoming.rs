@@ -99,10 +99,10 @@ fn the_tool_is_private_and_authenticated() {
 async fn items_from_every_source_come_back_in_one_list_by_date() {
     let upcoming = tool(vec![
         fake("Canvas", Ok(vec![item("Homework 3", 30), item("Quiz", 2)])),
-        fake("Google Calendar", Ok(vec![item("Club meeting", 10)])),
+        fake("Tasks", Ok(vec![item("Club meeting", 10)])),
         fake(
-            "Outlook",
-            Err("not connected; send /login and choose Outlook".into()),
+            "Google Calendar",
+            Err("not connected; send /login and choose Google Calendar".into()),
         ),
     ]);
     let Ok(out) = upcoming.call(&dm(Duration::from_secs(5)), json!({})).await else {
@@ -110,7 +110,7 @@ async fn items_from_every_source_come_back_in_one_list_by_date() {
     };
     let at = |s: &str| out.content.find(s).unwrap_or(usize::MAX);
     assert!(
-        at("[Canvas] Quiz") < at("[Google Calendar] Club meeting"),
+        at("[Canvas] Quiz") < at("[Tasks] Club meeting"),
         "{}",
         out.content
     );
@@ -120,7 +120,8 @@ async fn items_from_every_source_come_back_in_one_list_by_date() {
         out.content
     );
     assert!(
-        out.content.contains("Not included: Outlook: not connected"),
+        out.content
+            .contains("Not included: Google Calendar: not connected"),
         "{}",
         out.content
     );
@@ -147,7 +148,7 @@ async fn the_list_is_capped() {
 #[tokio::test]
 async fn a_slow_source_is_cut_at_the_deadline() {
     let slow: Arc<dyn UpcomingSource> = Arc::new(Fake {
-        label: "Outlook",
+        label: "Google Calendar",
         answer: Ok(vec![item("Never", 1)]),
         hang: true,
     });
@@ -164,7 +165,8 @@ async fn a_slow_source_is_cut_at_the_deadline() {
         out.content
     );
     assert!(
-        out.content.contains("Outlook: did not answer in time"),
+        out.content
+            .contains("Google Calendar: did not answer in time"),
         "{}",
         out.content
     );

@@ -6,7 +6,7 @@ import { Caret } from "../Caret";
 import MentionThread from "../MentionThread";
 import { progress, typed, type Scene, type Shot } from "../timeline";
 import { approved, cardAt, finished, FINISH, type Turn } from "./turn";
-import { BETWEEN, BOOK, DUE, GRADE, INBOX, WEEK } from "./turns";
+import { BETWEEN, BOOK, DUE, GRADE, WEEK } from "./turns";
 
 /** The student whose day the video follows. */
 const ME: Author = PEOPLE.maya;
@@ -52,7 +52,7 @@ const dmScene = ({ title, turn, time, past, focus }: { title: string; turn: Turn
       <Window
         dm={SPARKY}
         channel="Sparky"
-        topic="Your Canvas, Outlook and Google Calendar, read only here"
+        topic="Your Canvas and Google Calendar, read only here"
         me={ME}
         messages={
           <>
@@ -153,13 +153,6 @@ const serverScene = ({ title, turn, time, sources }: { title: string; turn: Turn
 /** The day, scene by scene, from the morning check to the plan for the week. */
 export const DAY: Scene[] = [
   dmScene({ title: "7:48 AM · What's due this week", turn: DUE, time: "Today at 7:48 AM", past: [], focus: { x: 900, y: 560, s: 1.25 } }),
-  dmScene({
-    title: "9:15 AM · Inbox triage",
-    turn: INBOX,
-    time: "Today at 9:15 AM",
-    past: [{ turn: DUE, time: "Today at 7:48 AM" }],
-    focus: { x: 900, y: 600, s: 1.3 },
-  }),
   serverScene({
     title: "12:20 PM · Between classes",
     turn: BETWEEN,
@@ -170,7 +163,7 @@ export const DAY: Scene[] = [
     title: "3:40 PM · Book a study room",
     turn: BOOK,
     time: "Today at 3:40 PM",
-    past: [{ turn: INBOX, time: "Today at 9:15 AM" }],
+    past: [{ turn: DUE, time: "Today at 7:48 AM" }],
     focus: { x: 900, y: 620, s: 1.3 },
   }),
   dmScene({

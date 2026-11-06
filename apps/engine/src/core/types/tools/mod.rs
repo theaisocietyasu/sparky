@@ -3,7 +3,6 @@
 pub mod canvas;
 pub mod gcal;
 pub mod oauth;
-pub mod outlook;
 pub mod sandbox;
 pub mod upcoming;
 

@@ -25,24 +25,6 @@ export const DUE: Turn = {
     "Four things are due this week:\n- **CSE 340** Project 2, Wednesday 11:59 PM\n- **MAT 343** Homework 6, Thursday 11:59 PM\n- **CSE 310** Quiz 4, now **Friday** 5 PM (moved from Wednesday)\n- **ENG 302** Draft 2, Sunday 11:59 PM\n\nMAT 343 has no office hours this Thursday, so ask your Homework 6 questions before then.",
 };
 
-/** Mid morning: what in the inbox needs action today, from Outlook. */
-export const INBOX: Turn = {
-  question: "anything in my inbox I actually need to deal with today?",
-  thought: "Read recent Outlook mail and today's calendar, then keep only what needs action today.",
-  calls: [
-    {
-      tool: "outlook_mail",
-      args: {},
-      output:
-        "10 recent messages: Please confirm your 2:00pm appointment (Academic Advising). Re: Project 1 regrade (CSE 340 TA). Career fair registration closes Oct 9 (Fulton Career Center). Your statement is ready (Sun Card Office). This week at the MU (Memorial Union).",
-    },
-    { tool: "outlook_calendar", args: {}, output: "2 events today: CSE 340 lecture 10:30am, BYENG 210. Advising appointment 2:00pm, Student Services." },
-  ],
-  wrap: "Three messages need a reply or a step; the rest are newsletters.",
-  answer:
-    "Three need you today:\n- **Advising** wants you to confirm your **2 PM** appointment. It is on your calendar.\n- The **CSE 340 TA** answered your Project 1 regrade request.\n- **Career fair** registration closes Friday.\n\nThe rest is newsletters and a Sun Card statement. Nothing to do there.",
-};
-
 /** Midday: food and a place to study, both live, asked in the server. */
 export const BETWEEN: Turn = {
   question: "got 90 min before my 2pm. where can I eat near the MU, and where can I study after?",
@@ -101,14 +83,13 @@ export const GRADE: Turn = {
     "You need about **87%** on the final to finish CSE 340 with an A (90%).\n\nThat assumes Project 2 lands near your Project 1 score of 88. Every point above that on Project 2 lowers what the final needs.",
 };
 
-/** Night: the week in one list, from three calendars. */
+/** Night: the week in one list, from two calendars. */
 export const WEEK: Turn = {
   question: "put my week in one list: deadlines, classes stuff, and my library shifts",
-  thought: "Merge the Canvas calendar, Outlook calendar and Google Calendar into one list by day.",
+  thought: "Merge the Canvas calendar and Google Calendar into one list by day.",
   calls: [
     { tool: "canvas_calendar", args: {}, output: "4 upcoming events: CSE 340 Project 2 due Oct 7. MAT 343 Homework 6 due Oct 8. CSE 310 Quiz 4 Oct 9. ENG 302 Draft 2 due Oct 11." },
-    { tool: "outlook_calendar", args: {}, output: "2 upcoming events: CSE 310 group study Oct 7 6:00pm, Hayden C-21. Career fair registration closes Oct 9." },
-    { tool: "google_calendar", args: {}, output: "2 upcoming events: Library shift Oct 7 4:00pm. Library shift Oct 9 4:00pm." },
+    { tool: "google_calendar", args: {}, output: "4 upcoming events: Library shift Oct 7 4:00pm. CSE 310 group study Oct 7 6:00pm, Hayden C-21. Library shift Oct 9 4:00pm. Career fair registration closes Oct 9." },
   ],
   wrap: "Group the events by day, earliest first.",
   answer:

@@ -42,7 +42,7 @@ This document describes the current shape of the system and its rules. Order of 
 apps/
   engine/         Rust bin. The agent, its HTTP surface, and the store adapters.
     src/core/       config (services, integrations, http, harness by domain), telemetry, types, traits, tests
-    src/runtime/    harness (loop, prompt, uploads, memory, safety, compaction, trace), model (Rig client, slot limit, server props), tools (knowledge/search, account for per-user Outlook and Gcal, papers, wiki, files, mcp, sandbox, shared http)
+    src/runtime/    harness (loop, prompt, uploads, memory, safety, compaction, trace), model (Rig client, slot limit, server props), tools (knowledge/search, account for per-user Gcal and Canvas, papers, wiki, files, mcp, sandbox, shared http)
     src/stores/     platform/: client, conversation, confirmation, memory, discovery, query, accounts, health over the Platform HTTP API
     src/routes/     chat (JSON and SSE), confirm, conversation, profile, oauth, sandbox, health, rate limit, auth, failure
     src/wiring/     builds every dependency from config and serves: platform stores, tools, agent, http, boot checks, system prompt
@@ -101,7 +101,7 @@ flowchart LR
     ENG -->|"spans"| OBS
 ```
 
-Processes talk only at these edges. Platform ([asusoda/platform](https://github.com/asusoda/platform)) is a separate service: it holds the knowledge index, the live query registry, and linked accounts, and it alone crawls and queries ASU sites. Beyond Platform, the engine calls only the Microsoft Graph, Google Calendar, Semantic Scholar, and MediaWiki APIs and the attachment hosts in `agent.file_hosts`; with `sandbox.egress` on, a sandbox command reads public pages through the egress proxy. Other MCP servers are optional and none is configured by default.
+Processes talk only at these edges. Platform ([asusoda/platform](https://github.com/asusoda/platform)) is a separate service: it holds the knowledge index, the live query registry, and linked accounts, and it alone crawls and queries ASU sites. Beyond Platform, the engine calls only the Google Calendar, Semantic Scholar, and MediaWiki APIs and the attachment hosts in `agent.file_hosts`; with `sandbox.egress` on, a sandbox command reads public pages through the egress proxy. Other MCP servers are optional and none is configured by default.
 
 The engine serves `/chat` and `/chat/stream` for the bot; both run the same loop. Every route except health and `/web/*` requires the bearer token in `SPARKY_ENGINE__SERVICE_TOKEN` or, where the web sign-in below allows it, a session cookie; and every route that carries a user applies the per-user `http.rate_limit_per_min`. The sandbox routes carry no user and are gated by the token alone, so any holder of it, `apps/discord` included, can read and stop the sandbox: `GET /sandbox` reports what is running, `DELETE /sandbox/{name}` removes one session container, and `POST /sandbox/enabled` stops the agent being offered `run_sandbox`. `apps/cli` shows and drives the containers through them, since the engine starts the containers outside compose.
 
@@ -124,7 +124,7 @@ flowchart TD
     ROUTES["routes and wiring<br/>compose everything, own main"]
     HARNESS["runtime::harness<br/>agent: run, step, inputs, execute, conclude, task, uploads, read<br/>agent/call: thinking, relay, draft, thought, retry, spans<br/>agent/prompt: assemble, capability<br/>safety: guardrail, policy<br/>compact, tools, trace"]
     MODEL["runtime::model<br/>rig_openai: chat, embed, convert<br/>limit, props"]
-    TOOLS["runtime::tools<br/>knowledge/search: Platform search<br/>account: outlook, gcal, grant<br/>papers, wiki, files, mcp, http<br/>sandbox: container, session, egress, output, log, wasm"]
+    TOOLS["runtime::tools<br/>knowledge/search: Platform search<br/>account: canvas, gcal, grant<br/>papers, wiki, files, mcp, http<br/>sandbox: container, session, egress, output, log, wasm"]
     STORES["stores<br/>platform: client, conversation, confirmation, memory, discovery, query, accounts, health"]
     CORE["core<br/>config, telemetry, types, traits, tests"]
 
@@ -177,7 +177,7 @@ What Platform serves beside the stores:
 | Search | the `search` tool: stored pages, the live sources of the `asu` pack, and SearXNG web search, with a shared Playwright browser for JS pages |
 | Sun Devil Central clubs and events behind an ASU sign-in | the `clubs` and `club_events` sources of `search`, over the organization's ASU sign-in |
 | `/login` and `/logout` | the Platform accounts link (`accounts:link`) and grant removal |
-| Outlook and Google Calendar | engine tools over tokens from Platform (`accounts:token`) |
+| Google Calendar | engine tools over tokens from Platform (`accounts:token`) |
 
 ## Types
 
@@ -259,7 +259,7 @@ pub trait TraceSink {
 }
 ```
 
-The rest follow the same pattern: `Compactor`, `ConfirmationStore`, `Sandbox`, `FileSource`, `Outlook`, `GoogleCalendar`, `OAuthStore`, `Probe`. `OAuthStore` loads a caller's linked grant, removes it, and hands out the Platform `login_link`.
+The rest follow the same pattern: `Compactor`, `ConfirmationStore`, `Sandbox`, `FileSource`, `GoogleCalendar`, `OAuthStore`, `Probe`. `OAuthStore` loads a caller's linked grant, removes it, and hands out the Platform `login_link`.
 
 ## Request lifecycle
 
@@ -453,7 +453,7 @@ Students see their memories with `/memories` (`POST /memories/list`, numbered in
 | Class | Examples | Default behavior |
 |---|---|---|
 | `ReadPublic` | `search` | run |
-| `ReadAuthenticated` | `canvas_deadlines`, `outlook_mail`, `google_calendar`, a page inside the user's own session | allowed in a direct message; elsewhere deny unless `policy.allow_authenticated_reads` |
+| `ReadAuthenticated` | `canvas_deadlines`, `google_calendar`, a page inside the user's own session | allowed in a direct message; elsewhere deny unless `policy.allow_authenticated_reads` |
 | `PrepareWrite` | `run_sandbox`, `remember`, `forget_memory`, a draft, a form filled without submitting | run |
 | `ExternalWrite` | post, create a ticket, book, submit | require a `policy.write_roles` role, then confirm |
 | `Destructive` | delete, cancel | require a `policy.write_roles` role, then confirm |
@@ -498,9 +498,7 @@ The bot polls `GET /notifications/outgoing` every `bot.notify_every_secs` with t
 
 ## Linked accounts and integrations
 
-Platform runs every per-user login and holds the grants. Canvas is the exception (see Canvas). `/login <service>` in Discord calls `POST /oauth/{provider}/authorize`, which returns the Platform login link the bot shows privately. The user signs in through the provider's own SSO; SparkyAI never sees a password. `/logout <service>` calls `POST /oauth/{provider}/logout`, which removes the Platform-linked grant. The web Settings page calls the same routes with its session, plus `GET /oauth/{provider}/status`. A provider whose tool (`[gcal]`, `[outlook]`) is off answers 503. `Credentials` in `runtime::tools::account::grant` reads a caller's token for a provider from Platform, which refreshes an expired one.
-
-`runtime/tools/account/outlook` offers read-only Outlook tools over Microsoft Graph, off until `[outlook] enabled`: `outlook_calendar` and `outlook_mail`, both `ReadAuthenticated` and direct-message only, keyed to the `microsoft` provider. Reading ASU accounts needs ASU admin consent on the Platform Microsoft app.
+Platform runs every per-user login and holds the grants. Canvas is the exception (see Canvas). `/login <service>` in Discord calls `POST /oauth/{provider}/authorize`, which returns the Platform login link the bot shows privately. The user signs in through the provider's own SSO; SparkyAI never sees a password. `/logout <service>` calls `POST /oauth/{provider}/logout`, which removes the Platform-linked grant. The web Settings page calls the same routes with its session, plus `GET /oauth/{provider}/status`. A provider whose tool (`[gcal]`) is off answers 503; Google Calendar is the only one. `Credentials` in `runtime::tools::account::grant` reads a caller's token for a provider from Platform, which refreshes an expired one.
 
 `runtime/tools/account/gcal` offers a read-only `google_calendar` tool over the Google Calendar API, off until `[gcal] enabled`: it lists the caller's upcoming events, is `ReadAuthenticated` and direct-message only, and is keyed to the `google` provider. The Calendar REST client sits behind the `GoogleCalendar` trait in `core/traits/tools/gcal.rs`.
 
@@ -575,7 +573,7 @@ Care is not a nudge: `prompt.proactive_rules` asks Sparky to answer a stressed s
 
 Every nudge carries keys in `nudges_sent`, so nothing is said twice; keys older than `nudges.keep_days` are dropped. A nudge is a `notifications` row with `kind` set, so home and the bot deliver it like a reminder. `GET` and `PUT /web/nudges` read and keep a student's quiet hours and switched off kinds; `POST /web/notifications/{id}/feedback` records whether a nudge was useful, and not useful switches its kind off.
 
-`upcoming` (`runtime/tools/upcoming.rs`) lists what the caller has coming up in one call: remembered tasks, reminders, Canvas due dates, and Google and Outlook events, merged and sorted by date, at most `upcoming.max_items`, for the next `days` (default `upcoming.default_days`, at most `upcoming.max_days`). Each integration that has dated items adds an `UpcomingSource` (`core/traits/tools/upcoming.rs`) beside its tools; a source whose tool is in `tools.disabled` is left out, and the tool is registered only when `[upcoming] enabled` and at least one source is. The sources are read in parallel within the request deadline. A source that is not linked, fails, or runs out of time adds one line naming it. `upcoming` is `ReadAuthenticated` and `private`.
+`upcoming` (`runtime/tools/upcoming.rs`) lists what the caller has coming up in one call: remembered tasks, reminders, Canvas due dates, and Google Calendar events, merged and sorted by date, at most `upcoming.max_items`, for the next `days` (default `upcoming.default_days`, at most `upcoming.max_days`). Each integration that has dated items adds an `UpcomingSource` (`core/traits/tools/upcoming.rs`) beside its tools; a source whose tool is in `tools.disabled` is left out, and the tool is registered only when `[upcoming] enabled` and at least one source is. The sources are read in parallel within the request deadline. A source that is not linked, fails, or runs out of time adds one line naming it. `upcoming` is `ReadAuthenticated` and `private`.
 
 Three public, no-auth tools sit beside search: `search_papers` (Semantic Scholar), `wikipedia_lookup` (MediaWiki) and `read_page`. They are `ReadPublic`. `read_page` takes a URL and returns the page text; every hop must resolve to a public address on port 80 or 443, and the connection goes to the address that passed the check. With `read_page.save_pages` on, a page with text is sent to Platform as its URL only (`POST /api/knowledge/discovered`, `Discovery` trait, `stores/platform/discovery.rs`), in the background. Platform saves it as a crawled source and keeps it fresh, so the next search finds it in stored knowledge. `calculate` works out arithmetic and date math in the engine, with no network.
 
@@ -713,7 +711,7 @@ Two layers, lowest first: `sparky.toml`, then `SPARKY_<SECTION>__<KEY>` environm
 
 Rust reads the file with figment, `apps/evals` with tomllib through pydantic-settings. `SPARKY_CONFIG_FILE` points at a different file, such as an eval profile. A missing file is not an error.
 
-Sections in `sparky.toml`: `app`, `agent` (with `agent.thinking`), `prompt`, `model` (with `model.sampling`), `policy`, `tools`, `sandbox`, `guardrail`, `compaction`, `query`, `mcp`, `outlook`, `gcal`, `canvas`, `upcoming`, `reminders`, `nudges`, `chat_search`, `calculate`, `read_page`, `papers`, `wikipedia`, `trace`, `telemetry`, `analytics`, `http`, `web`, `home`, `admin`, `bot`, `platform`, `store`, `memory`, `cli`, `evals`. The `engine` and `discord` sections hold only env values: the service token and the guild id; `platform.url` and `platform.token` come from the environment too.
+Sections in `sparky.toml`: `app`, `agent` (with `agent.thinking`), `prompt`, `model` (with `model.sampling`), `policy`, `tools`, `sandbox`, `guardrail`, `compaction`, `query`, `mcp`, `gcal`, `canvas`, `upcoming`, `reminders`, `nudges`, `chat_search`, `calculate`, `read_page`, `papers`, `wikipedia`, `trace`, `telemetry`, `analytics`, `http`, `web`, `home`, `admin`, `bot`, `platform`, `store`, `memory`, `cli`, `evals`. The `engine` and `discord` sections hold only env values: the service token and the guild id; `platform.url` and `platform.token` come from the environment too.
 
 A default belongs to exactly one settings struct; adapters declare no defaults of their own. `Config::validate` rejects at boot any combination the engine cannot serve, for example a section budget above the prompt budget, a sample ratio out of range, two MCP servers with the same name, a missing or malformed `SPARKY_PLATFORM__URL`, a missing `SPARKY_PLATFORM__TOKEN`, an empty `platform.mcp_private` or `platform.mcp_skip` prefix, a `[canvas]` window with `default_days` above `max_days`, a `[web]` sign-in without its Discord app, session key, https URLs, or its site in `http.cors_origins`, or with `agent.confirmation_ttl_secs` past what the platform accepts. An unreadable `prompt.system_file` also stops the boot. Nothing is clamped at runtime.
 

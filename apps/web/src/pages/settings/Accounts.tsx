@@ -1,11 +1,11 @@
-import { CalendarDays, CalendarRange, Check, Mail } from "lucide-react";
+import { CalendarDays, CalendarRange, Check } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { canvasStatus, EngineError, removeCanvas, saveCanvas } from "../../chat/client";
 import LinkedAccount from "./LinkedAccount";
 
 type Status = "loading" | "linked" | "unlinked" | "off" | "error";
 
-/** Settings, Connected accounts: Google Calendar, Outlook, and the Canvas calendar feed. */
+/** Settings, Connected accounts: Google Calendar and the Canvas calendar feed. */
 const Accounts = () => {
   const [status, setStatus] = useState<Status>("loading");
   const [link, setLink] = useState("");
@@ -118,7 +118,6 @@ const Accounts = () => {
           </section>
 
           <LinkedAccount provider="google" name="Google Calendar" detail="Your events, read only, so Sparky can plan around them." icon={CalendarRange} />
-          <LinkedAccount provider="microsoft" name="Outlook" detail="Your ASU Outlook calendar and mail, read only." icon={Mail} />
     </section>
   );
 };
