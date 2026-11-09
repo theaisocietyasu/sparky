@@ -1,5 +1,4 @@
 import { ArrowRight } from "lucide-react";
-import Embers from "@/components/dragon/Embers";
 import { Link } from "react-router-dom";
 import { CHAT, RUN } from "./content";
 
@@ -8,8 +7,6 @@ const WORDS = ["Your", "university", "copilot."];
 /** Opening screen: the promise, the web chat and self-hosting, and the dragon coiled beside them. */
 const Hero = () => (
   <section aria-label="Introduction" className="relative isolate min-h-[100svh] overflow-hidden">
-    <Embers className="absolute inset-0 -z-10 h-full w-full" />
-
     <div className="mx-auto grid max-w-6xl items-center gap-6 px-5 pt-28 sm:px-8 lg:min-h-[100svh] lg:grid-cols-[1.05fr_0.95fr] lg:pt-16">
       <div className="lg:pt-24">
         <h1 className="font-serif text-[clamp(3.1rem,8vw,6.5rem)] font-black leading-[0.95] tracking-[-0.035em]">
