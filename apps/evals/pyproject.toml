@@ -4,15 +4,15 @@ version = "0.1.0"
 description = "Engine evals with a baseline gate"
 requires-python = ">=3.12"
 dependencies = [
-    "pydantic>=2.14.1",
-    "pydantic-settings>=2.16.1",
+    "pydantic>=2.14.3",
+    "pydantic-settings>=2.16.2",
     "httpx>=0.28.1",
-    "typer>=0.27.3",
+    "typer>=0.28.0",
     "rich>=15.0.0",
 ]
 
 [project.optional-dependencies]
-dev = ["ruff>=0.17.2", "pytest>=9.1.1"]
+dev = ["ruff>=0.17.4", "pytest>=9.2.0"]
 
 [project.scripts]
 eval = "evals.cli:app"
