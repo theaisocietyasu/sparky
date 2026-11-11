@@ -26,7 +26,7 @@ schemars = "1"
 secrecy = { version = "0.10", features = ["serde"] }
 
 # llm / agents
-rig-core = "0.42"
+rig-core = "0.46"
 rmcp = { version = "3", features = ["client", "transport-child-process", "transport-streamable-http-client", "transport-streamable-http-client-reqwest"] }
 
 # interfaces
@@ -37,9 +37,9 @@ tower-http = { version = "0.7", features = ["trace", "cors", "timeout"] }
 reqwest = { version = "0.13", default-features = false, features = ["json", "rustls", "stream"] }
 
 # storage
-sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "sqlite", "migrate", "macros"] }
-chacha20poly1305 = "0.10"
-base64 = "0.22"
+sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "sqlite", "migrate", "macros"] }
+chacha20poly1305 = "0.11"
+base64 = "0.23"
 pdf-extract = "0.12"
 wasmer = { version = "7.5", default-features = false, features = ["sys", "cranelift", "compiler"] }
 wasmer-wasix = { version = "0.705", default-features = false, features = ["sys", "host-fs", "sys-default"] }
