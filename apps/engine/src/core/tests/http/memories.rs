@@ -92,14 +92,11 @@ async fn post(router: &axum::Router, path: &str, token: &str, body: Value) -> (S
 }
 
 fn texts(list: &Value) -> Vec<String> {
-    list["memories"]
-        .as_array()
-        .map(|a| {
-            a.iter()
-                .filter_map(|m| m["text"].as_str().map(str::to_owned))
-                .collect()
-        })
-        .unwrap_or_default()
+    list["memories"].as_array().map_or_default(|a| {
+        a.iter()
+            .filter_map(|m| m["text"].as_str().map(str::to_owned))
+            .collect()
+    })
 }
 
 #[tokio::test]

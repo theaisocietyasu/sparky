@@ -40,7 +40,7 @@ impl Recalling {
 
     /// The memories held now.
     pub fn held(&self) -> Vec<Memory> {
-        self.held.lock().map(|h| h.clone()).unwrap_or_default()
+        self.held.lock().map_or_default(|h| h.clone())
     }
 }
 

@@ -251,11 +251,7 @@ pub fn when(item: &UpcomingItem, now: DateTime<Utc>, offset: FixedOffset) -> Str
 
 /// An item as one line: title, course, and when.
 fn line(item: &UpcomingItem, f: &Facts<'_>) -> String {
-    let course = item
-        .detail
-        .as_deref()
-        .map(|d| format!(" ({d})"))
-        .unwrap_or_default();
+    let course = item.detail.as_deref().map_or_default(|d| format!(" ({d})"));
     format!("{}{course}, {}", item.title, when(item, f.now, f.offset))
 }
 

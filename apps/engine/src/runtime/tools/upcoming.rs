@@ -149,16 +149,8 @@ fn render(
         } else {
             local.format("%a %Y-%m-%d %H:%M").to_string()
         };
-        let detail = item
-            .detail
-            .as_deref()
-            .map(|d| format!(" ({d})"))
-            .unwrap_or_default();
-        let link = item
-            .url
-            .as_deref()
-            .map(|u| format!(" {u}"))
-            .unwrap_or_default();
+        let detail = item.detail.as_deref().map_or_default(|d| format!(" ({d})"));
+        let link = item.url.as_deref().map_or_default(|u| format!(" {u}"));
         let _ = write!(text, "\n- {when} [{label}] {}{detail}{link}", item.title);
     }
     if items.len() > max {

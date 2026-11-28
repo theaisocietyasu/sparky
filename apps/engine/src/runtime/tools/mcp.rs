@@ -58,13 +58,12 @@ pub fn required_only(value: Value) -> Value {
     let required: Vec<String> = map
         .get("required")
         .and_then(Value::as_array)
-        .map(|items| {
+        .map_or_default(|items| {
             items
                 .iter()
                 .filter_map(|v| v.as_str().map(str::to_owned))
                 .collect()
-        })
-        .unwrap_or_default();
+        });
     if let Some(Value::Object(props)) = map.get_mut("properties") {
         props.retain(|k, _| required.contains(k));
     }

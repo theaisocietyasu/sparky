@@ -31,13 +31,11 @@ async fn a_backup_writes_a_copy_and_keeps_only_the_newest() {
         unreachable!("the backup runs")
     };
     assert!(copy.exists());
-    let mut names: Vec<String> = std::fs::read_dir(&dir)
-        .map(|d| {
-            d.filter_map(Result::ok)
-                .map(|e| e.file_name().to_string_lossy().into_owned())
-                .collect()
-        })
-        .unwrap_or_default();
+    let mut names: Vec<String> = std::fs::read_dir(&dir).map_or_default(|d| {
+        d.filter_map(Result::ok)
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .collect()
+    });
     names.sort();
     assert_eq!(names.len(), 2);
     assert_eq!(names[0], "sparky-20200102T000000Z.db");

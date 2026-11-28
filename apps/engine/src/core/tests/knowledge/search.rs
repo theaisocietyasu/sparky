@@ -58,7 +58,7 @@ async fn a_call_passes_its_arguments_to_platform_as_sent() {
     let _ = search
         .call(&ctx(), json!({"query": "career fair", "source": "events"}))
         .await;
-    let sent = sent.lock().map(|s| s.clone()).unwrap_or_default();
+    let sent = sent.lock().map_or_default(|s| s.clone());
     assert_eq!(sent.len(), 1);
     assert_eq!(sent[0]["query"], "career fair");
     assert_eq!(sent[0]["source"], "events");

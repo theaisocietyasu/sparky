@@ -98,8 +98,7 @@ impl Loaded {
     fn messages(&self) -> Vec<Message> {
         self.rows
             .lock()
-            .map(|rows| rows.iter().map(|r| r.message.clone()).collect())
-            .unwrap_or_default()
+            .map_or_default(|rows| rows.iter().map(|r| r.message.clone()).collect())
     }
 }
 
@@ -129,8 +128,7 @@ impl ConversationStore for Loaded {
         Ok(self
             .rows
             .lock()
-            .map(|rows| history_of(&rows, limit))
-            .unwrap_or_default())
+            .map_or_default(|rows| history_of(&rows, limit)))
     }
 
     async fn append(&self, _ctx: &RequestContext, turns: &[Message]) -> Result<(), StoreError> {
@@ -304,8 +302,7 @@ fn contents(
     at: usize,
 ) -> Vec<Message> {
     sent.lock()
-        .map(|r| r.get(at).map(|q| q.messages.clone()).unwrap_or_default())
-        .unwrap_or_default()
+        .map_or_default(|r| r.get(at).map_or_default(|q| q.messages.clone()))
 }
 
 #[tokio::test]
@@ -332,7 +329,7 @@ async fn a_compaction_leaves_room_so_the_next_request_reads_the_summary_and_comp
     assert!(agent.run(&ctx(), "turn four").await.is_ok());
     assert!(agent.run(&ctx(), "turn five").await.is_ok());
 
-    let compactions = transcripts.lock().map(|r| r.len()).unwrap_or_default();
+    let compactions = transcripts.lock().map_or_default(|r| r.len());
     assert_eq!(
         compactions, 1,
         "the second request fits and compacts nothing"
@@ -387,14 +384,11 @@ async fn the_kept_turns_start_on_a_question_never_on_a_tool_result() {
 
     assert!(agent.run(&ctx(), "next").await.is_ok());
 
-    let replaced: String = transcripts
-        .lock()
-        .map(|r| {
-            r.iter()
-                .flat_map(|q| q.messages.iter().map(|m| m.content.clone()))
-                .collect()
-        })
-        .unwrap_or_default();
+    let replaced: String = transcripts.lock().map_or_default(|r| {
+        r.iter()
+            .flat_map(|q| q.messages.iter().map(|m| m.content.clone()))
+            .collect()
+    });
     assert!(
         replaced.contains("TOOL-RESULT"),
         "the tool result is summarized"

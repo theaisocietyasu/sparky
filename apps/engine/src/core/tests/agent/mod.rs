@@ -63,7 +63,7 @@ async fn tool_result_is_fed_back_and_loop_continues() {
     assert!(sink.records().iter().any(
         |record| matches!(&record.event, TraceEvent::ToolCall { tool, .. } if tool == "echo")
     ));
-    let runs = out.map(|answer| answer.tool_runs).unwrap_or_default();
+    let runs = out.map_or_default(|answer| answer.tool_runs);
     assert_eq!(runs.len(), 1, "the answer reports what it ran");
     assert_eq!(runs[0].tool, "echo");
     assert!(runs[0].ok);
@@ -84,8 +84,7 @@ async fn a_failing_tool_is_reported_as_run_and_failed() {
     let runs = agent
         .run(&ctx(), "go")
         .await
-        .map(|answer| answer.tool_runs)
-        .unwrap_or_default();
+        .map_or_default(|answer| answer.tool_runs);
 
     assert_eq!(runs.len(), 1);
     assert_eq!(runs[0].tool, "boom");
@@ -189,7 +188,7 @@ async fn the_last_step_answers_from_what_the_tools_found() {
         Some("from what I found")
     );
     assert_eq!(out.as_ref().map(|answer| answer.steps), Some(3));
-    let requests = sent.lock().map(|r| r.clone()).unwrap_or_default();
+    let requests = sent.lock().map_or_default(|r| r.clone());
     assert!(
         requests.last().is_some_and(|r| r.tools.is_empty()),
         "the last step is offered no tools"
@@ -245,7 +244,7 @@ async fn the_tool_call_cap_makes_the_next_step_answer() {
     );
     let out = agent.run(&ctx(), "go").await.ok();
     assert_eq!(out.map(|answer| answer.text), Some("enough".into()));
-    let requests = sent.lock().map(|r| r.clone()).unwrap_or_default();
+    let requests = sent.lock().map_or_default(|r| r.clone());
     assert!(requests.last().is_some_and(|r| r.tools.is_empty()));
 }
 
@@ -392,7 +391,7 @@ async fn the_tool_free_step_is_told_to_answer_in_plain_text() {
     let sent = model.sent();
     let (agent, _) = agent(model, tools, AgentConfig::default());
     assert!(agent.run(&ctx(), "loop").await.is_ok());
-    let requests = sent.lock().map(|r| r.clone()).unwrap_or_default();
+    let requests = sent.lock().map_or_default(|r| r.clone());
     let last = requests.last();
     assert!(
         last.is_some_and(|r| r.tools.is_empty()),
@@ -566,10 +565,7 @@ async fn a_failed_tool_sends_the_run_to_the_sandbox_before_it_gives_up() {
 
     let out = agent.run(&ctx(), "when does hayden close").await.ok();
 
-    let runs = out
-        .as_ref()
-        .map(|a| a.tool_runs.clone())
-        .unwrap_or_default();
+    let runs = out.as_ref().map_or_default(|a| a.tool_runs.clone());
     assert!(
         runs.iter().any(|r| r.tool == "run_sandbox"),
         "the last route is taken before the user is told nothing was found, got {runs:?}"

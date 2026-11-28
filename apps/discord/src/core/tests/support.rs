@@ -117,7 +117,7 @@ pub(super) fn wait_for(seen: &Seen, n: usize) -> Vec<(String, String, String)> {
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
     let mut got = Vec::new();
     while std::time::Instant::now() < deadline {
-        got = seen.lock().map(|s| s.clone()).unwrap_or_default();
+        got = seen.lock().map_or_default(|s| s.clone());
         if got.len() >= n {
             break;
         }

@@ -240,9 +240,9 @@ fn integrations(cfg: &Config, personal: Personal) -> Vec<Integration<'_>> {
             "search_chats",
             cfg.chat_search.enabled && chats.is_some(),
             Box::new(move || {
-                Ok(chats
-                    .map(|store| Built::from(chats::tools(store, cfg.chat_search.max_hits)))
-                    .unwrap_or_default())
+                Ok(chats.map_or_default(|store| {
+                    Built::from(chats::tools(store, cfg.chat_search.max_hits))
+                }))
             }),
         ),
         (

@@ -326,8 +326,7 @@ impl Tool for DisconnectTool {
         let account = args
             .get("account")
             .and_then(Value::as_str)
-            .map(|a| a.trim().to_ascii_lowercase())
-            .unwrap_or_default();
+            .map_or_default(|a| a.trim().to_ascii_lowercase());
         let s = &self.stores;
         let Some(feeds) = s.canvas.as_ref().filter(|_| account == "canvas") else {
             return Err(ToolError::InvalidArguments(format!(

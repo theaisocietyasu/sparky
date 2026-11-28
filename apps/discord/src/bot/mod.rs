@@ -143,7 +143,7 @@ fn event(
     channel: ChannelId,
 ) -> AnalyticsEvent {
     AnalyticsEvent::new(name, &user)
-        .with("guild_id", guild.map(|g| g.to_string()).unwrap_or_default())
+        .with("guild_id", guild.map_or_default(|g| g.to_string()))
         .with("channel_id", channel.to_string())
 }
 

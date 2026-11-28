@@ -70,7 +70,7 @@ impl Fake {
 
     /// Every request received, in order.
     fn seen(&self) -> Vec<Seen> {
-        self.seen.lock().map(|s| s.clone()).unwrap_or_default()
+        self.seen.lock().map_or_default(|s| s.clone())
     }
 
     /// The last request received.

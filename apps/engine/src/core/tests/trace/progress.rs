@@ -260,11 +260,7 @@ async fn a_run_with_a_listener_records_and_reports_at_once() {
     );
 
     assert_eq!(sink.records().len(), 2, "every event is still traced");
-    let seen = rx
-        .try_recv()
-        .ok()
-        .map(|p: Progress| p.text)
-        .unwrap_or_default();
+    let seen = rx.try_recv().ok().map_or_default(|p: Progress| p.text);
     assert!(seen.contains("searching"), "{seen}");
     assert!(rx.try_recv().is_err(), "only user-visible events are sent");
 }

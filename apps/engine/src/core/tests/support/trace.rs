@@ -20,7 +20,7 @@ impl MemorySink {
     }
 
     pub fn records(&self) -> Vec<TraceRecord> {
-        self.records.lock().map(|r| r.clone()).unwrap_or_default()
+        self.records.lock().map_or_default(|r| r.clone())
     }
 }
 

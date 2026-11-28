@@ -305,7 +305,7 @@ const PLATFORM_MAX_TTL_SECS: u64 = 86_400;
 fn validate_platform(cfg: &Config) -> Result<(), ConfigError> {
     let invalid = |m: String| Err(ConfigError::Invalid(m));
     let platform = &cfg.platform;
-    let url = platform.url.as_deref().map(str::trim).unwrap_or_default();
+    let url = platform.url.as_deref().map_or_default(str::trim);
     if url::Url::parse(url).is_err() || !(url.starts_with("https://") || url.starts_with("http://"))
     {
         return invalid("set SPARKY_PLATFORM__URL, an http or https URL".into());

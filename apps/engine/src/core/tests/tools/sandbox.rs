@@ -903,7 +903,6 @@ async fn a_session_left_by_an_earlier_engine_is_removed() {
         ])
         .output()
         .await
-        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_owned())
-        .unwrap_or_default();
+        .map_or_default(|o| String::from_utf8_lossy(&o.stdout).trim().to_owned());
     assert!(still.is_empty(), "{name} is still there");
 }

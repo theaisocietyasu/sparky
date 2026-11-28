@@ -22,8 +22,7 @@ pub enum Unread {
 fn extension(file: &FileAttachment) -> String {
     file.name
         .rsplit_once('.')
-        .map(|(_, ext)| ext.to_ascii_lowercase())
-        .unwrap_or_default()
+        .map_or_default(|(_, ext)| ext.to_ascii_lowercase())
 }
 
 fn is_pdf(file: &FileAttachment) -> bool {

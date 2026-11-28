@@ -252,11 +252,7 @@ impl Handler {
         ctx: &Context,
         msg: &Message,
     ) -> Result<Vec<String>, serenity::Error> {
-        let held: Vec<RoleId> = msg
-            .member
-            .as_ref()
-            .map(|m| m.roles.clone())
-            .unwrap_or_default();
+        let held: Vec<RoleId> = msg.member.as_ref().map_or_default(|m| m.roles.clone());
         let owner = self.owner(ctx).await?;
         let roles = self.guild_id.roles(&ctx.http).await?;
         let bits: HashMap<RoleId, Permissions> =

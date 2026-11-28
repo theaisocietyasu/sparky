@@ -58,7 +58,7 @@ pub struct Recording {
 
 impl Recording {
     pub fn appended(&self) -> Vec<Message> {
-        self.turns.lock().map(|t| t.clone()).unwrap_or_default()
+        self.turns.lock().map_or_default(|t| t.clone())
     }
 }
 
@@ -182,8 +182,7 @@ impl ConversationStore for Rooms {
             rooms
                 .iter()
                 .find(|r| r.id == ctx.conversation_id && owned_by(r, ctx))
-                .map(|r| history_of(&r.rows, limit))
-                .unwrap_or_default()
+                .map_or_default(|r| history_of(&r.rows, limit))
         })
     }
 
