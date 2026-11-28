@@ -1,8 +1,6 @@
 //! ToolDefinition, RiskClass, ToolOutput, ToolError.
 
 pub mod canvas;
-pub mod gcal;
-pub mod oauth;
 pub mod sandbox;
 pub mod upcoming;
 

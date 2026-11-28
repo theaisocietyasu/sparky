@@ -268,8 +268,7 @@ impl Runner {
 /// The pairs .env holds at this moment, or none when it is missing or unreadable.
 fn dotenv(root: &Path) -> Vec<(String, String)> {
     dotenvy::from_path_iter(root.join(".env"))
-        .map(|pairs| pairs.filter_map(Result::ok).collect())
-        .unwrap_or_default()
+        .map_or_default(|pairs| pairs.filter_map(Result::ok).collect())
 }
 
 fn all_profiles() -> [&'static str; 12] {

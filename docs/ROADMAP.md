@@ -1,6 +1,6 @@
 # SparkyAI roadmap
 
-SparkyAI is an assistant for ASU students and their organizations, on Discord first and the web later. Platform holds knowledge, live ASU queries and linked accounts. Sparky keeps its own conversations, confirmations and memories. An open model trained on clean interaction data comes after the evals exist.
+SparkyAI is an assistant for ASU students and their organizations, on Discord first and the web later. Platform holds knowledge and live ASU queries. Sparky keeps its own conversations, confirmations, memories and the Canvas link. An open model trained on clean interaction data comes after the evals exist.
 
 The order of work and each phase's checklist are in the master issue [#79 SparkyAI v1.0](https://github.com/theaisocietyasu/sparky/issues/79) and its sub-issues.
 

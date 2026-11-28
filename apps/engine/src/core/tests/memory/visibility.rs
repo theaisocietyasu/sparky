@@ -14,7 +14,7 @@ async fn recalls(visibility: Visibility) -> (usize, Vec<String>) {
     let answered = agent
         .run(&ctx().with_visibility(visibility), "what do I study")
         .await;
-    let memories = answered.map(|a| a.memories).unwrap_or_default();
+    let memories = answered.map_or_default(|a| a.memories);
     (memory.calls(), memories)
 }
 
@@ -46,5 +46,5 @@ async fn a_private_turn_makes_only_the_model_calls_of_the_loop() {
     let ctx = ctx().with_visibility(Visibility::Private);
     assert!(agent.run(&ctx, "I am a CS junior at Poly").await.is_ok());
     tokio::task::yield_now().await;
-    assert_eq!(sent.lock().map(|s| s.len()).unwrap_or_default(), 1);
+    assert_eq!(sent.lock().map_or_default(|s| s.len()), 1);
 }

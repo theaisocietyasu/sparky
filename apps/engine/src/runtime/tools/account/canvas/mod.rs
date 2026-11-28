@@ -216,16 +216,8 @@ fn render(items: &[CanvasItem], days: u32, max: usize, offset: FixedOffset) -> T
             } else {
                 local.format("%a %Y-%m-%d %H:%M").to_string()
             };
-            let course = item
-                .course
-                .as_deref()
-                .map(|c| format!(" ({c})"))
-                .unwrap_or_default();
-            let link = item
-                .url
-                .as_deref()
-                .map(|u| format!(" {u}"))
-                .unwrap_or_default();
+            let course = item.course.as_deref().map_or_default(|c| format!(" ({c})"));
+            let link = item.url.as_deref().map_or_default(|u| format!(" {u}"));
             let _ = write!(text, "\n- {when} {}{course}{link}", item.title);
         }
         if items.len() > max {

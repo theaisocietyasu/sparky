@@ -6,7 +6,6 @@ mod commands;
 mod confirm;
 mod destination;
 mod feedback;
-mod login;
 pub(crate) mod memory;
 pub(crate) mod notify;
 mod respond;
@@ -144,7 +143,7 @@ fn event(
     channel: ChannelId,
 ) -> AnalyticsEvent {
     AnalyticsEvent::new(name, &user)
-        .with("guild_id", guild.map(|g| g.to_string()).unwrap_or_default())
+        .with("guild_id", guild.map_or_default(|g| g.to_string()))
         .with("channel_id", channel.to_string())
 }
 
@@ -294,8 +293,6 @@ impl EventHandler for Handler {
                 commands::RESET => self.reset(&ctx, &cmd).await,
                 commands::MEMORIES => self.memories(&ctx, &cmd).await,
                 commands::FORGET => self.forget(&ctx, &cmd).await,
-                commands::LOGIN => self.login(&ctx, &cmd).await,
-                commands::LOGOUT => self.logout(&ctx, &cmd).await,
                 commands::CANVAS => self.canvas(&ctx, &cmd).await,
                 other => tracing::warn!(command = other, "unknown command"),
             },

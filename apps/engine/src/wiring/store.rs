@@ -1,11 +1,12 @@
-//! Local store composition: conversations, memories, pending actions, Canvas feed links, reminders and nudges in the SQLite file.
+//! Store composition: conversations, memories, pending actions, Canvas feed links, reminders and nudges in the SQLite file, beside the platform adapters.
 
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
 use super::Stores;
-use crate::core::config::{Config, StoreBackend};
+use super::platform::Platform;
+use crate::core::config::Config;
 use crate::stores::sqlite::{
     BackupPlan, MemoryLimits, PrunePlan, ReminderLimits, Seal, SqliteStore, StoreOptions,
     run_backups, run_prunes, run_reminders,
@@ -29,22 +30,26 @@ pub(super) fn seal(cfg: &Config) -> anyhow::Result<Seal> {
     Ok(Seal::new(&key))
 }
 
-/// With store.backend sqlite, moves conversations, memories, pending actions and feed links to the file.
-pub(super) async fn localize(cfg: &Config, stores: &mut Stores) -> anyhow::Result<()> {
-    if cfg.store.backend == StoreBackend::Platform {
-        tracing::warn!(
-            "store.backend is platform; conversations and memories stay on the platform and Canvas is off"
-        );
-        return Ok(());
-    }
+/// Opens the SQLite file, starts its background loops, and gathers every store with the platform's.
+pub(super) async fn stores(cfg: &Config, platform: Platform) -> anyhow::Result<Stores> {
     let store = open(cfg).await?;
-    stores.conversations = Arc::new(store.conversations());
     let limits = MemoryLimits {
         max_per_user: cfg.memory.max_per_user,
         task_soon_days: cfg.memory.task_soon_days,
         utc_offset_hours: cfg.prompt.utc_offset_hours,
     };
-    stores.memory = Arc::new(store.memory(seal(cfg)?, limits));
+    let mut stores = Stores {
+        queries: platform.queries,
+        conversations: Arc::new(store.conversations()),
+        memory: Arc::new(store.memory(seal(cfg)?, limits)),
+        confirmations: Arc::new(store.confirmations()),
+        canvas: None,
+        reminders: None,
+        nudges: None,
+        admin: Some(Arc::new(store.admin())),
+        discovery: platform.discovery,
+        probes: vec![platform.probe, Arc::new(store.probe())],
+    };
     if cfg.canvas.enabled {
         stores.canvas = Some(Arc::new(store.canvas_feeds(seal(cfg)?)));
     }
@@ -63,9 +68,6 @@ pub(super) async fn localize(cfg: &Config, stores: &mut Stores) -> anyhow::Resul
             stores.nudges = Some(Arc::new(store.nudges(seal(cfg)?)));
         }
     }
-    stores.confirmations = Arc::new(store.confirmations());
-    stores.admin = Some(Arc::new(store.admin()));
-    stores.probes.push(Arc::new(store.probe()));
     let prune = PrunePlan {
         every: Duration::from_secs(cfg.store.prune_every_hours * 3600),
         idle_days: (cfg.store.conversation_idle_days > 0)
@@ -82,5 +84,5 @@ pub(super) async fn localize(cfg: &Config, stores: &mut Stores) -> anyhow::Resul
         tokio::spawn(run_backups(store.pool().clone(), plan));
     }
     tracing::info!(path = %cfg.store.path, "conversations and memories are in the local store");
-    Ok(())
+    Ok(stores)
 }

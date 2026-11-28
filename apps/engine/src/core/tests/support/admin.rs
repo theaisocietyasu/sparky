@@ -74,7 +74,7 @@ impl AdminStore for Ledger {
     }
 
     async fn held(&self, _tenant: &str) -> Result<Vec<HeldAction>, StoreError> {
-        Ok(self.held.lock().map(|h| h.clone()).unwrap_or_default())
+        Ok(self.held.lock().map_or_default(|h| h.clone()))
     }
 
     async fn deny(&self, _tenant: &str, token: &str) -> Result<bool, StoreError> {

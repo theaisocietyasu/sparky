@@ -1,4 +1,4 @@
-//! Router assembly: /chat, /conversation, /memories, /sandbox, /oauth, /canvas, /notifications, /web, /admin, and /health. home holds the home chat rules.
+//! Router assembly: /chat, /conversation, /memories, /sandbox, /canvas, /notifications, /web, /admin, and /health. home holds the home chat rules.
 
 use axum::Router;
 use axum::extract::DefaultBodyLimit;
@@ -17,7 +17,6 @@ pub mod health;
 pub mod home;
 pub mod memories;
 pub mod notifications;
-pub mod oauth;
 pub mod rate_limit;
 pub mod sandbox;
 pub mod session;
@@ -95,8 +94,6 @@ pub struct States {
     pub memories: memories::MemoryState,
     /// Sandbox routes.
     pub sandbox: sandbox::SandboxState,
-    /// Account link routes.
-    pub oauth: oauth::OAuthState,
     /// Canvas feed link routes.
     pub canvas: canvas::CanvasState,
     /// Reminder and notification routes.
@@ -114,7 +111,6 @@ pub fn router(states: States, limits: Limits, cors_origins: &[String]) -> Router
         health: health_state,
         memories: memory_state,
         sandbox: sandbox_state,
-        oauth: oauth_state,
         canvas: canvas_state,
         notifications: notification_state,
         web: web_state,
@@ -146,11 +142,6 @@ pub fn router(states: States, limits: Limits, cors_origins: &[String]) -> Router
         .route("/sandbox/enabled", post(sandbox::switch))
         .route("/sandbox/{name}", delete(sandbox::kill))
         .with_state(sandbox_state);
-    let oauth = Router::new()
-        .route("/oauth/{provider}/authorize", post(oauth::authorize))
-        .route("/oauth/{provider}/logout", post(oauth::disconnect))
-        .route("/oauth/{provider}/status", get(oauth::status))
-        .with_state(oauth_state);
     let canvas = Router::new()
         .route("/canvas/feed", post(canvas::save).get(canvas::status))
         .route("/canvas/feed/remove", post(canvas::remove))
@@ -192,7 +183,6 @@ pub fn router(states: States, limits: Limits, cors_origins: &[String]) -> Router
         .merge(chat)
         .merge(memories)
         .merge(sandbox)
-        .merge(oauth)
         .merge(canvas)
         .merge(notifications)
         .merge(web_routes(web_state))

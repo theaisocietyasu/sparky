@@ -110,8 +110,7 @@ fn sidebar(frame: &mut Frame, app: &App, area: Rect) {
                 .as_deref()
                 .and_then(|u| u.rsplit(':').next())
                 .filter(|p| p.chars().all(|c| c.is_ascii_digit()))
-                .map(|p| format!(":{p}"))
-                .unwrap_or_default();
+                .map_or_default(|p| format!(":{p}"));
             let name_width = 24usize.saturating_sub(port.len());
             items.push(ListItem::new(Line::from(vec![
                 Span::styled(format!("  {} ", u.status.glyph()), status_style(&u.status)),
@@ -142,8 +141,7 @@ fn logs(frame: &mut Frame, app: &mut App, area: Rect) {
     let elapsed = u
         .started_at
         .filter(|_| u.status.is_active())
-        .map(|t| format!(" · {}s", t.elapsed().as_secs()))
-        .unwrap_or_default();
+        .map_or_default(|t| format!(" · {}s", t.elapsed().as_secs()));
     let title = format!(
         " {} · {}{} · {} lines{} ",
         u.unit.id,

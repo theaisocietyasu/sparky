@@ -12,10 +12,9 @@ use futures::StreamExt;
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::core::types::{
-    AuthorizeRequest, AuthorizeResponse, ChatRequest, ChatResponse, ConfirmRequest,
-    DisconnectResponse, ERROR_BODY_CHARS, EngineError, ForgetRequest, ForgetResponse, MemoryList,
-    MemoryRequest, OutgoingList, ResetRequest, ResetResponse, SaveFeedRequest, SaveFeedResponse,
-    SentRequest, Update,
+    ChatRequest, ChatResponse, ConfirmRequest, ERROR_BODY_CHARS, EngineError, ForgetRequest,
+    ForgetResponse, MemoryList, MemoryRequest, OutgoingList, RemoveFeedRequest, RemoveFeedResponse,
+    ResetRequest, ResetResponse, SaveFeedRequest, SaveFeedResponse, SentRequest, Update,
 };
 use crate::engine::sse::{decode, drain_frames, take_complete};
 
@@ -67,25 +66,6 @@ impl EngineClient {
         self.post("/memories/forget", req).await
     }
 
-    /// Mints a consent URL for the caller and a provider. 503 when that login is not enabled.
-    pub async fn oauth_login(
-        &self,
-        provider: &str,
-        req: &AuthorizeRequest,
-    ) -> Result<AuthorizeResponse, EngineError> {
-        self.post(&format!("/oauth/{provider}/authorize"), req)
-            .await
-    }
-
-    /// Disconnects the caller's grant for a provider.
-    pub async fn oauth_logout(
-        &self,
-        provider: &str,
-        req: &AuthorizeRequest,
-    ) -> Result<DisconnectResponse, EngineError> {
-        self.post(&format!("/oauth/{provider}/logout"), req).await
-    }
-
     /// Keeps the caller's Canvas calendar feed link.
     pub async fn canvas_save(
         &self,
@@ -97,8 +77,8 @@ impl EngineClient {
     /// Removes the caller's Canvas calendar feed link.
     pub async fn canvas_remove(
         &self,
-        req: &AuthorizeRequest,
-    ) -> Result<DisconnectResponse, EngineError> {
+        req: &RemoveFeedRequest,
+    ) -> Result<RemoveFeedResponse, EngineError> {
         self.post("/canvas/feed/remove", req).await
     }
 

@@ -149,7 +149,7 @@ fn render(query: &str, papers: Vec<RawPaper>, max: usize) -> ToolOutput {
         let mut lines = format!("{} papers for {query:?}:", shown.len());
         for p in &shown {
             let title = p.title.as_deref().unwrap_or("untitled");
-            let year = p.year.map(|y| format!(" ({y})")).unwrap_or_default();
+            let year = p.year.map_or_default(|y| format!(" ({y})"));
             let authors: Vec<&str> = p
                 .authors
                 .iter()

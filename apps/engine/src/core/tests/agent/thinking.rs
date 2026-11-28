@@ -33,8 +33,7 @@ fn first(input: &str) -> StepSignals<'_> {
 /// Whether each request the model was sent asked it to think.
 fn thinking_sent(sent: &Arc<Mutex<Vec<ModelRequest>>>) -> Vec<bool> {
     sent.lock()
-        .map(|requests| requests.iter().map(|r| r.thinking).collect())
-        .unwrap_or_default()
+        .map_or_default(|requests| requests.iter().map(|r| r.thinking).collect())
 }
 
 #[test]
@@ -216,8 +215,7 @@ async fn the_loop_sends_the_decision_with_each_call() {
     );
     let budgets: Vec<u32> = sent
         .lock()
-        .map(|r| r.iter().map(|q| q.max_tokens).collect())
-        .unwrap_or_default();
+        .map_or_default(|r| r.iter().map(|q| q.max_tokens).collect());
     assert_eq!(
         budgets,
         vec![4096, 512],

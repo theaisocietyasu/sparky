@@ -18,7 +18,6 @@ thiserror.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 uuid.workspace = true
-chrono.workspace = true
 secrecy.workspace = true
 serenity.workspace = true
 reqwest.workspace = true

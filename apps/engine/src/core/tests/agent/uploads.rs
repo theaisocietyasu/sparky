@@ -145,11 +145,7 @@ async fn an_attached_file_lands_in_the_workspace_and_its_text_reaches_the_prompt
     let ctx = ctx().with_files(vec![syllabus()]);
     assert!(agent.run(&ctx, "when is the midterm?").await.is_ok());
 
-    let written = workspace
-        .written
-        .lock()
-        .map(|w| w.clone())
-        .unwrap_or_default();
+    let written = workspace.written.lock().map_or_default(|w| w.clone());
     assert_eq!(written.len(), 1, "{written:?}");
     let (session, name, bytes) = &written[0];
     assert_eq!(name, "upload-CSE_310_syllabus.pdf");
@@ -159,8 +155,7 @@ async fn an_attached_file_lands_in_the_workspace_and_its_text_reaches_the_prompt
         .lock()
         .ok()
         .and_then(|r| r.first().cloned())
-        .map(|r| r.messages.iter().map(|m| m.content.clone()).collect())
-        .unwrap_or_default();
+        .map_or_default(|r| r.messages.iter().map(|m| m.content.clone()).collect());
     assert!(
         prompt.contains("/tmp/upload-CSE_310_syllabus.pdf"),
         "{prompt}"
@@ -176,7 +171,7 @@ async fn an_attached_file_lands_in_the_workspace_and_its_text_reaches_the_prompt
         prompt.contains("/tmp/upload-CSE_310_syllabus.pdf.txt"),
         "{prompt}"
     );
-    let ran = workspace.ran.lock().map(|r| r.clone()).unwrap_or_default();
+    let ran = workspace.ran.lock().map_or_default(|r| r.clone());
     assert!(
         ran.first().is_some_and(|c| c.contains("pdftotext")),
         "the file is turned into text in the sandbox: {ran:?}"
@@ -213,8 +208,7 @@ async fn a_file_no_text_came_out_of_is_left_for_the_model_to_open() {
         .lock()
         .ok()
         .and_then(|r| r.first().cloned())
-        .map(|r| r.messages.iter().map(|m| m.content.clone()).collect())
-        .unwrap_or_default();
+        .map_or_default(|r| r.messages.iter().map(|m| m.content.clone()).collect());
     assert!(prompt.contains("no text could be pulled"), "{prompt}");
 }
 
@@ -238,8 +232,7 @@ async fn a_file_that_cannot_be_read_is_named_as_unopened() {
         .lock()
         .ok()
         .and_then(|r| r.first().cloned())
-        .map(|r| r.messages.iter().map(|m| m.content.clone()).collect())
-        .unwrap_or_default();
+        .map_or_default(|r| r.messages.iter().map(|m| m.content.clone()).collect());
     assert!(prompt.contains("could not be opened"), "{prompt}");
     assert!(prompt.contains("connection refused"), "{prompt}");
 }
@@ -399,8 +392,7 @@ fn first_text(sent: &Arc<Mutex<Vec<crate::core::types::model::ModelRequest>>>) -
     sent.lock()
         .ok()
         .and_then(|r| r.first().cloned())
-        .map(|r| r.messages.iter().map(|m| m.content.clone()).collect())
-        .unwrap_or_default()
+        .map_or_default(|r| r.messages.iter().map(|m| m.content.clone()).collect())
 }
 
 fn inline(name: &str, media_type: &str, body: &[u8]) -> FileAttachment {

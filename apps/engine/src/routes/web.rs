@@ -50,8 +50,7 @@ impl WebState {
     /// Path of the sign-in routes as the browser sees them, under the path of the public URL.
     fn state_path(&self) -> String {
         let base = url::Url::parse(&self.public_url)
-            .map(|u| u.path().trim_end_matches('/').to_owned())
-            .unwrap_or_default();
+            .map_or_default(|u| u.path().trim_end_matches('/').to_owned());
         format!("{base}/web")
     }
 
@@ -126,7 +125,7 @@ pub async fn callback(
     headers: HeaderMap,
     Query(query): Query<HashMap<String, String>>,
 ) -> Response {
-    let sent = query.get("state").map(String::as_str).unwrap_or_default();
+    let sent = query.get("state").map_or_default(String::as_str);
     let held = cookie(&headers, &state.state_cookie()).unwrap_or_default();
     if sent.is_empty() || !same_secret(sent.as_bytes(), held.as_bytes()) {
         return state.back("expired", None);

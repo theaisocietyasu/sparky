@@ -62,7 +62,7 @@ fn exported(cfg: &Telemetry, seen: &Seen) -> Vec<(String, String)> {
     let deadline = Instant::now() + Duration::from_secs(10);
     let mut got = Vec::new();
     while Instant::now() < deadline {
-        got = seen.lock().map(|s| s.clone()).unwrap_or_default();
+        got = seen.lock().map_or_default(|s| s.clone());
         if !got.is_empty() {
             break;
         }

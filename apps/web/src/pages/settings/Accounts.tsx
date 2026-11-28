@@ -1,11 +1,10 @@
-import { CalendarDays, CalendarRange, Check } from "lucide-react";
+import { CalendarDays, Check } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { canvasStatus, EngineError, removeCanvas, saveCanvas } from "../../chat/client";
-import LinkedAccount from "./LinkedAccount";
 
 type Status = "loading" | "linked" | "unlinked" | "off" | "error";
 
-/** Settings, Connected accounts: Google Calendar and the Canvas calendar feed. */
+/** Settings, Connected accounts: the Canvas calendar feed. */
 const Accounts = () => {
   const [status, setStatus] = useState<Status>("loading");
   const [link, setLink] = useState("");
@@ -116,8 +115,6 @@ const Accounts = () => {
               </p>
             )}
           </section>
-
-          <LinkedAccount provider="google" name="Google Calendar" detail="Your events, read only, so Sparky can plan around them." icon={CalendarRange} />
     </section>
   );
 };

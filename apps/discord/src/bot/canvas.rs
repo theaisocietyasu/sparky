@@ -9,7 +9,7 @@ use tracing::Instrument;
 use super::commands;
 use super::respond::{defer_private, fill, finish};
 use super::{Handler, error_kind, event};
-use crate::core::types::{AuthorizeRequest, EngineError, SaveFeedRequest};
+use crate::core::types::{EngineError, RemoveFeedRequest, SaveFeedRequest};
 
 /// Longest link the form accepts, as the engine does.
 const MAX_LINK_CHARS: u16 = 512;
@@ -118,7 +118,7 @@ impl Handler {
         if !defer_private(ctx, cmd).await {
             return;
         }
-        let req = AuthorizeRequest {
+        let req = RemoveFeedRequest {
             user: cmd.user.id.to_string(),
         };
         let span = tracing::info_span!(

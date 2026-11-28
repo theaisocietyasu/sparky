@@ -1,4 +1,4 @@
-//! Slash command names and their registration: reset, memories, forget, login, logout, canvas.
+//! Slash command names and their registration: reset, memories, forget, canvas.
 
 use serenity::all::{CommandOptionType, CreateCommand, CreateCommandOption};
 
@@ -10,10 +10,6 @@ pub const MEMORIES: &str = "memories";
 pub const FORGET: &str = "forget";
 /// Name of the option on /forget: a number from /memories, or all.
 pub const WHICH: &str = "which";
-/// The /login command, which connects one of the user's accounts.
-pub const LOGIN: &str = "login";
-/// The /logout command, which disconnects one of the user's accounts.
-pub const LOGOUT: &str = "logout";
 /// The /canvas command, which links or unlinks the user's Canvas calendar feed.
 pub const CANVAS: &str = "canvas";
 /// The /canvas subcommand that opens the form for the feed link.
@@ -22,10 +18,6 @@ pub const CANVAS_LINK: &str = "link";
 pub const CANVAS_UNLINK: &str = "unlink";
 /// Custom id of the form that takes the feed link, and of its one field.
 pub const CANVAS_FORM: &str = "canvas_feed";
-/// Name of the service option on /login and /logout.
-pub const SERVICE: &str = "service";
-/// The services a login connects: the option value is the provider key the engine expects.
-pub const SERVICES: [(&str, &str); 1] = [("Google Calendar", "google")];
 
 /// Every command the bot registers on its guild.
 pub fn all() -> Vec<CreateCommand> {
@@ -43,12 +35,6 @@ pub fn all() -> Vec<CreateCommand> {
                 )
                 .required(true),
             ),
-        CreateCommand::new(LOGIN)
-            .description("Connect your Google Calendar so Sparky can check it in DMs")
-            .add_option(service_option()),
-        CreateCommand::new(LOGOUT)
-            .description("Disconnect your Google Calendar from Sparky")
-            .add_option(service_option()),
         CreateCommand::new(CANVAS)
             .description("Link your Canvas calendar so Sparky can list due dates in DMs")
             .add_option(CreateCommandOption::new(
@@ -62,18 +48,4 @@ pub fn all() -> Vec<CreateCommand> {
                 "Remove your Canvas Calendar Feed link from Sparky",
             )),
     ]
-}
-
-/// The required service choice shared by /login and /logout.
-fn service_option() -> CreateCommandOption {
-    let mut option = CreateCommandOption::new(
-        CommandOptionType::String,
-        SERVICE,
-        "Which account to connect or disconnect",
-    )
-    .required(true);
-    for (label, value) in SERVICES {
-        option = option.add_string_choice(label, value);
-    }
-    option
 }

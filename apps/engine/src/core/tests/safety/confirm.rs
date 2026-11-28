@@ -51,8 +51,7 @@ async fn only_the_caller_who_was_asked_can_claim_it() {
         .await
         .ok()
         .and_then(|a| a.confirmation)
-        .map(|c| c.token)
-        .unwrap_or_default();
+        .map_or_default(|c| c.token);
 
     let someone_else = crate::core::types::agent::context::RequestContext::new(
         "g",
@@ -112,7 +111,7 @@ async fn approving_runs_the_action_and_carries_on_to_an_answer() {
         Some("Done — the message is posted."),
         "the agent speaks after the action, not the raw tool output"
     );
-    let ran = out.map(|a| a.tool_runs).unwrap_or_default();
+    let ran = out.map_or_default(|a| a.tool_runs);
     assert_eq!(ran.len(), 1);
     assert_eq!(ran[0].tool, "echo");
     assert!(ran[0].ok);

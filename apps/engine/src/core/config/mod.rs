@@ -77,13 +77,10 @@ pub struct Config {
     /// MCP servers exposed as tools.
     #[serde(default)]
     pub mcp: Mcp,
-    /// Google Calendar integration. Off by default.
-    #[serde(default)]
-    pub gcal: Gcal,
     /// Canvas calendar feed integration.
     #[serde(default)]
     pub canvas: Canvas,
-    /// The upcoming tool over tasks, Canvas and calendars.
+    /// The upcoming tool over tasks, reminders and Canvas.
     #[serde(default)]
     pub upcoming: Upcoming,
     /// Reminders and notifications.
@@ -110,7 +107,7 @@ pub struct Config {
     /// Wikipedia lookups.
     #[serde(default)]
     pub wikipedia: Wikipedia,
-    /// The platform that holds the knowledge base, the live queries, and the linked accounts.
+    /// The platform that holds the knowledge base and the live queries.
     #[serde(default)]
     pub platform: Platform,
     /// Where conversations, memories and pending actions live.
@@ -308,7 +305,7 @@ const PLATFORM_MAX_TTL_SECS: u64 = 86_400;
 fn validate_platform(cfg: &Config) -> Result<(), ConfigError> {
     let invalid = |m: String| Err(ConfigError::Invalid(m));
     let platform = &cfg.platform;
-    let url = platform.url.as_deref().map(str::trim).unwrap_or_default();
+    let url = platform.url.as_deref().map_or_default(str::trim);
     if url::Url::parse(url).is_err() || !(url.starts_with("https://") || url.starts_with("http://"))
     {
         return invalid("set SPARKY_PLATFORM__URL, an http or https URL".into());

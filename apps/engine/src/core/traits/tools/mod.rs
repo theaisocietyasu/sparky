@@ -2,7 +2,6 @@
 
 pub mod canvas;
 pub mod files;
-pub mod gcal;
 pub mod sandbox;
 pub mod upcoming;
 

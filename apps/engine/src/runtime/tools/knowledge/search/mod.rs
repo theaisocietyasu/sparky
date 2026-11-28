@@ -59,12 +59,10 @@ pub fn render_stored(pages: &[StoredPage], note: Option<&str>, now: DateTime<Utc
         let link = page
             .url
             .as_deref()
-            .map(|url| format!(" - {url}"))
-            .unwrap_or_default();
+            .map_or_default(|url| format!(" - {url}"));
         let fetched = page
             .fetched_at
-            .map(|at| format!(" (stored copy, fetched {})", age(at, now)))
-            .unwrap_or_default();
+            .map_or_default(|at| format!(" (stored copy, fetched {})", age(at, now)));
         let _ = write!(
             out,
             "[{}] {}{link}{fetched}\n{}\n\n",

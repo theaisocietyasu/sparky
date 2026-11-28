@@ -50,8 +50,7 @@ pub async fn opens_topic(
         .into_iter()
         .rev()
         .find(|s| s.message.role == Role::Assistant)
-        .map(|s| s.message.content)
-        .unwrap_or_default();
+        .map_or_default(|s| s.message.content);
     let input = format!("Sparky's last message:\n{last}\n\nThe student's message:\n{message}");
     match router.run(ctx, &input).await {
         Ok(answer) => answer.trim().to_uppercase().starts_with("THREAD"),

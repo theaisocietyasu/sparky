@@ -84,7 +84,7 @@ describe("admin pages", () => {
   });
 
   it("denies a held action", async () => {
-    let held = [{ token: "t1", user_id: "222", tool: "gcal_create", created_at: "a", expires_at: "b" }];
+    let held = [{ token: "t1", user_id: "222", tool: "disconnect", created_at: "a", expires_at: "b" }];
     engine({
       "GET /web/me": () => Response.json(MOD),
       "GET /admin/approvals": () => Response.json(held),
@@ -94,7 +94,7 @@ describe("admin pages", () => {
       },
     });
     open("/admin/approvals");
-    fireEvent.click(await screen.findByRole("button", { name: "Deny gcal_create for 222" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Deny disconnect for 222" }));
     expect(await screen.findByText("Nothing is waiting.")).toBeInTheDocument();
   });
 

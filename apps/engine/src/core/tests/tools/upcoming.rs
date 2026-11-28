@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use chrono::{DateTime, FixedOffset, TimeZone, Utc};
+use chrono::{DateTime, FixedOffset, Utc};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -15,17 +15,13 @@ use crate::core::types::agent::context::RequestContext;
 use crate::core::types::conversation::Visibility;
 use crate::core::types::memory::{Memory, MemoryKind, NewMemory};
 use crate::core::types::store::StoreError;
-use crate::core::types::tools::upcoming::{UpcomingItem, parse_start};
+use crate::core::types::tools::upcoming::UpcomingItem;
 use crate::core::types::tools::{RiskClass, ToolError};
 use crate::runtime::tools::memory::MemoryTasks;
 use crate::runtime::tools::upcoming::{UpcomingTool, Window};
 
 fn utc() -> FixedOffset {
     FixedOffset::east_opt(0).unwrap_or_else(|| unreachable!("a valid offset"))
-}
-
-fn arizona() -> FixedOffset {
-    FixedOffset::west_opt(7 * 3600).unwrap_or_else(|| unreachable!("a valid offset"))
 }
 
 fn item(title: &str, hours: i64) -> UpcomingItem {
@@ -60,7 +56,7 @@ impl UpcomingSource for Fake {
         _until: DateTime<Utc>,
     ) -> Result<Vec<UpcomingItem>, String> {
         if self.hang {
-            tokio::time::sleep(Duration::from_secs(60)).await;
+            tokio::time::sleep(Duration::from_mins(1)).await;
         }
         self.answer.clone()
     }
@@ -100,10 +96,7 @@ async fn items_from_every_source_come_back_in_one_list_by_date() {
     let upcoming = tool(vec![
         fake("Canvas", Ok(vec![item("Homework 3", 30), item("Quiz", 2)])),
         fake("Tasks", Ok(vec![item("Club meeting", 10)])),
-        fake(
-            "Google Calendar",
-            Err("not connected; send /login and choose Google Calendar".into()),
-        ),
+        fake("Reminders", Err("not set up".into())),
     ]);
     let Ok(out) = upcoming.call(&dm(Duration::from_secs(5)), json!({})).await else {
         unreachable!("the tool answers")
@@ -120,8 +113,7 @@ async fn items_from_every_source_come_back_in_one_list_by_date() {
         out.content
     );
     assert!(
-        out.content
-            .contains("Not included: Google Calendar: not connected"),
+        out.content.contains("Not included: Reminders: not set up"),
         "{}",
         out.content
     );
@@ -148,7 +140,7 @@ async fn the_list_is_capped() {
 #[tokio::test]
 async fn a_slow_source_is_cut_at_the_deadline() {
     let slow: Arc<dyn UpcomingSource> = Arc::new(Fake {
-        label: "Google Calendar",
+        label: "Reminders",
         answer: Ok(vec![item("Never", 1)]),
         hang: true,
     });
@@ -165,8 +157,7 @@ async fn a_slow_source_is_cut_at_the_deadline() {
         out.content
     );
     assert!(
-        out.content
-            .contains("Google Calendar: did not answer in time"),
+        out.content.contains("Reminders: did not answer in time"),
         "{}",
         out.content
     );
@@ -190,28 +181,6 @@ async fn the_tool_is_refused_in_a_server_and_checks_days() {
             "{days}: {out:?}"
         );
     }
-}
-
-#[test]
-fn a_start_is_read_in_each_form_the_calendars_send() {
-    let at = |y, mo, d, h, mi| {
-        Utc.with_ymd_and_hms(y, mo, d, h, mi, 0)
-            .single()
-            .unwrap_or_default()
-    };
-    assert_eq!(
-        parse_start("2026-11-05T09:00:00-07:00", arizona()),
-        Some((at(2026, 11, 5, 16, 0), false))
-    );
-    assert_eq!(
-        parse_start("2026-11-05", arizona()),
-        Some((at(2026, 11, 5, 7, 0), true))
-    );
-    assert_eq!(
-        parse_start("2026-11-05T17:30:00.0000000", arizona()),
-        Some((at(2026, 11, 5, 17, 30), false))
-    );
-    assert_eq!(parse_start("soon", arizona()), None);
 }
 
 /// A store that holds fixed memories.
