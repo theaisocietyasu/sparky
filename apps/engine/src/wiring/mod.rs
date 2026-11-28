@@ -1,14 +1,12 @@
 //! Construct concrete adapters, hand them to the harness, build the router, serve.
 //!
-//! Knowledge, live queries and linked accounts are the platform's. Conversations, memories and
-//! pending actions are in the SQLite file unless store.backend is platform. Everything past
-//! Stores sees traits alone.
+//! Knowledge and live queries are the platform's. Conversations, memories and pending actions
+//! are in the SQLite file. Everything past Stores sees traits alone.
 
 mod agent;
 mod background;
 mod boot;
 mod http;
-mod import;
 mod platform;
 mod prompt;
 mod store;
@@ -17,7 +15,7 @@ pub(crate) mod tools;
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::core::config::{Config, StoreBackend};
+use crate::core::config::Config;
 use crate::core::traits::admin::AdminStore;
 use crate::core::traits::conversation::ConversationStore;
 use crate::core::traits::health::Probe;
@@ -26,7 +24,6 @@ use crate::core::traits::knowledge::query::SourceQueries;
 use crate::core::traits::memory::MemoryStore;
 use crate::core::traits::model::ModelProvider;
 use crate::core::traits::nudge::NudgeStore;
-use crate::core::traits::oauth::OAuthStore;
 use crate::core::traits::reminder::ReminderStore;
 use crate::core::traits::safety::confirmation::ConfirmationStore;
 use crate::core::traits::tools::canvas::CanvasFeeds;
@@ -46,9 +43,7 @@ use self::http::http_router;
 use self::prompt::SYSTEM_PROMPT;
 use self::tools::{Personal, build_tools, sandbox};
 
-pub use self::import::import_platform;
-
-/// Every store the harness, tools and routes read, from whichever mode is on.
+/// Every store the harness, tools and routes read.
 struct Stores {
     /// Platform search.
     queries: Arc<dyn SourceQueries>,
@@ -58,15 +53,13 @@ struct Stores {
     memory: Arc<dyn MemoryStore>,
     /// Actions waiting on approval.
     confirmations: Arc<dyn ConfirmationStore>,
-    /// Per-user account grants.
-    oauth_store: Arc<dyn OAuthStore>,
-    /// Canvas calendar feed links, when the local store holds them.
+    /// Canvas calendar feed links, when Canvas is on.
     canvas: Option<Arc<dyn CanvasFeeds>>,
-    /// Reminders and notifications, when the local store holds them.
+    /// Reminders and notifications, when they are on.
     reminders: Option<Arc<dyn ReminderStore>>,
-    /// Nudges, when the local store holds them and they are on.
+    /// Nudges, when reminders and nudges are on.
     nudges: Option<Arc<dyn NudgeStore>>,
-    /// Admin changes, when the local store holds them.
+    /// Admin changes.
     admin: Option<Arc<dyn AdminStore>>,
     /// Where pages read_page reads are suggested, when read_page.save_pages is on.
     discovery: Option<Arc<dyn Discovery>>,
@@ -98,20 +91,17 @@ pub async fn serve(cfg: Config) -> anyhow::Result<()> {
         Arc::new(Fanout::new(trace_sink(&cfg)?).with_style(cfg.agent.progress_style()));
 
     // Every configured dependency must be reachable at boot.
-    let mut stores = platform::stores(&cfg)?;
-    store::localize(&cfg, &mut stores).await?;
+    let stores = store::stores(&cfg, platform::platform(&cfg)?).await?;
     let sandbox = sandbox(&cfg).await?;
     let (tools, mcp_names, upcoming) = build_tools(
         &cfg,
         Arc::clone(&stores.queries),
         sandbox.clone(),
-        Arc::clone(&stores.oauth_store),
         Personal {
             canvas: stores.canvas.clone(),
             reminders: stores.reminders.clone(),
             memory: memory_tools(&cfg, &stores, &trace),
-            chats: (cfg.store.backend == StoreBackend::Sqlite)
-                .then(|| Arc::clone(&stores.conversations)),
+            chats: Some(Arc::clone(&stores.conversations)),
             pages: stores.discovery.clone(),
             nudges: stores
                 .nudges
@@ -175,13 +165,13 @@ pub async fn serve(cfg: Config) -> anyhow::Result<()> {
     .await
 }
 
-/// The store and trace the memory tools write to, when memory.tools is on over the SQLite store.
+/// The store and trace the memory tools write to, when memory.tools is on.
 fn memory_tools(
     cfg: &Config,
     stores: &Stores,
     trace: &Arc<dyn TraceSink>,
 ) -> Option<(Arc<dyn MemoryStore>, Arc<dyn TraceSink>)> {
-    if !cfg.memory.tools || cfg.store.backend != StoreBackend::Sqlite {
+    if !cfg.memory.tools {
         return None;
     }
     Some((Arc::clone(&stores.memory), Arc::clone(trace)))

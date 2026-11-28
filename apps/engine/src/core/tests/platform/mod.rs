@@ -1,11 +1,7 @@
 //! Platform-backed adapters against a scripted fake platform that records every request.
 
 mod config;
-mod confirmation;
-mod conversation;
 mod discovery;
-mod memory;
-mod oauth;
 mod query;
 mod tools;
 
@@ -29,9 +25,7 @@ const TOKEN: &str = "plat_test";
 /// One request the fake received.
 #[derive(Debug, Clone)]
 struct Seen {
-    method: String,
     path: String,
-    query: HashMap<String, String>,
     body: Value,
 }
 
@@ -107,20 +101,10 @@ async fn answer(
     headers: HeaderMap,
     body: Bytes,
 ) -> Response {
-    let query = uri
-        .query()
-        .map(|q| {
-            url::form_urlencoded::parse(q.as_bytes())
-                .into_owned()
-                .collect::<HashMap<_, _>>()
-        })
-        .unwrap_or_default();
     let body = serde_json::from_slice(&body).unwrap_or(Value::Null);
     if let Ok(mut seen) = fake.seen.lock() {
         seen.push(Seen {
-            method: method.to_string(),
             path: uri.path().to_owned(),
-            query,
             body,
         });
     }
@@ -187,9 +171,6 @@ fn caller() -> RequestContext {
     RequestContext::new("guild", "111", Duration::from_secs(30))
 }
 
-/// The member path prefix of user 111.
-const MEMBER: &str = "/api/agents/members/111";
-
 #[tokio::test]
 async fn the_client_rejects_a_base_that_is_not_a_url() {
     assert!(
@@ -199,14 +180,6 @@ async fn the_client_rejects_a_base_that_is_not_a_url() {
             Duration::from_secs(1)
         )
         .is_err()
-    );
-}
-
-#[test]
-fn a_member_id_is_one_escaped_path_segment() {
-    assert_eq!(
-        PlatformClient::member("a/b c", "/memories"),
-        "/api/agents/members/a%2Fb%20c/memories"
     );
 }
 

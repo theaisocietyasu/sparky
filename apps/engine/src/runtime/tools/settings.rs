@@ -8,12 +8,10 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 
 use crate::core::traits::nudge::NudgeStore;
-use crate::core::traits::oauth::OAuthStore;
 use crate::core::traits::tools::Tool;
 use crate::core::traits::tools::canvas::CanvasFeeds;
 use crate::core::types::agent::context::RequestContext;
 use crate::core::types::nudge::{NudgeKind, NudgePrefs, Person};
-use crate::core::types::tools::oauth::USER_SCOPE;
 use crate::core::types::tools::{RiskClass, ToolDefinition, ToolError, ToolOutput};
 
 /// Name of the settings tool.
@@ -30,17 +28,6 @@ pub struct SettingsStores {
     pub nudge_defaults: Option<NudgePrefs>,
     /// Canvas calendar feed links.
     pub canvas: Option<Arc<dyn CanvasFeeds>>,
-    /// Linked accounts whose tool is on.
-    pub accounts: Option<Accounts>,
-}
-
-/// The accounts a student can link through a sign-in, and where their grants are kept.
-#[derive(Clone)]
-pub struct Accounts {
-    /// Where grants are kept and sign-ins start.
-    pub store: Arc<dyn OAuthStore>,
-    /// Each account as the model names it, with its provider.
-    pub names: Vec<(String, String)>,
 }
 
 /// The arguments of settings.
@@ -105,19 +92,7 @@ impl SettingsStores {
         if self.canvas.is_some() {
             names.push("canvas".to_owned());
         }
-        if let Some(accounts) = &self.accounts {
-            names.extend(accounts.names.iter().map(|(name, _)| name.clone()));
-        }
         names
-    }
-
-    fn provider(&self, account: &str) -> Option<(&Arc<dyn OAuthStore>, &str)> {
-        let accounts = self.accounts.as_ref()?;
-        accounts
-            .names
-            .iter()
-            .find(|(name, _)| name == account)
-            .map(|(_, provider)| (&accounts.store, provider.as_str()))
     }
 
     async fn prefs(&self, who: &Person) -> Result<Option<NudgePrefs>, ToolError> {
@@ -170,21 +145,6 @@ impl SettingsStores {
                     "not linked; the student pastes their Canvas Calendar Feed link in this chat and it is saved"
                 }
             );
-        }
-        if let Some(accounts) = &self.accounts {
-            for (name, provider) in &accounts.names {
-                let grant = accounts
-                    .store
-                    .load_grant(USER_SCOPE, &ctx.user_id, provider)
-                    .await
-                    .map_err(|e| failed(e, "read linked accounts"))?;
-                let state = if grant.is_some() {
-                    "linked"
-                } else {
-                    "not linked"
-                };
-                let _ = writeln!(out, "{name}: {state}.");
-            }
         }
         if out.is_empty() {
             out.push_str("This student has no settings to show.");
@@ -271,11 +231,7 @@ impl SettingsStores {
         Ok(format!("Saved. {}", self.summary(ctx).await?))
     }
 
-    async fn connect(
-        &self,
-        ctx: &RequestContext,
-        account: Option<&str>,
-    ) -> Result<String, ToolError> {
+    fn connect(&self, account: Option<&str>) -> Result<String, ToolError> {
         let account = account.unwrap_or_default().trim().to_ascii_lowercase();
         if account == "canvas" && self.canvas.is_some() {
             return Ok("Canvas links by its calendar feed. Ask the student to open Canvas, go to \
@@ -283,22 +239,10 @@ impl SettingsStores {
                        it here. It is saved the moment they send it, and you never see it."
                 .to_owned());
         }
-        let Some((store, provider)) = self.provider(&account) else {
-            return Err(ToolError::InvalidArguments(format!(
-                "account is one of: {}",
-                self.account_names().join(", ")
-            )));
-        };
-        match store.login_link(&ctx.user_id, provider).await {
-            Ok(Some(url)) => Ok(format!(
-                "Give the student this link to sign in and allow access: {url} \
-                 Once they finish, their {account} account is linked."
-            )),
-            Ok(None) => Err(ToolError::Failed(format!(
-                "{account} sign-in is not set up for Sparky"
-            ))),
-            Err(error) => Err(failed(error, "start the sign-in")),
-        }
+        Err(ToolError::InvalidArguments(format!(
+            "account is one of: {}",
+            self.account_names().join(", ")
+        )))
     }
 }
 
@@ -314,7 +258,7 @@ impl Tool for SettingsTool {
                 "Show or change the student's own Sparky settings, so they never have to open a \
                  settings page. Actions: show; quiet_hours with quiet_start and quiet_end, local \
                  hours 0 to 23, when check-ins stay silent; nudges_off or nudges_on with kinds; \
-                 connect with account ({}), which gives the steps or sign-in link to hand them. \
+                 connect with account ({}), which gives the steps to hand them. \
                  Examples: no check-ins after 10pm is quiet_hours 22 to 8; stop the morning \
                  brief is nudges_off with kinds brief.",
                 accounts.join(", ")
@@ -346,7 +290,7 @@ impl Tool for SettingsTool {
             "quiet_hours" => s.set_quiet(ctx, args.quiet_start, args.quiet_end).await?,
             "nudges_off" => s.switch(ctx, &args.kinds, false).await?,
             "nudges_on" => s.switch(ctx, &args.kinds, true).await?,
-            "connect" => s.connect(ctx, args.account.as_deref()).await?,
+            "connect" => s.connect(args.account.as_deref())?,
             other => {
                 return Err(ToolError::InvalidArguments(format!(
                     "{other} is not an action; use show, quiet_hours, nudges_off, nudges_on or connect"
@@ -385,26 +329,16 @@ impl Tool for DisconnectTool {
             .map(|a| a.trim().to_ascii_lowercase())
             .unwrap_or_default();
         let s = &self.stores;
-        let removed = if account == "canvas" {
-            let Some(feeds) = &s.canvas else {
-                return Err(ToolError::InvalidArguments("Canvas is not on".into()));
-            };
-            feeds
-                .delete(&ctx.user_id)
-                .await
-                .map_err(|e| failed(e, "unlink Canvas"))?
-        } else {
-            let Some((store, provider)) = s.provider(&account) else {
-                return Err(ToolError::InvalidArguments(format!(
-                    "account is one of: {}",
-                    s.account_names().join(", ")
-                )));
-            };
-            store
-                .delete_grant(USER_SCOPE, &ctx.user_id, provider)
-                .await
-                .map_err(|e| failed(e, "unlink the account"))?
+        let Some(feeds) = s.canvas.as_ref().filter(|_| account == "canvas") else {
+            return Err(ToolError::InvalidArguments(format!(
+                "account is one of: {}",
+                s.account_names().join(", ")
+            )));
         };
+        let removed = feeds
+            .delete(&ctx.user_id)
+            .await
+            .map_err(|e| failed(e, "unlink Canvas"))?;
         Ok(text(if removed {
             format!("Unlinked {account}.")
         } else {

@@ -170,7 +170,7 @@ impl WasmSandbox {
             .child(
                 &scratch,
                 "python3 -c 0 && grep -q . /dev/null; true",
-                Duration::from_secs(600),
+                Duration::from_mins(10),
             )
             .await;
         let _ = tokio::fs::remove_dir_all(&scratch).await;

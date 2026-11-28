@@ -6,7 +6,6 @@ mod commands;
 mod confirm;
 mod destination;
 mod feedback;
-mod login;
 pub(crate) mod memory;
 pub(crate) mod notify;
 mod respond;
@@ -294,8 +293,6 @@ impl EventHandler for Handler {
                 commands::RESET => self.reset(&ctx, &cmd).await,
                 commands::MEMORIES => self.memories(&ctx, &cmd).await,
                 commands::FORGET => self.forget(&ctx, &cmd).await,
-                commands::LOGIN => self.login(&ctx, &cmd).await,
-                commands::LOGOUT => self.logout(&ctx, &cmd).await,
                 commands::CANVAS => self.canvas(&ctx, &cmd).await,
                 other => tracing::warn!(command = other, "unknown command"),
             },

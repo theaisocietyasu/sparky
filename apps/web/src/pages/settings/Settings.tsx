@@ -16,7 +16,7 @@ const SECTIONS: { key: string; label: string; icon: LucideIcon; page: () => Reac
   { key: "appearance", label: "Appearance", icon: Palette, page: Appearance },
 ];
 
-/** /settings/:section: the student's profile, linked accounts, notifications, memories and theme. */
+/** /settings/:section: the student's profile, Canvas link, notifications, memories and theme. */
 const Settings = () => {
   const { section = "profile" } = useParams();
   const still = useReducedMotion() ?? false;

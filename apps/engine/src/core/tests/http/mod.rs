@@ -3,7 +3,6 @@
 mod admin;
 mod canvas;
 mod health;
-mod login;
 mod memories;
 mod notifications;
 mod rate_limit;

@@ -85,7 +85,7 @@ async fn a_held_action_is_listed_without_arguments_and_denied_once() {
     let pending = PendingAction {
         call_id: "c1".into(),
         action: ProposedAction {
-            tool: "gcal_create".into(),
+            tool: "disconnect".into(),
             risk: RiskClass::ExternalWrite,
             arguments: json!({"title": "secret plans"}),
             private: true,
@@ -101,7 +101,7 @@ async fn a_held_action_is_listed_without_arguments_and_denied_once() {
         unreachable!("the held actions read")
     };
     assert_eq!(held.len(), 1);
-    assert_eq!(held[0].tool, "gcal_create");
+    assert_eq!(held[0].tool, "disconnect");
     assert_eq!(held[0].user_id, caller().user_id);
     assert!(!format!("{held:?}").contains("secret plans"));
 

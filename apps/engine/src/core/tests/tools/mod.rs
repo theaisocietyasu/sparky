@@ -2,7 +2,6 @@
 
 mod calculate;
 mod canvas;
-mod gcal;
 mod integrations;
 mod mcp;
 mod memory;

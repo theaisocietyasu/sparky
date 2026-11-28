@@ -5,7 +5,6 @@ use std::time::Duration;
 
 use serde_json::json;
 
-use crate::core::tests::support::HostedLogins;
 use crate::core::traits::nudge::NudgeStore;
 use crate::core::traits::tools::Tool;
 use crate::core::traits::tools::canvas::CanvasFeeds;
@@ -13,7 +12,7 @@ use crate::core::types::agent::context::RequestContext;
 use crate::core::types::nudge::{NudgeKind, NudgePrefs, Person};
 use crate::core::types::tools::canvas::feed_in;
 use crate::core::types::tools::{RiskClass, ToolError};
-use crate::runtime::tools::settings::{self, Accounts, SettingsStores};
+use crate::runtime::tools::settings::{self, SettingsStores};
 use crate::stores::sqlite::{Seal, SqliteStore, StoreOptions};
 
 const LINK: &str = "https://canvas.asu.edu/feeds/calendars/user_AbC123.ics";
@@ -53,10 +52,6 @@ async fn stores() -> (SettingsStores, Arc<dyn NudgeStore>, Arc<dyn CanvasFeeds>)
             off: Vec::new(),
         }),
         canvas: Some(Arc::clone(&feeds)),
-        accounts: Some(Accounts {
-            store: Arc::new(HostedLogins),
-            names: Vec::new(),
-        }),
     };
     (stores, nudges, feeds)
 }

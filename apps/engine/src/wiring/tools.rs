@@ -13,7 +13,6 @@ use crate::core::traits::knowledge::discovery::Discovery;
 use crate::core::traits::knowledge::query::SourceQueries;
 use crate::core::traits::memory::MemoryStore;
 use crate::core::traits::nudge::NudgeStore;
-use crate::core::traits::oauth::OAuthStore;
 use crate::core::traits::reminder::ReminderStore;
 use crate::core::traits::tools::Tool;
 use crate::core::traits::tools::canvas::CanvasFeeds;
@@ -23,7 +22,7 @@ use crate::core::traits::trace::TraceSink;
 use crate::core::types::nudge::NudgePrefs;
 use crate::core::types::tools::sandbox::Limits as SandboxLimits;
 use crate::runtime::harness::tools::ToolSet;
-use crate::runtime::tools::account::{canvas, gcal};
+use crate::runtime::tools::account::canvas;
 use crate::runtime::tools::knowledge::search::Search;
 use crate::runtime::tools::mcp::{self, McpLimits};
 use crate::runtime::tools::memory::{self, MemoryRules, MemoryTasks};
@@ -32,7 +31,7 @@ use crate::runtime::tools::sandbox::{
     ContainerSandbox, SandboxTool, WasmLimits, WasmSandbox, Wording as SandboxWording,
     reap_sessions,
 };
-use crate::runtime::tools::settings::{self, Accounts, SettingsStores};
+use crate::runtime::tools::settings::{self, SettingsStores};
 use crate::runtime::tools::upcoming::{UpcomingTool, Window as UpcomingWindow};
 use crate::runtime::tools::{Built, calculate, chats, page, papers, wiki};
 
@@ -64,7 +63,6 @@ pub(crate) async fn build_tools(
     cfg: &Config,
     queries: Arc<dyn SourceQueries>,
     sandbox: Option<Arc<dyn Sandbox>>,
-    oauth_store: Arc<dyn OAuthStore>,
     personal: Personal,
 ) -> anyhow::Result<(ToolSet, Vec<String>, Vec<Arc<dyn UpcomingSource>>)> {
     let disabled = |name: &str| cfg.tools.disabled.iter().any(|d| d == name);
@@ -142,16 +140,11 @@ pub(crate) async fn build_tools(
     }
     let mut personal = personal;
     if cfg.settings.enabled {
-        let stores = settings_stores(
-            cfg,
-            &oauth_store,
-            personal.canvas.as_ref(),
-            personal.nudges.take(),
-        );
+        let stores = settings_stores(cfg, personal.canvas.as_ref(), personal.nudges.take());
         tools = register(tools, settings::tools(stores), &disabled, "settings");
     }
     let mut sources: Vec<Arc<dyn UpcomingSource>> = Vec::new();
-    for (integration, enabled, build) in integrations(cfg, &oauth_store, personal) {
+    for (integration, enabled, build) in integrations(cfg, personal) {
         if !enabled {
             continue;
         }
@@ -188,11 +181,7 @@ fn upcoming(
 }
 
 /// Every integration that adds tools, in registration order.
-fn integrations<'a>(
-    cfg: &'a Config,
-    oauth_store: &'a Arc<dyn OAuthStore>,
-    personal: Personal,
-) -> Vec<Integration<'a>> {
+fn integrations(cfg: &Config, personal: Personal) -> Vec<Integration<'_>> {
     let Personal {
         canvas: canvas_feeds,
         reminders,
@@ -201,8 +190,8 @@ fn integrations<'a>(
         pages,
         nudges: _,
     } = personal;
-    let mut all: Vec<Integration<'a>> = Vec::new();
-    all.extend::<[Integration<'a>; 9]>([
+    let mut all: Vec<Integration<'_>> = Vec::new();
+    all.extend::<[Integration<'_>; 8]>([
         (
             "memory",
             memory.is_some(),
@@ -232,14 +221,6 @@ fn integrations<'a>(
                     offset,
                 };
                 Ok(remind::tools(&store, rules))
-            }),
-        ),
-        (
-            "gcal",
-            cfg.gcal.enabled,
-            Box::new(move || {
-                gcal::tools(&cfg.gcal, oauth_store.clone(), cfg.prompt.utc_offset_hours)
-                    .map_err(|e| e.to_string())
             }),
         ),
         (
@@ -283,26 +264,16 @@ fn integrations<'a>(
     all
 }
 
-/// What the settings tools read and change: check-ins, the Canvas link, and accounts with a sign-in.
+/// What the settings tools read and change: check-ins and the Canvas link.
 fn settings_stores(
     cfg: &Config,
-    oauth_store: &Arc<dyn OAuthStore>,
     canvas: Option<&Arc<dyn CanvasFeeds>>,
     nudges: Option<(Arc<dyn NudgeStore>, NudgePrefs)>,
 ) -> SettingsStores {
-    let names = [("google", "google", cfg.gcal.enabled)]
-        .into_iter()
-        .filter(|(_, _, on)| *on)
-        .map(|(name, provider, _)| (name.to_owned(), provider.to_owned()))
-        .collect();
     SettingsStores {
         nudge_defaults: nudges.as_ref().map(|(_, defaults)| defaults.clone()),
         nudges: nudges.map(|(store, _)| store),
         canvas: canvas.filter(|_| cfg.canvas.enabled).cloned(),
-        accounts: Some(Accounts {
-            store: Arc::clone(oauth_store),
-            names,
-        }),
     }
 }
 

@@ -37,16 +37,6 @@ impl MemoryKind {
             _ => None,
         }
     }
-
-    /// The kind of a platform memory: episodic and semantic are facts, profile is a preference.
-    pub fn from_platform(s: &str) -> Option<Self> {
-        match s {
-            "episodic" | "semantic" | "fact" => Some(Self::Fact),
-            "profile" | "preference" => Some(Self::Preference),
-            "task" => Some(Self::Task),
-            _ => None,
-        }
-    }
 }
 
 /// A stored memory.

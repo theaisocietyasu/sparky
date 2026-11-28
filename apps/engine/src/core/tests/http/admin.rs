@@ -212,7 +212,7 @@ async fn a_moderator_sees_held_actions_and_denies_one() {
         held.push(HeldAction {
             token: "t1".into(),
             user_id: "222".into(),
-            tool: "gcal_create".into(),
+            tool: "disconnect".into(),
             created_at: "2026-11-04T00:00:00Z".into(),
             expires_at: "2026-11-04T00:10:00Z".into(),
         });
@@ -222,7 +222,7 @@ async fn a_moderator_sees_held_actions_and_denies_one() {
     assert_eq!(
         listed,
         json!([{
-            "token": "t1", "user_id": "222", "tool": "gcal_create",
+            "token": "t1", "user_id": "222", "tool": "disconnect",
             "created_at": "2026-11-04T00:00:00Z", "expires_at": "2026-11-04T00:10:00Z"
         }])
     );

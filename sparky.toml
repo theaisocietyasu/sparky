@@ -231,18 +231,9 @@ max_tool_description_chars = 160
 # tool_timeout_secs = 45
 # risks = { page_snapshot = "read_public" }   # per-tool class in place of the one derived from the name
 
-# Google Calendar, read-only, in a direct message only. Each caller reads their own calendar
-# through the Google account linked on the platform.
-[gcal]
-enabled = false
-base_url = "https://www.googleapis.com/calendar/v3"
-timeout_secs = 30
-max_items = 15
-
 # Canvas due dates and course events from each student's Calendar Feed link, read-only, in a
 # direct message only. /canvas link in Discord takes the link in a private form; it is kept sealed
-# with SPARKY_MEMORY__KEY. Nothing read from the feed is stored or traced. No grades. Needs
-# store.backend = "sqlite".
+# with SPARKY_MEMORY__KEY. Nothing read from the feed is stored or traced. No grades.
 [canvas]
 enabled = true
 hosts = ["canvas.asu.edu"]     # hosts a feed link may point at
@@ -293,7 +284,7 @@ max_instructions_chars = 20000
 history_limit = 50
 traces_limit = 100
 
-# upcoming lists the caller's remembered tasks, Canvas due dates, and Google Calendar events
+# upcoming lists the caller's remembered tasks, reminders and Canvas due dates
 # in one call, soonest first, in a direct message only. It reads the sources that are registered.
 [upcoming]
 enabled = true
@@ -302,7 +293,7 @@ max_days = 30
 max_items = 30
 
 # Reminders the student sets with remind. Each one becomes a notification when due: a bell on the
-# web and a direct message from the bot. Needs store.backend sqlite.
+# web and a direct message from the bot.
 [reminders]
 enabled = true
 tick_secs = 30                 # seconds between checks for due reminders
@@ -380,7 +371,7 @@ tips = [
   "Tip: tap Thread under any of my messages to dig into it without cluttering this chat.",
 ]
 
-# search_chats: full text search over the student's earlier private chats. Needs store.backend sqlite.
+# search_chats: full text search over the student's earlier private chats.
 [chat_search]
 enabled = true
 max_hits = 6                    # most messages one search returns
@@ -389,7 +380,7 @@ max_hits = 6                    # most messages one search returns
 [calculate]
 enabled = true
 
-# settings and disconnect: the student changes check-ins and linked accounts by asking in chat.
+# settings and disconnect: the student changes check-ins and the Canvas link by asking in chat.
 [settings]
 enabled = true
 
@@ -456,15 +447,11 @@ max_files = 4
 max_file_bytes = 2000000
 
 # ---------------------------------------------------------------- platform
-# Search and linked accounts come from the platform HTTP API. So do the Sun Devil Central clubs and events, and the ASU knowledge. With
-# store.backend = "platform", conversations, memories and confirmations do too. url and token
-# live in .env and are required.
+# Search comes from the platform HTTP API. So do the Sun Devil Central clubs and events, and the
+# ASU knowledge. url and token live in .env and are required.
 # The token needs these scopes:
-#   agents:read, agents:write   the export the import reads; store.backend platform
 #   knowledge:read              search and the source list on /admin/sources
 #   knowledge:discover          saving the pages read_page reads
-#   accounts:link               the /login link for a member
-#   accounts:token              the Google Calendar token of a member
 [platform]
 timeout_secs = 10              # one platform call; a search uses what is left of the request
 # Platform tools over MCP, with the same token. Set SPARKY_PLATFORM__MCP_URL (for example
@@ -481,18 +468,14 @@ mcp_skip = ["batch", "search", "modules."]
 
 # ---------------------------------------------------------------- local store
 # Conversations, memories and pending confirmations live in one SQLite file that only the engine
-# opens. SPARKY_MEMORY__KEY in .env seals sensitive memories. backend = "platform" keeps them on
-# the platform agents routes for one release, as the rollback.
+# opens. SPARKY_MEMORY__KEY in .env seals sensitive memories.
 [store]
-backend = "sqlite"
 path = ".sparky/sparky.db"
 max_connections = 4
 busy_timeout_ms = 5000
 backup_dir = ""                # empty turns backups off; a VACUUM INTO copy per run
 backup_every_hours = 24
 backups_kept = 7
-import_days = 30               # engine import-platform leaves out older conversations
-import_page_size = 100         # rows per page of the platform export, 1 to 500
 prune_every_hours = 24         # deletes expired tasks, settled confirmations and idle conversations
 conversation_idle_days = 0     # a conversation idle this many days is deleted; 0 keeps every one
 
@@ -500,7 +483,7 @@ conversation_idle_days = 0     # a conversation idle this many days is deleted; 
 # What Sparky remembers about a student, written by the remember tool in direct messages.
 # SPARKY_MEMORY__KEY in .env seals sensitive memories.
 [memory]
-tools = true                   # remember and forget_memory; need store.backend = "sqlite"
+tools = true                   # remember and forget_memory
 max_per_user = 50              # at the cap the oldest fact goes first
 max_chars = 200
 task_soon_days = 7             # a task due this soon is recalled first

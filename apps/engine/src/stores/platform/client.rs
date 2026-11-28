@@ -1,9 +1,7 @@
 //! The HTTP client every platform adapter shares, holding the machine token.
 
-use std::fmt::Write as _;
 use std::time::Duration;
 
-use chrono::{DateTime, NaiveDateTime, Utc};
 use reqwest::{Method, StatusCode};
 use secrecy::{ExposeSecret, SecretString};
 use serde::de::DeserializeOwned;
@@ -42,14 +40,12 @@ impl PlatformError {
     }
 }
 
-/// One request: method, path under the root, query pairs, JSON body, and its own budget.
+/// One request: method, path under the root, JSON body, and its own budget.
 pub(super) struct Call<'a> {
     /// HTTP method.
     pub method: Method,
     /// Path from the root, starting with a slash.
     pub path: &'a str,
-    /// Query pairs.
-    pub query: &'a [(&'a str, String)],
     /// JSON body.
     pub body: Option<&'a Value>,
     /// Budget for this call instead of the client default.
@@ -57,20 +53,14 @@ pub(super) struct Call<'a> {
 }
 
 impl<'a> Call<'a> {
-    /// A call with no query, body, or budget of its own.
+    /// A call with no body or budget of its own.
     pub fn new(method: Method, path: &'a str) -> Self {
         Self {
             method,
             path,
-            query: &[],
             body: None,
             timeout: None,
         }
-    }
-
-    /// Adds query pairs.
-    pub fn query(self, query: &'a [(&'a str, String)]) -> Self {
-        Self { query, ..self }
     }
 
     /// Adds a JSON body.
@@ -116,16 +106,6 @@ impl PlatformClient {
         })
     }
 
-    /// The agents path of one member, the Discord user id, followed by rest.
-    pub fn member(user: &str, rest: &str) -> String {
-        format!("/api/agents/members/{}{rest}", segment(user))
-    }
-
-    /// The accounts path of one member followed by rest.
-    pub(super) fn account(user: &str, rest: &str) -> String {
-        format!("/api/accounts/members/{}{rest}", segment(user))
-    }
-
     /// Whether the platform health route answers 2xx.
     pub async fn ready(&self) -> bool {
         let mut url = self.root.clone();
@@ -143,9 +123,6 @@ impl PlatformClient {
     async fn send(&self, call: &Call<'_>) -> Result<(StatusCode, Value), PlatformError> {
         let mut url = self.root.clone();
         url.set_path(call.path);
-        if !call.query.is_empty() {
-            url.query_pairs_mut().extend_pairs(call.query);
-        }
         let budget = call.timeout.unwrap_or(self.timeout);
         let mut request = self
             .http
@@ -193,20 +170,6 @@ impl PlatformClient {
     }
 }
 
-/// Percent-encodes one path segment.
-pub(super) fn segment(value: &str) -> String {
-    let mut out = String::with_capacity(value.len());
-    for byte in value.bytes() {
-        if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~') {
-            out.push(char::from(byte));
-        } else {
-            // Writing to a String cannot fail.
-            let _ = write!(out, "%{byte:02X}");
-        }
-    }
-    out
-}
-
 /// Reads a field, failing when it is missing or of another type.
 pub(super) fn field<T: DeserializeOwned>(value: &Value, name: &str) -> Result<T, PlatformError> {
     let found = value
@@ -214,33 +177,4 @@ pub(super) fn field<T: DeserializeOwned>(value: &Value, name: &str) -> Result<T,
         .cloned()
         .ok_or_else(|| PlatformError::Body(format!("{name} is missing")))?;
     serde_json::from_value(found).map_err(|e| PlatformError::Body(format!("{name}: {e}")))
-}
-
-/// A platform timestamp field: ISO 8601, read as UTC when it carries no offset.
-pub(super) fn timestamp(value: &Value, name: &str) -> Result<DateTime<Utc>, PlatformError> {
-    let text: String = field(value, name)?;
-    parse_time(&text).ok_or_else(|| PlatformError::Body(format!("{name} is not a timestamp")))
-}
-
-/// An optional platform timestamp field.
-pub(super) fn optional_timestamp(
-    value: &Value,
-    name: &str,
-) -> Result<Option<DateTime<Utc>>, PlatformError> {
-    match value.get(name) {
-        None | Some(Value::Null) => Ok(None),
-        Some(_) => timestamp(value, name).map(Some),
-    }
-}
-
-/// Parses ISO 8601; a time without an offset is UTC.
-pub(super) fn parse_time(text: &str) -> Option<DateTime<Utc>> {
-    DateTime::parse_from_rfc3339(text)
-        .map(|t| t.with_timezone(&Utc))
-        .ok()
-        .or_else(|| {
-            NaiveDateTime::parse_from_str(text, "%Y-%m-%dT%H:%M:%S%.f")
-                .ok()
-                .map(|t| t.and_utc())
-        })
 }

@@ -347,7 +347,7 @@ describe("web chat", () => {
   });
 
   it("asks before a held action and sends the answer to /confirm", async () => {
-    const held = { token: "t1", tool: "gcal_create", summary: "Add Study group to your calendar" };
+    const held = { token: "t1", tool: "disconnect", summary: "Unlink your Canvas calendar" };
     const calls = engine({
       "/web/me": () => Response.json(ME),
       "/chat/stream": () => sse([["answer", answer({ text: "Shall I?", confirmation: held, citations: [] })]]),

@@ -9,7 +9,6 @@ use crate::core::traits::conversation::ConversationStore;
 use crate::core::traits::identity::DiscordIdentity;
 use crate::core::traits::memory::MemoryStore;
 use crate::core::traits::nudge::NudgeStore;
-use crate::core::traits::oauth::OAuthStore;
 use crate::core::traits::reminder::ReminderStore;
 use crate::core::traits::safety::confirmation::ConfirmationStore;
 use crate::core::traits::tools::canvas::CanvasFeeds;
@@ -24,7 +23,6 @@ use crate::routes::health::HealthState;
 use crate::routes::home::HomeRules;
 use crate::routes::memories::MemoryState;
 use crate::routes::notifications::NotificationState;
-use crate::routes::oauth::OAuthState;
 use crate::routes::rate_limit::RateLimiter;
 use crate::routes::session::WebAuth;
 use crate::routes::web::WebState;
@@ -216,25 +214,6 @@ pub(super) fn sandbox_state(
     }
 }
 
-/// The state the account link routes read: the grant store and the providers whose tool is on.
-pub(super) fn oauth_state(
-    cfg: &Config,
-    store: Arc<dyn OAuthStore>,
-    web: Option<WebAuth>,
-) -> OAuthState {
-    let providers = [("google", cfg.gcal.enabled)]
-        .into_iter()
-        .filter(|(_, on)| *on)
-        .map(|(name, _)| name.to_owned())
-        .collect();
-    OAuthState {
-        store,
-        service_token: cfg.engine.service_token.clone(),
-        web,
-        providers,
-    }
-}
-
 /// The state the Canvas feed link routes read: the link store when Canvas is on.
 pub(super) fn canvas_state(
     cfg: &Config,
@@ -312,7 +291,6 @@ pub(super) fn http_router(
         health,
         memories,
         sandbox: sandbox_state(cfg, sandbox),
-        oauth: oauth_state(cfg, stores.oauth_store, web.clone()),
         canvas: canvas_state(cfg, stores.canvas, web.clone()),
         notifications: notification_state(cfg, stores.reminders, stores.nudges, web.clone()),
         web: web_state(cfg, web)?,

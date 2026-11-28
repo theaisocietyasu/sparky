@@ -7,7 +7,7 @@ use figment::providers::{Format, Toml};
 use serde_json::Value;
 
 use crate::core::config::Config;
-use crate::core::tests::support::{FakeQueries, HostedLogins};
+use crate::core::tests::support::{FakeQueries, MemorySink, Recalling};
 use crate::core::types::knowledge::query::QuerySourceInfo;
 use crate::core::types::tools::ToolDefinition;
 use crate::wiring::tools::{Personal, build_tools};
@@ -52,12 +52,16 @@ fn registry(keys: &[&str]) -> Vec<QuerySourceInfo> {
 
 /// Every tool definition the engine registers for cfg over a registry of keys.
 async fn registered(cfg: &Config, keys: &[&str]) -> Vec<ToolDefinition> {
+    registered_with(cfg, keys, Personal::default()).await
+}
+
+/// Every tool definition the engine registers for cfg over a registry of keys and personal stores.
+async fn registered_with(cfg: &Config, keys: &[&str], personal: Personal) -> Vec<ToolDefinition> {
     let built = build_tools(
         cfg,
         Arc::new(FakeQueries::new(registry(keys))),
         None,
-        Arc::new(HostedLogins),
-        Personal::default(),
+        personal,
     )
     .await;
     match built {
@@ -100,25 +104,32 @@ async fn upcoming_is_registered_only_with_a_source_and_follows_its_switch() {
         |defs: Vec<ToolDefinition>| -> Vec<String> { defs.into_iter().map(|d| d.name).collect() };
     let none = names(registered(&config(), &["events"]).await);
     assert!(!none.iter().any(|n| n == "upcoming"), "{none:?}");
-    let with_gcal = |extra: &str| -> Config {
+    let with = |extra: &str| -> Config {
         match Figment::new()
-            .merge(Toml::string(&format!(
-                "{BASE}[gcal]\nenabled = true\n{extra}"
-            )))
+            .merge(Toml::string(&format!("{BASE}{extra}")))
             .extract()
         {
             Ok(cfg) => cfg,
             Err(e) => unreachable!("the test config parses: {e}"),
         }
     };
-    let on = names(registered(&with_gcal(""), &["events"]).await);
+    let tasks = || Personal {
+        memory: Some((
+            Arc::new(Recalling::default()),
+            Arc::new(MemorySink::default()),
+        )),
+        ..Personal::default()
+    };
+    let on = names(registered_with(&with(""), &["events"], tasks()).await);
     assert!(on.iter().any(|n| n == "upcoming"), "{on:?}");
-    let off = names(registered(&with_gcal("[upcoming]\nenabled = false\n"), &["events"]).await);
+    let off =
+        names(registered_with(&with("[upcoming]\nenabled = false\n"), &["events"], tasks()).await);
     assert!(!off.iter().any(|n| n == "upcoming"), "{off:?}");
     let source_off = names(
-        registered(
-            &with_gcal("[tools]\ndisabled = [\"google_calendar\"]\n"),
+        registered_with(
+            &with("[tools]\ndisabled = [\"remember\"]\n"),
             &["events"],
+            tasks(),
         )
         .await,
     );

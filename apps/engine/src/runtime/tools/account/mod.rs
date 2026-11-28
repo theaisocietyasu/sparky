@@ -1,5 +1,3 @@
-//! Per-user integrations: tools over the caller's own accounts, the OAuth grants and the Canvas feed links they read.
+//! Per-user integrations: tools over the caller's own Canvas feed link.
 
 pub mod canvas;
-pub mod gcal;
-pub mod grant;

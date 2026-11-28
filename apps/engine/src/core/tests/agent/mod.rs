@@ -259,8 +259,8 @@ async fn a_slow_tool_leaves_time_to_answer() {
         ]),
         tools,
         AgentConfig {
-            tool_timeout: Duration::from_secs(60),
-            answer_reserve: Duration::from_secs(60),
+            tool_timeout: Duration::from_mins(1),
+            answer_reserve: Duration::from_mins(1),
             ..AgentConfig::default()
         },
     );

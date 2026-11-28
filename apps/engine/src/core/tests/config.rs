@@ -400,24 +400,6 @@ fn sandbox_egress_names_its_network_and_proxy() {
 }
 
 #[test]
-fn the_committed_google_calendar_tool_is_off() {
-    let file = concat!(env!("CARGO_MANIFEST_DIR"), "/../../sparky.toml");
-    let cfg: Result<Config, String> = {
-        use figment::providers::{Format, Toml};
-        figment::Figment::new()
-            .merge(Toml::string(SECRETS))
-            .merge(Toml::file(file))
-            .extract()
-            .map_err(|e| e.to_string())
-    };
-    let Ok(cfg) = cfg else {
-        unreachable!("sparky.toml loads")
-    };
-    assert!(!cfg.gcal.enabled);
-    assert!(!cfg.mcp.servers.iter().any(|s| s.name == "google_calendar"));
-}
-
-#[test]
 fn a_risk_pinned_outside_the_exposed_tools_is_rejected() {
     let e = err("[[mcp.servers]]\nname = \"c\"\nurl = \"http://one/mcp\"\n\
                  tools = [\"list_events\"]\n\
@@ -443,10 +425,8 @@ fn platform_tools_need_an_http_mcp_url() {
 #[test]
 fn the_store_defaults_to_the_sqlite_file_with_backups_off() {
     let cfg = ok("");
-    assert_eq!(cfg.store.backend, crate::core::config::StoreBackend::Sqlite);
     assert_eq!(cfg.store.path, ".sparky/sparky.db");
     assert_eq!(cfg.store.backup_dir, "");
-    assert_eq!(cfg.store.import_days, 30);
 }
 
 #[test]
@@ -460,16 +440,11 @@ fn a_store_that_cannot_open_or_back_up_is_rejected() {
 }
 
 #[test]
-fn the_memory_key_must_be_32_bytes_of_base64_unless_the_store_is_the_platform() {
+fn the_memory_key_must_be_32_bytes_of_base64() {
     let e = err("[memory]\nkey = \"not base64!\"\n");
     assert!(e.contains("SPARKY_MEMORY__KEY"), "{e}");
     let e = err("[memory]\nkey = \"AAAA\"\n");
     assert!(e.contains("32 bytes"), "{e}");
-    let cfg = ok("[store]\nbackend = \"platform\"\n[memory]\nkey = \"AAAA\"\n");
-    assert_eq!(
-        cfg.store.backend,
-        crate::core::config::StoreBackend::Platform
-    );
 }
 
 #[test]

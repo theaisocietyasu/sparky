@@ -186,17 +186,4 @@ async fn migration_two_maps_the_old_kinds() {
     let sql: String = row.try_get("sql").unwrap_or_default();
     assert!(sql.contains("'fact'") && sql.contains("'preference'") && sql.contains("'task'"));
     assert!(!sql.contains("confidence"));
-    assert_eq!(
-        MemoryKind::from_platform("episodic"),
-        Some(MemoryKind::Fact)
-    );
-    assert_eq!(
-        MemoryKind::from_platform("semantic"),
-        Some(MemoryKind::Fact)
-    );
-    assert_eq!(
-        MemoryKind::from_platform("profile"),
-        Some(MemoryKind::Preference)
-    );
-    assert_eq!(MemoryKind::from_platform("task"), Some(MemoryKind::Task));
 }

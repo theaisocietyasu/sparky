@@ -23,7 +23,7 @@ just prod-logs engine
 
 ## RunPod
 
-`deploy/docker/runpod.Dockerfile` builds `ghcr.io/theaisocietyasu/sparkyai-runpod`: all of Sparky in one GPU pod. A RunPod pod cannot start containers, so supervisord (`deploy/runpod/supervisord.conf`) runs chat and embed `llama-server`, the engine, and the bot as processes. Knowledge search, live queries and linked accounts live on Platform; conversations, memories and confirmations are in the engine SQLite file on the volume. It differs from compose in two ways:
+`deploy/docker/runpod.Dockerfile` builds `ghcr.io/theaisocietyasu/sparkyai-runpod`: all of Sparky in one GPU pod. A RunPod pod cannot start containers, so supervisord (`deploy/runpod/supervisord.conf`) runs chat and embed `llama-server`, the engine, and the bot as processes. Knowledge search and live queries live on Platform; conversations, memories and confirmations are in the engine SQLite file on the volume. It differs from compose in two ways:
 
 - `run_sandbox` runs as WebAssembly inside the engine (`SPARKY_SANDBOX__RUNTIME=wasm`, no network). The image carries the packages in `deploy/wasm/packages.txt`; compiled modules and student folders live in `/workspace/sandbox`. See [The sandbox](#the-sandbox).
 - Phoenix runs only with `SPARKY_RUN_PHOENIX=true`. Expose `6006/http` too. It signs in with `admin@localhost` and `admin` and asks for a new password at once, so sign in right after the first start. Its database and keys are in `/workspace/phoenix`, traces are kept `SPARKY_PHOENIX_RETENTION_DAYS` days (30), and the engine and the bot export to it with its admin key. The admin trace list links each request to its page there.
@@ -99,8 +99,6 @@ The engine keeps conversations, memories and pending confirmations in one SQLite
 | Backups | `/data/backups` | `$SPARKY_DATA_DIR/sparky/backups` |
 
 To restore: stop the engine, copy a backup over the file (remove `sparky.db-wal` and `sparky.db-shm` beside it), and start the engine.
-
-To move from Platform once: set `SPARKY_STORE__BACKEND=platform`, deploy, run `engine import-platform` (`just import-platform`) on the host, check the counts it logs, then remove `SPARKY_STORE__BACKEND` and restart. A second run is refused unless `--again` is passed. Turns written between the import and the restart stay on Platform. The token needs `agents:read` and Platform needs the `/api/agents/export/*` routes.
 
 ### Troubleshooting
 

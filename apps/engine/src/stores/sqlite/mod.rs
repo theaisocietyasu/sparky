@@ -9,7 +9,6 @@ mod confirmation;
 mod conversation;
 mod health;
 mod home;
-mod import;
 mod memory;
 mod nudge;
 mod prune;
@@ -34,9 +33,6 @@ pub use canvas::SqliteCanvasFeeds;
 pub use confirmation::SqliteConfirmations;
 pub use conversation::SqliteConversations;
 pub use health::SqliteProbe;
-#[cfg(test)]
-pub use import::ImportError;
-pub use import::{ImportCounts, Importer};
 pub use memory::{MemoryLimits, SqliteMemory};
 pub use nudge::SqliteNudges;
 pub use prune::{PrunePlan, run_prunes};

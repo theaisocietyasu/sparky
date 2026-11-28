@@ -2,7 +2,7 @@
 
 use serde::Deserialize;
 
-/// Canvas due dates and events from each student's calendar feed link. Off with store.backend platform.
+/// Canvas due dates and events from each student's calendar feed link.
 #[derive(Debug, Deserialize)]
 #[serde(default)]
 pub struct Canvas {
@@ -79,7 +79,7 @@ impl Default for Upcoming {
 #[derive(Debug, Deserialize)]
 #[serde(default)]
 pub struct Reminders {
-    /// Whether the remind tools, the notification routes and the reminder loop are on. Needs store.backend sqlite.
+    /// Whether the remind tools, the notification routes and the reminder loop are on..
     pub enabled: bool,
     /// Seconds between checks for due reminders.
     pub tick_secs: u64,
@@ -105,31 +105,6 @@ impl Default for Reminders {
             max_days_ahead: 365,
             keep_days: 30,
             list_limit: 50,
-        }
-    }
-}
-
-/// Google Calendar read-only tool. Off by default; reads the caller's Google account linked on the platform.
-#[derive(Debug, Deserialize)]
-#[serde(default)]
-pub struct Gcal {
-    /// Whether the Google Calendar tool is registered at boot.
-    pub enabled: bool,
-    /// Base URL of the Google Calendar API, no trailing path.
-    pub base_url: String,
-    /// Budget for one request.
-    pub timeout_secs: u64,
-    /// Most events one call returns to the model.
-    pub max_items: usize,
-}
-
-impl Default for Gcal {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            base_url: "https://www.googleapis.com/calendar/v3".into(),
-            timeout_secs: 30,
-            max_items: 15,
         }
     }
 }
@@ -347,7 +322,7 @@ pub const CALENDAR_PROMPT: &str = "Background check, not a question from the stu
 /// Default instruction for the late study check.
 pub const STUDY_PROMPT: &str = "Background check, not a question from the student. They have {item} due {due}. Check ASU library hours tonight and the study rooms. If the main libraries near their campus close before midnight tonight, write a short friendly message, two sentences at most, naming a place that stays open later and its hours, with a link. If they are open late anyway, or you cannot tell, answer exactly {nothing}.";
 
-/// Searching the student's earlier private chats. Needs store.backend sqlite.
+/// Searching the student's earlier private chats.
 #[derive(Debug, Deserialize)]
 #[serde(default)]
 pub struct ChatSearch {
@@ -380,7 +355,7 @@ impl Default for Calculate {
     }
 }
 
-/// The settings tools: the student changes check-ins and linked accounts by asking in chat.
+/// The settings tools: the student changes check-ins and the Canvas link by asking in chat.
 #[derive(Debug, Deserialize)]
 #[serde(default)]
 pub struct Settings {

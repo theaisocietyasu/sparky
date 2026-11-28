@@ -24,7 +24,7 @@ async fn a_backup_writes_a_copy_and_keeps_only_the_newest() {
     }
     let plan = BackupPlan {
         dir: dir.clone(),
-        every: Duration::from_secs(3600),
+        every: Duration::from_hours(1),
         kept: 2,
     };
     let Ok(copy) = backup_once(store.pool(), &plan).await else {
